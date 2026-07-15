@@ -1,0 +1,8 @@
+{
+  "_note": "GET userstats.php — the rage/exp/level refresh source. VERIFIED 2026-07-15.",
+  "_format": "clean JSON; numbers are comma-formatted strings; 'width' is exp-bar pixel width",
+  "exp": "80,906",
+  "rage": "2,000",
+  "level": "19",
+  "width": -300
+}
