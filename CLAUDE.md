@@ -1,3 +1,76 @@
+# cdca-api — Outwar Automation Backend
+
+This Laravel 13 API automates gameplay for the browser MMORPG **Outwar**
+(`sigil.outwar.com` / `torax.outwar.com`). Automation is explicitly permitted
+by the game's developers. The API owns all game-server communication, the
+world/mob/quest/skill databases, the per-character automation engine, and
+scheduling; Angular + mobile clients consume it later.
+
+## READ THIS FIRST — the knowledge base (in the parent repo)
+
+Everything about how the game works was reverse-engineered via live capture and
+is documented in the parent directory. **Read these before writing game code:**
+
+- `/Users/armingerina/Code/cdca/docs/game-api/README.md` — index + the
+  `[LEGACY]`/`[VERIFIED]`/`[CHANGED]` status convention.
+- `.../docs/game-api/auth-session.md` — RGA login, cookies, **multi-character
+  switching** (one login drives many characters via `ow_userid`/`ow_serverid`).
+- `.../docs/game-api/world-pathfinding.md` — room graph, movement, the
+  **corrected spider algorithm** (BFS-to-frontier), zones-as-labels.
+- `.../docs/game-api/combat.md` — PvE attack (encid, single-use), drops, **PvP**.
+- `.../docs/game-api/quests.md` — multi-quest/multi-step, kill/collect/talk
+  objectives.
+- `.../docs/game-api/skills.md` — schools, cast/train, full 43-skill catalog.
+- `.../docs/game-api/parsing.md`, `endpoints.md` — response parsing + endpoint
+  table. Fixtures in `.../docs/game-api/samples/`.
+- `.../docs/reference-attacker.md` — feature spec of the mature bot we're
+  matching (attack modes, rage/skill/scheduling options).
+
+## Seed data → import into the DB
+
+`/Users/armingerina/Code/cdca/data/xowh-seed/` (JSON, current, cross-checked
+478/480 exits vs live): **Rooms** (41,055 `{Id,AreaId,Name,N/W/E/S}`),
+**Mobs** (4,268 `{Name,Id,Level,Rooms[],flags}`), **Areas** (462), **Quests**
+(2,399), **QuestItems** (3,146 `{Name,Mobs[]}` = collect-item→source-mob), plus
+enhancements/sets/cauldron/junk. See its `README.md`. Import, then let the live
+spider verify-and-extend. (`data/legacy/` = older 2011 data, reference only.)
+
+## Verified endpoints cheat-sheet (all HTTPS, host = the server subdomain)
+
+- **Login**: `POST www.outwar.com/index.php` `serverid&login_username&login_password&submitit` → 302 `/world?suid=&serverid=`. Cookies: `rg_sess_id`,`token`,`cuserid2` (RGA) + `ow_userid`,`ow_serverid` (active char). One RGA login works across both servers.
+- **Switch char**: `GET /world?suid={char}&serverid={srv}` (sets `ow_*` cookies). Concurrency = one cookie jar per character sharing RGA cookies.
+- **Move / room**: `GET ajax_changeroomb.php?room={target}&lastroom={cur}` → JSON `{name,curRoom,north/south/east/west, roomDetailsNew[], ...}`. Move by absolute room id (neighbor only).
+- **Attack mob (PvE)**: `GET somethingelse.php?attackid={encid}&r=world` → 302 `/attack/{battleId}/`. `encid` from room JSON, **single-use per room load** → loop: load room→read encid→attack→reload.
+- **Attack player (PvP)**: search `POST playersearch.php` → scout `GET profile.php?id=` → `POST somethingelse.php?attackid={playerId}&r=` `message&rage(2-50)&hash` → 302 `/plrattack/{id}/`.
+- **Battle result**: parse JS vars `attacker_result`("Win!")/`battle_result`; drops in `div#found_items` "Found {item}".
+- **Quests**: NPC popup `mob.php?id=&h=` lists quests → steps via `mob_talk.php?id=&stepid=&userspawn=[&questid=]`, complete with `&finish=1`. Objectives: kill (`n/m killed`), collect (`item: n/m`, farm drops), talk. `world_questHelper.php` = live progress.
+- **Skills**: cast `POST cast_skills.php` `castskillid={id}&cast=Cast Skill`; list `cast_skills.php?C={4 Fero,5 Pres,6 Affl,7 Misc}`; detail `skills_info.php?id=`. Schools mutually exclusive (Class always trainable). Circumspect=3008, Street Smarts=25, Circle of Protection=14.
+- **Stats refresh**: `userstats.php` (post-action). Never trust stale rage/exp.
+
+## Suggested build order
+
+1. Migrations/models: `Rga` (holds session cookies) → `Character`; world
+   `Area`/`Room` (adjacency); `Mob` (+ mob_room); `Quest`/`QuestItem`; `Skill`.
+2. Seeder importing `data/xowh-seed/`.
+3. Game HTTP client: per-character cookie jar (RGA cookies + `ow_*`), throttled,
+   session-collision (`Rampid Gaming Login`) detection.
+4. World service: BFS pathfinding + spider (see world-pathfinding.md).
+5. Run engine: per-character state machine, Quest mode first, then Mob & PvP.
+
+## Guardrails
+
+- Never store credentials in plaintext (the xOWH bot did — we encrypt). Never
+  commit creds/session tokens; sanitize any captured response used as a fixture.
+- Every HTML/JSON parser gets a fixture test against a sample in
+  `docs/game-api/samples/`.
+- Treat `[LEGACY]` facts as unverified; prefer `[VERIFIED]` ones.
+
+> Note: this project's context lives in the files above, not in any prior
+> Claude session's memory — a fresh session won't recall the capture work, so
+> rely on these docs.
+
+---
+
 <laravel-boost-guidelines>
 === foundation rules ===
 
