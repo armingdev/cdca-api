@@ -11,6 +11,7 @@ use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Sleep;
 use Throwable;
 
 /**
@@ -119,7 +120,7 @@ class GameClient
             $elapsedMs = (microtime(true) - (float) $last) * 1000;
 
             if ($elapsedMs < $gapMs) {
-                usleep((int) (($gapMs - $elapsedMs) * 1000));
+                Sleep::usleep((int) (($gapMs - $elapsedMs) * 1000));
             }
         }
 

@@ -1,0 +1,13 @@
+{
+  "_note": "PvE battle-result classification. VERIFIED 2026-07-15 (2 wins + 1 loss captured).",
+  "win": {
+    "battle_result": "AzRaa gained 0 strength<br>AzRaa has gained 676 experience!<br>AzRaa gained 77 gold!",
+    "marker": "contains 'has gained {N} experience!' (+ optional stat/gold/drop)"
+  },
+  "loss": {
+    "battle_result": "Grand Sole Protector has weakened LinuXX_2 by 2",
+    "marker": "contains '{defenderName} has weakened {yourName} by {N}' AND no 'gained ... experience'"
+  },
+  "classification_rule": "Prefer battle_result TEXT: win iff it contains 'has gained {N} experience!'; loss iff '{mob} has weakened {you}' with no exp gain. NOTE: on a re-fetched (persisted) /attack/{id}/ page, the JS var attacker_result can read 'Win!' even for a loss — do NOT rely on attacker_result alone off a persisted page; battle_result text is authoritative.",
+  "drop_on_win": "div#found_items 'WIN: Found {item}' (empty = no drop)"
+}
