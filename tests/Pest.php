@@ -44,7 +44,11 @@ expect()->extend('toBeOne', function () {
 |
 */
 
-function something()
+/**
+ * Load a captured game-response fixture (sanitized copies of
+ * docs/game-api/samples/).
+ */
+function gameFixture(string $name): string
 {
-    // ..
+    return file_get_contents(__DIR__.'/Fixtures/game/'.$name);
 }
