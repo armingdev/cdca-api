@@ -14,8 +14,14 @@ class RoomBlobParser
     {
         $data = json_decode($body, true);
 
-        if (! is_array($data) || ! array_key_exists('curRoom', $data)) {
-            throw new ParseException('Room blob is not valid JSON or is missing curRoom: '.substr($body, 0, 200));
+        if (! is_array($data)) {
+            throw new ParseException('Room blob is not valid JSON: '.substr($body, 0, 200));
+        }
+
+        $error = (string) ($data['error'] ?? '');
+
+        if (! array_key_exists('curRoom', $data) && $error === '') {
+            throw new ParseException('Room blob is missing curRoom and carries no error: '.substr($body, 0, 200));
         }
 
         $exits = [];
@@ -34,12 +40,12 @@ class RoomBlobParser
         );
 
         return new RoomBlob(
-            curRoom: (int) $data['curRoom'],
+            curRoom: (int) ($data['curRoom'] ?? 0),
             name: (string) ($data['name'] ?? ''),
             exits: $exits,
             mobs: array_values($mobs),
             doors: is_array($data['doorsData'] ?? null) ? $data['doorsData'] : null,
-            error: (string) ($data['error'] ?? ''),
+            error: $error,
         );
     }
 }

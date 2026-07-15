@@ -58,7 +58,8 @@ class LoginService
     {
         $cookies = [];
 
-        foreach ($response->headers()['Set-Cookie'] ?? [] as $header) {
+        // Case-insensitive lookup — HTTP/2 lowercases header names (set-cookie).
+        foreach ($response->toPsrResponse()->getHeader('Set-Cookie') as $header) {
             $pair = explode('=', explode(';', $header, 2)[0], 2);
 
             if (count($pair) !== 2) {
