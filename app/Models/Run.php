@@ -17,6 +17,8 @@ class Run extends Model
     protected $fillable = [
         'mode',
         'config',
+        'cast_on_start',
+        'require_circumspect',
         'status',
         'restart_every_minutes',
         'start_at',
@@ -32,6 +34,8 @@ class Run extends Model
             'mode' => RunMode::class,
             'status' => RunStatus::class,
             'config' => 'array',
+            'cast_on_start' => 'boolean',
+            'require_circumspect' => 'boolean',
             'restart_every_minutes' => 'integer',
             'start_at' => 'datetime',
             'last_started_at' => 'datetime',

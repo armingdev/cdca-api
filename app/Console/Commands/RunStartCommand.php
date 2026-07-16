@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Game\Engine\MobRunConfig;
+use App\Game\Engine\PvpRunConfig;
 use App\Game\Engine\QuestListRunConfig;
 use App\Game\Engine\QuestRunConfig;
 use App\Game\Engine\RunDispatcher;
@@ -19,14 +20,20 @@ use Illuminate\Support\Collection;
 
 #[Signature('outwar:run-start
     {--characters=* : Character ids or names to run}
-    {--mode=mob : Run mode: mob, quest, or quest-list}
+    {--mode=mob : Run mode: mob, quest, quest-list, or pvp}
     {--mob=* : (mob mode) Exact mob name(s) to farm}
     {--npc= : (quest mode) Exact quest-giver mob name}
     {--quest= : (quest mode) Quest id to run}
     {--list= : (quest-list mode) Quest list name}
+    {--target=* : (pvp mode) Player name(s) to attack}
+    {--attack-rage=50 : (pvp mode) PvP power per attack (2-50)}
+    {--attacks=1 : (pvp mode) Attacks per target}
+    {--message= : (pvp mode) Optional attack message}
     {--stop-rage=2500 : Per-character rage floor}
     {--max-kills=0 : (mob mode) Stop each character after this many wins (0 = unlimited)}
     {--level-up : Level up (refills rage) instead of stopping when rage is low}
+    {--cast-on-start : Cast the character\'s selected skills before the run begins}
+    {--require-circ : Only run while Circumspect is active (cast it if possible, else gate off)}
     {--restart-every= : Re-dispatch the run every N minutes after it finishes}
     {--start-at= : Delay the first start until this time (e.g. "22:57")}')]
 #[Description('Start a mob or quest run for the selected characters (one queued worker each)')]
@@ -65,6 +72,8 @@ class RunStartCommand extends Command
         $run = Run::create([
             'mode' => $mode,
             'config' => $config,
+            'cast_on_start' => (bool) $this->option('cast-on-start'),
+            'require_circumspect' => (bool) $this->option('require-circ'),
             'status' => RunStatus::Running,
             'restart_every_minutes' => $this->option('restart-every') !== null ? (int) $this->option('restart-every') : null,
             'start_at' => $startAt,
@@ -98,7 +107,30 @@ class RunStartCommand extends Command
             RunMode::Mob => $this->buildMobConfig(),
             RunMode::Quest => $this->buildQuestConfig(),
             RunMode::QuestList => $this->buildQuestListConfig(),
+            RunMode::Pvp => $this->buildPvpConfig(),
         };
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function buildPvpConfig(): ?array
+    {
+        $targets = array_values((array) $this->option('target'));
+
+        if ($targets === []) {
+            $this->error('PvP mode needs at least one --target="PlayerName".');
+
+            return null;
+        }
+
+        return (new PvpRunConfig(
+            targets: $targets,
+            attackRage: (int) $this->option('attack-rage'),
+            attacksPerTarget: (int) $this->option('attacks'),
+            stopRage: (int) $this->option('stop-rage'),
+            message: (string) ($this->option('message') ?? ''),
+        ))->toArray();
     }
 
     /**

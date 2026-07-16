@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Game\Auth\LoginService;
 use App\Game\Enums\BattleOutcome;
 use App\Game\Enums\RunStatus;
+use App\Game\Skills\SkillCaster;
 use App\Models\BattleEvent;
 use App\Models\Character;
 use App\Models\RunParticipant;
@@ -53,16 +54,27 @@ abstract class RunJob implements ShouldQueue
 
         $participant->update(['status' => RunStatus::Running, 'started_at' => now()]);
         $character = $participant->character;
+        $log = fn (string $message) => $participant->update(['last_activity' => Str::limit($message, 250)]);
 
         try {
             if (! $character->rga->hasSession()) {
                 $loginService->login($character->rga);
             }
 
+            if (! $this->applySkillOptions($character, $participant, $log)) {
+                $participant->update([
+                    'status' => RunStatus::Stopped,
+                    'last_activity' => 'Circumspect not active — run gated.',
+                    'finished_at' => now(),
+                ]);
+
+                return;
+            }
+
             [$status, $reason] = $this->runEngine(
                 $character,
                 $participant,
-                log: fn (string $message) => $participant->update(['last_activity' => Str::limit($message, 250)]),
+                log: $log,
                 shouldStop: fn (): bool => $participant->stopRequested(),
                 onBattle: function (BattleEvent $event) use ($participant): void {
                     match ($event->outcome) {
@@ -89,6 +101,34 @@ abstract class RunJob implements ShouldQueue
         } finally {
             $participant->run->refreshStatus();
         }
+    }
+
+    /**
+     * Cast-on-start and Circumspect gating — cross-cutting, run-level, applied
+     * before any mode engine. Returns false only when the run requires
+     * Circumspect and it could not be made active (the run is gated off).
+     *
+     * @param  Closure(string): void  $log
+     */
+    private function applySkillOptions(Character $character, RunParticipant $participant, Closure $log): bool
+    {
+        $run = $participant->run;
+
+        if (! $run->cast_on_start && ! $run->require_circumspect) {
+            return true;
+        }
+
+        $caster = SkillCaster::forCharacter($character);
+
+        if ($run->cast_on_start) {
+            $caster->castOnStart($log);
+        }
+
+        if ($run->require_circumspect) {
+            return $caster->ensureCircumspect($log);
+        }
+
+        return true;
     }
 
     /**
