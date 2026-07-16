@@ -11,84 +11,10 @@ use Illuminate\Support\Facades\Http;
 beforeEach(function () {
     config(['outwar.http.throttle_min_ms' => 0, 'outwar.http.throttle_max_ms' => 0]);
 
-    // Mapped world: room 1 –E– room 2; Kix Harvester lives in room 2.
-    Room::factory()->create(['id' => 1, 'east' => 2]);
-    Room::factory()->create(['id' => 2, 'west' => 1]);
-    $mob = Mob::factory()->create(['name' => 'Kix Harvester']);
-    $mob->rooms()->attach(2, ['last_seen_at' => now()]);
+    // Mapped world: room 1 –E– room 2; Kix Harvester lives in room 2
+    // (fake HTTP side + DB side live in tests/Pest.php).
+    seedCombatWorld();
 });
-
-/**
- * Stateful fake game: the character starts in room 1, the harvester dies
- * after one successful attack, rage is configurable.
- */
-function fakeCombatWorld(int $rage = 5000): void
-{
-    $position = 1;
-    $killed = false;
-
-    $roomBlob = function (int $roomId) use (&$killed): string {
-        $mobs = $roomId === 2 ? [[
-            'name' => 'Kix Harvester',
-            'level' => '60',
-            'rage' => '150',
-            'h' => 'hash',
-            'encid' => 'FRESH'.random_int(1, 9999),
-            'mobId' => '777',
-            'spawnId' => '1234',
-            'image' => 'mobs/kix.jpg',
-            'isDead' => $killed,
-            'type' => 0,
-            'lastKilledBy' => null,
-            'canForm' => false,
-        ]] : [];
-
-        return json_encode([
-            'error' => '',
-            'curRoom' => (string) $roomId,
-            'name' => "Room {$roomId}",
-            'north' => '0',
-            'east' => $roomId === 1 ? '2' : '0',
-            'south' => '0',
-            'west' => $roomId === 2 ? '1' : '0',
-            'roomDetailsNew' => $mobs,
-            'doorsData' => null,
-        ]);
-    };
-
-    Http::fake(function ($request) use (&$position, &$killed, $roomBlob, $rage) {
-        $url = $request->url();
-
-        if (str_contains($url, 'userstats.php')) {
-            return Http::response(json_encode(['exp' => '1,000', 'rage' => number_format($rage), 'level' => '60', 'width' => 0]));
-        }
-
-        if (str_contains($url, 'somethingelse.php')) {
-            $killed = true;
-
-            return Http::response('', 302, ['Location' => 'https://sigil.outwar.com/attack/555/']);
-        }
-
-        if (str_contains($url, 'attack/555')) {
-            return Http::response(
-                'var battle_result = "Hero gained 2 strength<br>Hero has gained 950 experience!<br>Hero gained 55 gold!";'
-                .'var attacker_name = "Hero"; var defender_name = "Kix Harvester";'
-                .'<div id="found_items"><b>WIN: Found Kix Potion</b></div>'
-            );
-        }
-
-        if (str_contains($url, 'ajax_changeroomb.php')) {
-            $query = [];
-            parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
-            $target = (int) $query['room'] ?: $position;
-            $position = $target;
-
-            return Http::response($roomBlob($target));
-        }
-
-        return Http::response('<html>world page</html>');
-    });
-}
 
 it('walks to the mob, kills it, records the battle and drop, then stops when no targets remain', function () {
     $character = Character::factory()->for(Rga::factory()->withSession())->create();
