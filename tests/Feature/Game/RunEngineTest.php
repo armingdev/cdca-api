@@ -1,10 +1,15 @@
 <?php
 
 use App\Game\Auth\LoginService;
+use App\Game\Enums\RunMode;
 use App\Game\Enums\RunStatus;
 use App\Game\Exceptions\GameException;
 use App\Jobs\RunMobJob;
+use App\Jobs\RunQuestJob;
+use App\Jobs\RunQuestListJob;
 use App\Models\Character;
+use App\Models\Mob;
+use App\Models\QuestList;
 use App\Models\Rga;
 use App\Models\Run;
 use App\Models\RunParticipant;
@@ -130,4 +135,106 @@ it('re-dispatches completed runs whose restart interval elapsed', function () {
         ->and($notDue->fresh()->status)->toBe(RunStatus::Completed);
 
     Queue::assertPushed(RunMobJob::class, 1);
+});
+
+it('starts a quest run and queues a RunQuestJob with the quest config', function () {
+    Queue::fake();
+
+    $character = Character::factory()->for(Rga::factory()->withSession())->create();
+
+    $this->artisan('outwar:run-start', [
+        '--characters' => [(string) $character->id],
+        '--mode' => 'quest',
+        '--npc' => 'Stella',
+        '--quest' => 742,
+    ])->assertSuccessful();
+
+    $run = Run::first();
+
+    expect($run->mode)->toBe(RunMode::Quest)
+        ->and($run->config['npc_name'])->toBe('Stella')
+        ->and($run->config['quest_id'])->toBe(742);
+
+    Queue::assertPushed(RunQuestJob::class, 1);
+    Queue::assertNotPushed(RunMobJob::class);
+});
+
+it('rejects a quest run started without --npc/--quest', function () {
+    $character = Character::factory()->for(Rga::factory()->withSession())->create();
+
+    $this->artisan('outwar:run-start', [
+        '--characters' => [(string) $character->id],
+        '--mode' => 'quest',
+    ])->assertFailed()->expectsOutputToContain('Quest mode needs');
+
+    expect(Run::count())->toBe(0);
+});
+
+it('executes a quest run job end to end and completes the run', function () {
+    // Rooms 1–2 already exist from the combat seed; add the quest giver + objective mob.
+    Mob::factory()->create(['name' => 'Stella'])->rooms()->attach(1, ['last_seen_at' => now()]);
+    Mob::factory()->create(['name' => 'Street Crawler'])->rooms()->attach(2, ['last_seen_at' => now()]);
+    fakeQuestWorld();
+
+    $character = Character::factory()->for(Rga::factory()->withSession())->create();
+    $participant = RunParticipant::factory()
+        ->for(Run::factory()->state([
+            'mode' => RunMode::Quest,
+            'config' => ['npc_name' => 'Stella', 'quest_id' => 742, 'stop_rage' => 2500],
+            'status' => RunStatus::Running,
+        ]))
+        ->for($character)
+        ->create();
+
+    new RunQuestJob($participant)->handle(app(LoginService::class));
+
+    expect($participant->fresh()->status)->toBe(RunStatus::Completed)
+        ->and($participant->fresh()->wins)->toBe(5)
+        ->and($participant->run->fresh()->status)->toBe(RunStatus::Completed);
+});
+
+it('starts a quest-list run and queues a RunQuestListJob', function () {
+    Queue::fake();
+
+    $character = Character::factory()->for(Rga::factory()->withSession())->create();
+    QuestList::create(['name' => 'Armins List']);
+
+    $this->artisan('outwar:run-start', [
+        '--characters' => [(string) $character->id],
+        '--mode' => 'quest-list',
+        '--list' => 'Armins List',
+    ])->assertSuccessful();
+
+    $run = Run::first();
+
+    expect($run->mode)->toBe(RunMode::QuestList)
+        ->and($run->config['quest_list_id'])->toBe(QuestList::first()->id);
+
+    Queue::assertPushed(RunQuestListJob::class, 1);
+});
+
+it('executes a quest-list job end to end and completes the run', function () {
+    // Rooms 1–2 exist from the combat seed; add the quest giver + objective mob.
+    Mob::factory()->create(['name' => 'Stella'])->rooms()->attach(1, ['last_seen_at' => now()]);
+    Mob::factory()->create(['name' => 'Street Crawler'])->rooms()->attach(2, ['last_seen_at' => now()]);
+    fakeQuestWorld();
+
+    $list = QuestList::create(['name' => 'Armins List']);
+    $list->addQuest(742, 'Stella', 'Street Crawler');
+
+    $character = Character::factory()->for(Rga::factory()->withSession())->create();
+    $participant = RunParticipant::factory()
+        ->for(Run::factory()->state([
+            'mode' => RunMode::QuestList,
+            'config' => ['quest_list_id' => $list->id, 'stop_rage' => 2500],
+            'status' => RunStatus::Running,
+        ]))
+        ->for($character)
+        ->create();
+
+    new RunQuestListJob($participant)->handle(app(LoginService::class));
+
+    expect($participant->fresh()->status)->toBe(RunStatus::Completed)
+        ->and($participant->fresh()->wins)->toBe(5)
+        ->and($participant->run->fresh()->status)->toBe(RunStatus::Completed);
 });

@@ -50,7 +50,10 @@ class GameClient
      */
     public function get(string $path, array $query = []): Response
     {
-        return $this->send('GET', $path, ['query' => $query]);
+        // Only send the query option when non-empty: an empty `query` array
+        // makes Guzzle overwrite a query string already present in $path
+        // (e.g. a full mob_talk.php?...&finish=1 href).
+        return $this->send('GET', $path, $query === [] ? [] : ['query' => $query]);
     }
 
     /**
@@ -59,7 +62,17 @@ class GameClient
      */
     public function post(string $path, array $data = [], array $query = []): Response
     {
-        return $this->send('POST', $path, ['query' => $query, 'form_params' => $data]);
+        $options = [];
+
+        if ($query !== []) {
+            $options['query'] = $query;
+        }
+
+        if ($data !== []) {
+            $options['form_params'] = $data;
+        }
+
+        return $this->send('POST', $path, $options);
     }
 
     /**

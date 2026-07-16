@@ -5,5 +5,7 @@ namespace App\Game\Enums;
 enum RunMode: string
 {
     case Mob = 'mob';
-    // Quest and Pvp modes follow in later phases.
+    case Quest = 'quest';
+    case QuestList = 'quest-list';
+    // Pvp mode follows in a later phase.
 }

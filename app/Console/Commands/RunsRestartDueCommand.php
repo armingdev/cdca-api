@@ -2,8 +2,8 @@
 
 namespace App\Console\Commands;
 
+use App\Game\Engine\RunDispatcher;
 use App\Game\Enums\RunStatus;
-use App\Jobs\RunMobJob;
 use App\Models\Run;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
@@ -13,7 +13,7 @@ use Illuminate\Console\Command;
 #[Description('Re-dispatch finished runs whose restart interval has elapsed (scheduled every minute)')]
 class RunsRestartDueCommand extends Command
 {
-    public function handle(): int
+    public function handle(RunDispatcher $dispatcher): int
     {
         $due = Run::query()
             ->whereNotNull('restart_every_minutes')
@@ -33,7 +33,7 @@ class RunsRestartDueCommand extends Command
                     'finished_at' => null,
                 ]);
 
-                dispatch(new RunMobJob($participant));
+                $dispatcher->dispatch($participant);
             }
 
             $this->info("Restarted run #{$run->id}.");
