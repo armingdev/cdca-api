@@ -21,8 +21,14 @@ is documented in the parent directory. **Read these before writing game code:**
 - `.../docs/game-api/quests.md` — multi-quest/multi-step, kill/collect/talk
   objectives.
 - `.../docs/game-api/skills.md` — schools, cast/train, full 43-skill catalog.
+- `.../docs/game-api/items.md` — backpack, item stats, equip/unequip/drop.
 - `.../docs/game-api/parsing.md`, `endpoints.md` — response parsing + endpoint
-  table. Fixtures in `.../docs/game-api/samples/`.
+  table.
+- **Parser fixtures: `/Users/armingerina/Code/cdca/docs/game-api/samples/fixtures/`**
+  — sanitized real HTML (NPC popup, kill step incomplete vs complete, turn-in,
+  questHelper) for unit tests; see that dir's `README.md`. More distilled
+  JSON captures in `.../samples/`. Verified rule: a quest step shows the
+  `&finish=1` link only when its objective is met.
 - `.../docs/reference-attacker.md` — feature spec of the mature bot we're
   matching (attack modes, rage/skill/scheduling options).
 
@@ -84,6 +90,7 @@ This application is a Laravel application and its main Laravel ecosystems packag
 
 - php - 8.5
 - laravel/framework (LARAVEL) - v13
+- laravel/horizon (HORIZON) - v5
 - laravel/prompts (PROMPTS) - v0
 - laravel/boost (BOOST) - v2
 - laravel/mcp (MCP) - v0

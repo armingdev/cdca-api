@@ -73,6 +73,17 @@ return [
             'after_commit' => false,
         ],
 
+        // Long-running game-automation runs: retry_after must exceed the
+        // supervisor-runs timeout (7200) so a live run is never re-dispatched.
+        'redis-runs' => [
+            'driver' => 'redis',
+            'connection' => env('REDIS_QUEUE_CONNECTION', 'default'),
+            'queue' => 'runs',
+            'retry_after' => (int) env('REDIS_RUNS_RETRY_AFTER', 7800),
+            'block_for' => null,
+            'after_commit' => false,
+        ],
+
         'deferred' => [
             'driver' => 'deferred',
         ],
