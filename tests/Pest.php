@@ -104,6 +104,10 @@ function fakeCombatWorld(int $rage = 5000): void
             ]));
         }
 
+        if (str_contains($url, 'cast_skills.php')) {
+            return Http::response('Status: You just cast a skill');
+        }
+
         if (str_contains($url, 'somethingelse.php')) {
             $killed = true;
 
@@ -225,6 +229,35 @@ function fakeQuestWorld(int $rage = 50000): void
             $position = (int) $query['room'] ?: $position;
 
             return Http::response($roomBlob($position));
+        }
+
+        return Http::response('<html>world</html>');
+    });
+}
+
+/**
+ * Fake PvP world: search returns the captured results; every attack 302s to a
+ * plrattack win; userstats reports a configurable rage pool.
+ */
+function fakePvpWorld(int $rage = 50000): void
+{
+    Http::fake(function ($request) use ($rage) {
+        $url = $request->url();
+
+        if (str_contains($url, 'userstats.php')) {
+            return Http::response(json_encode(['exp' => '1,000', 'rage' => number_format($rage), 'level' => '80', 'width' => 0]));
+        }
+
+        if (str_contains($url, 'playersearch.php')) {
+            return Http::response(gameFixture('playersearch_results.html'));
+        }
+
+        if (str_contains($url, 'somethingelse.php')) {
+            return Http::response('', 302, ['Location' => 'https://sigil.outwar.com/plrattack/700/']);
+        }
+
+        if (str_contains($url, 'plrattack/700')) {
+            return Http::response('var battle_result = "OFFENSIVE has gained 25 experience!"; var defender_name = "OFFENSIVE";');
         }
 
         return Http::response('<html>world</html>');

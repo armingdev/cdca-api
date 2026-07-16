@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Game\Enums\BattleKind;
 use App\Game\Enums\BattleOutcome;
 use Database\Factories\BattleEventFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -20,7 +21,9 @@ class BattleEvent extends Model
 
     protected $fillable = [
         'character_id',
+        'kind',
         'mob_id',
+        'opponent_name',
         'room_id',
         'battle_id',
         'outcome',
@@ -37,6 +40,7 @@ class BattleEvent extends Model
     protected function casts(): array
     {
         return [
+            'kind' => BattleKind::class,
             'outcome' => BattleOutcome::class,
             'battle_id' => 'integer',
             'exp_gained' => 'integer',

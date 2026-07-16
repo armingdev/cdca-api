@@ -5,14 +5,17 @@ use App\Game\Enums\RunMode;
 use App\Game\Enums\RunStatus;
 use App\Game\Exceptions\GameException;
 use App\Jobs\RunMobJob;
+use App\Jobs\RunPvpJob;
 use App\Jobs\RunQuestJob;
 use App\Jobs\RunQuestListJob;
 use App\Models\Character;
+use App\Models\CharacterSkill;
 use App\Models\Mob;
 use App\Models\QuestList;
 use App\Models\Rga;
 use App\Models\Run;
 use App\Models\RunParticipant;
+use App\Models\Skill;
 use Illuminate\Support\Facades\Queue;
 
 beforeEach(function () {
@@ -236,5 +239,92 @@ it('executes a quest-list job end to end and completes the run', function () {
 
     expect($participant->fresh()->status)->toBe(RunStatus::Completed)
         ->and($participant->fresh()->wins)->toBe(5)
+        ->and($participant->run->fresh()->status)->toBe(RunStatus::Completed);
+});
+
+it('casts on-start skills before the run when cast_on_start is set', function () {
+    fakeCombatWorld(); // handles cast_skills.php too
+
+    $character = Character::factory()->for(Rga::factory()->withSession())->create();
+    Skill::create(['id' => 4, 'name' => 'Stealth', 'school' => 'class', 'rage_cost' => 10, 'cooldown_minutes' => 60, 'duration_minutes' => 60]);
+    CharacterSkill::create(['character_id' => $character->id, 'skill_id' => 4, 'cast_on_start' => true]);
+
+    $participant = RunParticipant::factory()
+        ->for(Run::factory()->state([
+            'config' => ['mob_names' => ['Kix Harvester'], 'max_kills' => 1],
+            'cast_on_start' => true,
+            'status' => RunStatus::Running,
+        ]))
+        ->for($character)
+        ->create();
+
+    new RunMobJob($participant)->handle(app(LoginService::class));
+
+    expect($participant->fresh()->status)->toBe(RunStatus::Completed)
+        ->and(CharacterSkill::where('character_id', $character->id)->where('skill_id', 4)->value('last_cast_at'))->not->toBeNull();
+});
+
+it('gates the run off when Circumspect is required but cannot be made active', function () {
+    fakeCombatWorld();
+
+    $character = Character::factory()->for(Rga::factory()->withSession())->create();
+    Skill::create(['id' => Skill::CIRCUMSPECT_ID, 'name' => 'Circumspect', 'school' => 'ferocity', 'rage_cost' => 20, 'cooldown_minutes' => 720, 'duration_minutes' => 60]);
+    // Cast 70m ago: buff expired, still on cooldown → cannot re-activate.
+    CharacterSkill::create(['character_id' => $character->id, 'skill_id' => Skill::CIRCUMSPECT_ID, 'last_cast_at' => now()->subMinutes(70)]);
+
+    $participant = RunParticipant::factory()
+        ->for(Run::factory()->state([
+            'config' => ['mob_names' => ['Kix Harvester']],
+            'require_circumspect' => true,
+            'status' => RunStatus::Running,
+        ]))
+        ->for($character)
+        ->create();
+
+    new RunMobJob($participant)->handle(app(LoginService::class));
+
+    expect($participant->fresh()->status)->toBe(RunStatus::Stopped)
+        ->and($participant->fresh()->last_activity)->toContain('Circumspect not active')
+        ->and($participant->fresh()->wins)->toBe(0);
+});
+
+it('starts a pvp run and queues a RunPvpJob with the target config', function () {
+    Queue::fake();
+
+    $character = Character::factory()->for(Rga::factory()->withSession())->create();
+
+    $this->artisan('outwar:run-start', [
+        '--characters' => [(string) $character->id],
+        '--mode' => 'pvp',
+        '--target' => ['OFFENSIVE', 'offensive2'],
+        '--attacks' => 3,
+    ])->assertSuccessful();
+
+    $run = Run::first();
+
+    expect($run->mode)->toBe(RunMode::Pvp)
+        ->and($run->config['targets'])->toBe(['OFFENSIVE', 'offensive2'])
+        ->and($run->config['attacks_per_target'])->toBe(3);
+
+    Queue::assertPushed(RunPvpJob::class, 1);
+});
+
+it('executes a pvp job end to end and completes the run', function () {
+    fakePvpWorld();
+
+    $character = Character::factory()->for(Rga::factory()->withSession())->create();
+    $participant = RunParticipant::factory()
+        ->for(Run::factory()->state([
+            'mode' => RunMode::Pvp,
+            'config' => ['targets' => ['OFFENSIVE'], 'attacks_per_target' => 1, 'stop_rage' => 2500],
+            'status' => RunStatus::Running,
+        ]))
+        ->for($character)
+        ->create();
+
+    new RunPvpJob($participant)->handle(app(LoginService::class));
+
+    expect($participant->fresh()->status)->toBe(RunStatus::Completed)
+        ->and($participant->fresh()->wins)->toBe(1)
         ->and($participant->run->fresh()->status)->toBe(RunStatus::Completed);
 });

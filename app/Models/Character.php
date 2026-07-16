@@ -6,6 +6,7 @@ use Database\Factories\CharacterFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Character extends Model
 {
@@ -56,6 +57,14 @@ class Character extends Model
     public function currentRoom(): BelongsTo
     {
         return $this->belongsTo(Room::class, 'current_room_id');
+    }
+
+    /**
+     * @return HasMany<CharacterSkill, $this>
+     */
+    public function skills(): HasMany
+    {
+        return $this->hasMany(CharacterSkill::class);
     }
 
     public function serverHost(): string
