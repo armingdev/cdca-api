@@ -7,6 +7,7 @@ use App\Game\Enums\RunStatus;
 use Database\Factories\RunFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Run extends Model
@@ -15,6 +16,7 @@ class Run extends Model
     use HasFactory;
 
     protected $fillable = [
+        'user_id',
         'mode',
         'config',
         'cast_on_start',
@@ -40,6 +42,14 @@ class Run extends Model
             'start_at' => 'datetime',
             'last_started_at' => 'datetime',
         ];
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
     }
 
     /**

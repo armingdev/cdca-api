@@ -5,6 +5,7 @@ namespace App\Models;
 use Database\Factories\RgaFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Rga extends Model
@@ -40,6 +41,14 @@ class Rga extends Model
             'cookies' => 'encrypted:array',
             'last_login_at' => 'datetime',
         ];
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
     }
 
     /**

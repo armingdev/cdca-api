@@ -6,12 +6,10 @@ use App\Game\Engine\MobRunConfig;
 use App\Game\Engine\PvpRunConfig;
 use App\Game\Engine\QuestListRunConfig;
 use App\Game\Engine\QuestRunConfig;
-use App\Game\Engine\RunDispatcher;
+use App\Game\Engine\RunLauncher;
 use App\Game\Enums\RunMode;
-use App\Game\Enums\RunStatus;
 use App\Models\Character;
 use App\Models\QuestList;
-use App\Models\Run;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
@@ -39,7 +37,7 @@ use Illuminate\Support\Collection;
 #[Description('Start a mob or quest run for the selected characters (one queued worker each)')]
 class RunStartCommand extends Command
 {
-    public function handle(RunDispatcher $dispatcher): int
+    public function handle(RunLauncher $launcher): int
     {
         $characters = $this->resolveCharacters((array) $this->option('characters'));
 
@@ -52,7 +50,7 @@ class RunStartCommand extends Command
         $mode = RunMode::tryFrom((string) $this->option('mode'));
 
         if ($mode === null) {
-            $this->error('--mode must be "mob" or "quest".');
+            $this->error('--mode must be mob, quest, quest-list, or pvp.');
 
             return self::FAILURE;
         }
@@ -65,25 +63,17 @@ class RunStartCommand extends Command
 
         $startAt = $this->option('start-at') !== null ? Carbon::parse($this->option('start-at')) : null;
 
-        if ($startAt !== null && $startAt->isPast()) {
-            $startAt = $startAt->addDay();
-        }
+        $run = $launcher->launch(
+            mode: $mode,
+            characters: $characters,
+            config: $config,
+            castOnStart: (bool) $this->option('cast-on-start'),
+            requireCircumspect: (bool) $this->option('require-circ'),
+            restartEveryMinutes: $this->option('restart-every') !== null ? (int) $this->option('restart-every') : null,
+            startAt: $startAt,
+        );
 
-        $run = Run::create([
-            'mode' => $mode,
-            'config' => $config,
-            'cast_on_start' => (bool) $this->option('cast-on-start'),
-            'require_circumspect' => (bool) $this->option('require-circ'),
-            'status' => RunStatus::Running,
-            'restart_every_minutes' => $this->option('restart-every') !== null ? (int) $this->option('restart-every') : null,
-            'start_at' => $startAt,
-            'last_started_at' => $startAt ?? now(),
-        ]);
-
-        foreach ($characters as $character) {
-            $participant = $run->participants()->create(['character_id' => $character->id]);
-            $dispatcher->dispatch($participant, $startAt);
-        }
+        $startAt = $run->start_at;
 
         $this->info(sprintf(
             'Run #%d [%s] started for %d character(s): %s%s.',
