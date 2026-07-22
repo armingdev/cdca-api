@@ -5,6 +5,7 @@ namespace App\Models;
 use Database\Factories\QuestListFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class QuestList extends Model
@@ -12,7 +13,15 @@ class QuestList extends Model
     /** @use HasFactory<QuestListFactory> */
     use HasFactory;
 
-    protected $fillable = ['name'];
+    protected $fillable = ['user_id', 'name'];
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
 
     /**
      * @return HasMany<QuestListItem, $this>

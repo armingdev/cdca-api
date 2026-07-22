@@ -20,6 +20,7 @@ class RunFactory extends Factory
     public function definition(): array
     {
         return [
+            'user_id' => null,
             'mode' => RunMode::Mob,
             'config' => [
                 'mob_names' => ['Kix Harvester'],
@@ -27,6 +28,8 @@ class RunFactory extends Factory
                 'max_kills' => 0,
                 'level_up' => false,
             ],
+            'cast_on_start' => false,
+            'require_circumspect' => false,
             'status' => RunStatus::Pending,
             'restart_every_minutes' => null,
             'start_at' => null,

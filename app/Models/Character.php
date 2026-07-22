@@ -67,6 +67,14 @@ class Character extends Model
         return $this->hasMany(CharacterSkill::class);
     }
 
+    /**
+     * @return HasMany<BattleEvent, $this>
+     */
+    public function battleEvents(): HasMany
+    {
+        return $this->hasMany(BattleEvent::class);
+    }
+
     public function serverHost(): string
     {
         return config("outwar.servers.{$this->server_id}.host");

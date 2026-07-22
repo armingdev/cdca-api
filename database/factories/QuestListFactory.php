@@ -18,6 +18,7 @@ class QuestListFactory extends Factory
     public function definition(): array
     {
         return [
+            'user_id' => null,
             'name' => fake()->unique()->words(2, true),
         ];
     }
