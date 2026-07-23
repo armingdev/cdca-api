@@ -43,7 +43,11 @@ class SkillCaster
             return false;
         }
 
-        $this->stateFor($skill)->update(['last_cast_at' => now()]);
+        $this->stateFor($skill)->update([
+            'last_cast_at' => now(),
+            'recharge_until' => null,
+            'buff_until' => null,
+        ]);
 
         return true;
     }
@@ -66,6 +70,12 @@ class SkillCaster
             ->get();
 
         foreach ($selected as $state) {
+            if ($state->synced_at !== null && ! $state->isCastable()) {
+                $log("{$state->skill->name} not trained — skipping.");
+
+                continue;
+            }
+
             if ($state->isBuffActive()) {
                 $log("{$state->skill->name} already active — skipping.");
 

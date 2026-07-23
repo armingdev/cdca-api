@@ -13,4 +13,19 @@ enum SkillSchool: string
     case Preservation = 'preservation';
     case Affliction = 'affliction';
     case Misc = 'misc';
+
+    /**
+     * The cast_skills.php?C= tab for this school. Class is the default page
+     * (no C param). C=2 is the train action, never a tab.
+     */
+    public function tabParam(): ?int
+    {
+        return match ($this) {
+            self::ClassSkill => null,
+            self::Ferocity => 4,
+            self::Preservation => 5,
+            self::Affliction => 6,
+            self::Misc => 7,
+        };
+    }
 }

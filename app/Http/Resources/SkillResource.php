@@ -23,6 +23,8 @@ class SkillResource extends JsonResource
             'rage_cost' => $this->rage_cost,
             'cooldown_minutes' => $this->cooldown_minutes,
             'duration_minutes' => $this->duration_minutes,
+            'unlock_level' => $this->unlock_level,
+            'single_level' => $this->single_level,
             'description' => $this->description,
         ];
     }

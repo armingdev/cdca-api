@@ -26,6 +26,8 @@ class CharacterResource extends JsonResource
             'level' => $this->level,
             'rage' => $this->rage,
             'exp' => $this->exp,
+            'skill_points' => $this->skill_points,
+            'school' => $this->school,
             'crew' => $this->crew,
             'current_room_id' => $this->current_room_id,
             'status' => $this->status,

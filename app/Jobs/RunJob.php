@@ -6,9 +6,11 @@ use App\Game\Auth\LoginService;
 use App\Game\Enums\BattleOutcome;
 use App\Game\Enums\RunStatus;
 use App\Game\Skills\SkillCaster;
+use App\Game\Skills\SkillSyncService;
 use App\Models\BattleEvent;
 use App\Models\Character;
 use App\Models\RunParticipant;
+use App\Models\Skill;
 use Closure;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -118,6 +120,8 @@ abstract class RunJob implements ShouldQueue
             return true;
         }
 
+        $this->preSyncSkills($character, $run->cast_on_start, $run->require_circumspect, $log);
+
         $caster = SkillCaster::forCharacter($character);
 
         if ($run->cast_on_start) {
@@ -129,6 +133,41 @@ abstract class RunJob implements ShouldQueue
         }
 
         return true;
+    }
+
+    /**
+     * Full pre-sync before casting: refresh trained levels, skill points, and
+     * active buffs from the game (5 requests), then read the authoritative
+     * recharge for each selected skill that is not already buff-active (one
+     * request each), so cast decisions never rely on stale local cooldowns.
+     */
+    private function preSyncSkills(Character $character, bool $castOnStart, bool $requireCircumspect, Closure $log): void
+    {
+        $sync = SkillSyncService::forCharacter($character);
+
+        $log('Syncing skills with the game…');
+        $sync->sync();
+
+        $states = $character->skills()
+            ->with('skill')
+            ->where(function ($query) use ($castOnStart, $requireCircumspect) {
+                $query->when($castOnStart, fn ($q) => $q->orWhere('cast_on_start', true))
+                    ->when($requireCircumspect, fn ($q) => $q->orWhere('skill_id', Skill::CIRCUMSPECT_ID));
+            })
+            ->get();
+
+        $refreshed = 0;
+
+        foreach ($states as $state) {
+            if ($state->isBuffActive() || ! $state->isCastable()) {
+                continue;
+            }
+
+            $sync->refreshSkillInfo($state->skill);
+            $refreshed++;
+        }
+
+        $log("Skills synced ({$refreshed} recharge check(s)).");
     }
 
     /**
