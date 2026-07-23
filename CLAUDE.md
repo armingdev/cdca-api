@@ -50,7 +50,7 @@ spider verify-and-extend. (`data/legacy/` = older 2011 data, reference only.)
 - **Attack player (PvP)**: search `POST playersearch.php` → scout `GET profile.php?id=` → `POST somethingelse.php?attackid={playerId}&r=` `message&rage(2-50)&hash` → 302 `/plrattack/{id}/`.
 - **Battle result**: parse JS vars `attacker_result`("Win!")/`battle_result`; drops in `div#found_items` "Found {item}".
 - **Quests**: NPC popup `mob.php?id=&h=` lists quests → steps via `mob_talk.php?id=&stepid=&userspawn=[&questid=]`, complete with `&finish=1`. Objectives: kill (`n/m killed`), collect (`item: n/m`, farm drops), talk. `world_questHelper.php` = live progress.
-- **Skills**: cast `POST cast_skills.php` `castskillid={id}&cast=Cast Skill`; list `cast_skills.php?C={4 Fero,5 Pres,6 Affl,7 Misc}`; detail `skills_info.php?id=`. Schools mutually exclusive (Class always trainable). Circumspect=3008, Street Smarts=25, Circle of Protection=14.
+- **Skills**: cast `POST cast_skills.php` `castskillid={id}&cast=Cast Skill`; **train** `GET cast_skills.php?C=2&T={id}`; list `cast_skills.php` (Class) / `?C={4 Fero,5 Pres,6 Affl,7 Misc}`; detail `skills_info.php?id=` (level-scaled stats + `recharging, {n} minutes remaining`). Untrained = uncastable; levels scale cooldown/duration/effect (and rage cost); some skills max at L1. List shows `(trained+bonus)`. Schools mutually exclusive (Class always trainable). Circumspect=3008, Street Smarts=25, Circle of Protection=14.
 - **Stats refresh**: `userstats.php` (post-action). Never trust stale rage/exp.
 
 ## Suggested build order

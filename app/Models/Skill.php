@@ -19,6 +19,8 @@ class Skill extends Model
         'rage_cost',
         'cooldown_minutes',
         'duration_minutes',
+        'unlock_level',
+        'single_level',
         'description',
     ];
 
@@ -33,6 +35,8 @@ class Skill extends Model
             'rage_cost' => 'integer',
             'cooldown_minutes' => 'integer',
             'duration_minutes' => 'integer',
+            'unlock_level' => 'integer',
+            'single_level' => 'boolean',
         ];
     }
 }

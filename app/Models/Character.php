@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Game\Enums\SkillSchool;
 use Database\Factories\CharacterFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -21,6 +22,8 @@ class Character extends Model
         'level',
         'rage',
         'exp',
+        'skill_points',
+        'school',
         'crew',
         'current_room_id',
         'last_stats_at',
@@ -38,6 +41,8 @@ class Character extends Model
             'level' => 'integer',
             'rage' => 'integer',
             'exp' => 'integer',
+            'skill_points' => 'integer',
+            'school' => SkillSchool::class,
             'current_room_id' => 'integer',
             'last_stats_at' => 'datetime',
         ];

@@ -1,0 +1,1820 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+
+<style type="text/css">
+#outerdiv
+{
+width:160px;
+height:600px;
+overflow:hidden;
+position:relative;
+}
+
+#inneriframe
+{
+position:absolute;
+top:-72px;
+left:0px;
+width:160px;
+height:600px;
+}
+*:focus {outline:0px none transparent;}
+</style>
+
+	<meta http-equiv="Content-Language" content="en-us">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, shrink-to-fit=no">
+	<meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
+
+<title>Outwar | Browser Based MMORPG - No Download</title>
+<meta name="description" content="Outwar is a free online MMORPG that can be played in any web browser with no download required. Immerse yourself in this addicting text based browser game.">
+<meta name="keywords" content="mmorpg, mmo, rpg, multiplayer, games, role playing, free, online, strategy, fantasy, browser, text, based, no download, adventure, pc, fun, top, new, best, addicting">
+<meta name="robots" content="FOLLOW, INDEX">
+<meta name="revisit-after" content="3 days">
+
+<link rel="icon" 
+      type="image/png" 
+      href="/favicon.png">
+
+	<script language="Javascript">
+		/* copy to clipboard */
+		function copyToClipboard(s) {
+			if( window.clipboardData && clipboardData.setData ) {
+				clipboardData.setData("Text", s);
+			}
+		}
+
+		function openWindow(){
+			window.open('http://test.outwar.com//chatwindow?uname=PLAYER','windowRef','width=640,height=485');
+		}
+	</script>
+	
+	<!-- NEW DESIGN ASSETS --!>
+    <!-- BEGIN GLOBAL MANDATORY STYLES -->
+    <link href="https://fonts.googleapis.com/css?family=Nunito:400,600,700" rel="stylesheet">
+    <link href="/bootstrap/css/bootstrap.min.css" rel="stylesheet" type="text/css" />
+    <link href="/assets/css/plugins.css" rel="stylesheet" type="text/css" />
+
+    <link href="/assets/css/theme/theme_5.css" rel="stylesheet" type="text/css" />
+    <link href="/plugins/highlight/styles/monokai-sublime.css" rel="stylesheet" type="text/css" />
+
+    
+    <link href="/plugins/sweetalerts/sweetalert2.min.css" rel="stylesheet" type="text/css">
+    <link href="/plugins/sweetalerts/sweetalert.css" rel="stylesheet" type="text/css">
+
+    <!-- END GLOBAL MANDATORY STYLES -->
+
+    <!-- BEGIN PAGE LEVEL PLUGINS/CUSTOM STYLES -->
+    <link href="/plugins/apex/apexcharts.css" rel="stylesheet" type="text/css">
+    <link href="/assets/css/dashboard/dash_1.css" rel="stylesheet" type="text/css" />
+    <link href="/assets/css/elements/alert.css" rel="stylesheet" type="text/css" />
+    <link href="/assets/css/custom.css" rel="stylesheet" type="text/css" />
+
+    <!-- END GLOBAL MANDATORY STYLES -->
+    <link href="/assets/css/scrollspyNav.css" rel="stylesheet" type="text/css">
+    <link rel="stylesheet" href="/plugins/font-icons/fontawesome/css/regular.css">
+    
+    <link rel="stylesheet" type="text/css" href="/plugins/table/datatable/datatables.css">
+    <link rel="stylesheet" type="text/css" href="/plugins/table/datatable/dt-global_style.css">
+    <link href="/assets/css/components/custom-list-group.css" rel="stylesheet" type="text/css">
+    <link href="/assets/css/components/cards/card.css" rel="stylesheet" type="text/css" />
+    
+    <link rel="stylesheet" href="/font-awesome/css/fontawesome-all.css">
+    <!-- END PAGE LEVEL PLUGINS/CUSTOM STYLES -->
+    <link href="https://cdn.jsdelivr.net/gh/gitbrent/bootstrap4-toggle@3.6.1/css/bootstrap4-toggle.min.css" rel="stylesheet">
+	
+	<!-- BEGIN GLOBAL MANDATORY SCRIPTS -->
+    <script src="/assets/js/libs/jquery-3.1.1.min.js"></script>
+    <script src="/bootstrap/js/popper.min.js"></script>
+    <script src="/bootstrap/js/bootstrap.min.js"></script>
+    <script src="/plugins/perfect-scrollbar/perfect-scrollbar.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/gitbrent/bootstrap4-toggle@3.6.1/js/bootstrap4-toggle.min.js"></script>
+    <script src="/plugins/sweetalerts/sweetalert2.min.js"></script>
+    <script src="/plugins/blockui/jquery.blockUI.min.js"></script>
+    <script src="/plugins/bootstrap-touchspin/jquery.bootstrap-touchspin.min.js"></script>
+
+	<!-- SLIDER JS INCLUDES	-->
+	<script type="text/javascript" src="/js/range.js"></script>
+	<script type="text/javascript" src="/js/timer.js"></script>
+	<script type="text/javascript" src="/js/slider.js"></script>
+
+
+    <link href="/assets/css/select2.min.css" rel="stylesheet" />
+    <script src="/assets/js/select2.min.js"></script>
+
+
+	<!-- MAIN JAVASCRIPT  -->
+	<script language="javascript" src="/main.js"></script>
+
+    
+	<!-- AJAX FUNCTIONS -->
+	<script language="javascript" src="/ajax.js"></script>
+
+	<!-- DRAG AND DROP -->
+	<script language="javascript" src="/drag.js"></script>
+
+	<!-- AnyLink Menu -->
+	<script type="text/javascript" src="/anylink.js"></script>
+
+	<!-- VA Menu -->
+    <link rel="STYLESHEET" type="text/css" href="/va_menu.css">
+	<script type="text/javascript" src="/va_menu.js"></script>
+
+    <link type="text/css" rel="stylesheet" href="/js/clock_assets/flipclock.css" />
+
+	
+	<link rel="STYLESHEET" type="text/css" href="/pop.css">
+	
+<link rel="stylesheet" type="text/css" href="/landing/shadowbox.css">
+<script type="text/javascript" src="/landing/shadowbox2.js"></script>
+<script type="text/javascript">
+
+    /*
+    onOpen: function() {
+          
+    }
+    */
+    
+Shadowbox.init({
+    skipSetup: true,
+    players: ['html'], // whatever players you want here
+    animate: true,
+    onClose: function(){ 
+    },
+    onOpen: function() {
+    },
+    enableKeys: true
+    });
+</script>
+
+
+<script type="text/javascript">
+function getCookie(player){
+    var i,x,y,ARRcookies=document.cookie.split(";");
+    for (i=0;i<ARRcookies.length;i++){
+      x=ARRcookies[i].substr(0,ARRcookies[i].indexOf("="));
+      y=ARRcookies[i].substr(ARRcookies[i].indexOf("=")+1);
+      x=x.replace(/^\s+|\s+$/g,"");
+      if (x == player)
+      {
+        return 'oldPlayer';
+      }
+      else
+      {
+        return 'newPlayer';
+      }
+    }
+}
+
+function setCookie(newPlayer,value,exdays)
+{
+var exdate=new Date();
+exdate.setDate(exdate.getDate() + exdays);
+var c_value=escape(value) + ((exdays==null) ? "" : "; expires="+exdate.toUTCString());
+document.cookie=newPlayer + "=" + c_value;
+}
+
+function checkCookie()
+{ 
+    var status = getCookie("player"); 
+    // New Player
+    if (status == 'newPlayer'){ 
+        var anchor = $('<a rel="shadowbox;height=510;width=778" class="sbox"  href="/mob_talk?id=59293&stepid=3071&userspawn="><img src="/landing/bigbubble.png" style="position:absolute;top:300px;left:600px;"></a>');
+        $('#mydiv').append(anchor);
+        anchor.click(function(){
+            setCookie('player','oldPlayer',365);
+            $(this).remove();
+        });
+    }    
+}
+</script>
+
+</head>
+
+	<!-- END HEADER -->
+
+<body xmlns:fb="http://www.facebook.com/2008/fbml">
+<div id="fb-root"></div>
+
+<div id="dropmenudiv" class="custom-dropdown-menu" style="visibility:hidden;position:absolute;z-index:9999;will-change: transform;" onMouseover="clearhidemenu()"></div>
+
+<script>(function(d, s, id) {
+  var js, fjs = d.getElementsByTagName(s)[0];
+  if (d.getElementById(id)) {return;}
+  js = d.createElement(s); js.id = id;
+  js.src = "//connect.facebook.net/en_US/all.js#xfbml=1";
+  fjs.parentNode.insertBefore(js, fjs);
+}(document, 'script', 'facebook-jssdk'));</script>
+	<div id="dyk"></div>
+<div id="tutorialtip"></div>
+<div id="dhtmltooltip" style="z-index:2000;position: absolute;padding: 10px; border-radius: 5px;text-align: center"></div>
+
+<script type="text/javascript">
+disable_rollover = false;
+
+/************************
+* RAMPID TOOLTIP SYSTEM *
+************************/
+var tutobj = document.getElementById("tutorialtip");
+var tutorial_text = '';
+var tipwidth = '';
+
+var showtut = false;
+
+var ie=document.all;
+var ns6=document.getElementById && !document.all;
+
+function ietruebody(){
+	return (document.compatMode && document.compatMode!="BackCompat")? document.documentElement : document.body
+}
+
+function ShowTutorial()
+{
+		if(showtut)
+		{
+			var winWidth=document.all&&!window.opera? ietruebody().clientWidth : window.innerWidth-20
+			var winHeight=document.all&&!window.opera? ietruebody().clientHeight : window.innerHeight
+			var floatHeight=tutobj.offsetHeight
+			var PageOffset=(ie) ?  document.body.scrollTop : window.pageYOffset
+			var tipLeft = winWidth - tipwidth - 10;
+			var tipTop = PageOffset+winHeight-floatHeight-10;
+			tutobj.style.width=tipwidth+"px"
+			tutobj.innerHTML=tutorial_text
+			tutobj.style.left= tipLeft+"px"
+			tutobj.style.top= tipTop-10+"px"
+			tutobj.style.visibility="visible"
+		}		
+}
+
+function repositiontut()
+{
+		if(showtut)
+		{
+				var winWidth=document.all&&!window.opera? ietruebody().clientWidth : window.innerWidth-20
+				var winHeight=document.all&&!window.opera? ietruebody().clientHeight : window.innerHeight
+				var floatHeight=tutobj.offsetHeight
+				var PageOffset=(ie) ?  document.body.scrollTop : window.pageYOffset
+				tutobj.style.left= winWidth-tipwidth-10+"px"
+				tutobj.style.top= PageOffset+winHeight-floatHeight-10+"px"
+			}
+}
+
+setInterval("repositiontut()", 250);
+
+</script>
+
+<script type="text/javascript">
+
+/***********************************************
+* Fixed ToolTip script- � Dynamic Drive (www.dynamicdrive.com)
+* This notice MUST stay intact for legal use
+* Visit http://www.dynamicdrive.com/ for full source code
+***********************************************/
+		
+var tipwidth='150px' //default tooltip width
+var tipbgcolor='lightyellow'  //tooltip bgcolor
+var disappeardelay=250  //tooltip disappear speed onMouseout (in miliseconds)
+var vertical_offset="5px" //horizontal offset of tooltip from anchor link
+var horizontal_offset="5px" //horizontal offset of tooltip from anchor link
+var offsetxpoint=10 //Customize x offset of tooltip
+var offsetypoint=-10 //Customize y offset of tooltip
+
+
+tipobj = document.getElementById("dhtmltooltip");
+
+/////No further editting needed
+
+var ie4=document.all
+var ns6=document.getElementById&&!document.all
+
+function positiontip(e){
+	var curX=(ns6)?e.pageX : event.x+ietruebody().scrollLeft;
+	var curY=(ns6)?e.pageY : event.y+ietruebody().scrollTop;
+		
+	//Find out how close the mouse is to the corner of the window
+	var rightedge=ie4&&!window.opera? ietruebody().clientWidth-event.clientX-offsetxpoint : window.innerWidth-e.clientX-offsetxpoint-20
+	var bottomedge=ie4&&!window.opera? ietruebody().clientHeight-event.clientY-offsetypoint : window.innerHeight-e.clientY-offsetypoint-20
+
+	var leftedge=(offsetxpoint<0)? offsetxpoint*(-1) : -1000
+
+	//if the horizontal distance isn't enough to accomodate the width of the context menu
+	if (rightedge<tipobj.offsetWidth)
+		//move the horizontal position of the menu to the left by it's width
+		tipobj.style.left=ie4? ietruebody().scrollLeft+event.clientX-tipobj.offsetWidth+"px" : window.pageXOffset+e.clientX-tipobj.offsetWidth+"px"
+	else if (curX<leftedge)
+		tipobj.style.left="5px"
+	else
+		//position the horizontal position of the menu where the mouse is positioned
+		tipobj.style.left=curX+offsetxpoint+"px"
+
+	//same concept with the vertical position
+	if (bottomedge<tipobj.offsetHeight)
+		tipobj.style.top=ie4? ietruebody().scrollTop+event.clientY-tipobj.offsetHeight-offsetypoint+"px" : window.pageYOffset+e.clientY-tipobj.offsetHeight-offsetypoint+"px"
+	else
+		tipobj.style.top=curY+offsetypoint+"px"
+	
+	tipobj.style.visibility="visible"
+}
+
+function fixedtooltip(e, menucontents, tipcolor, tipwidth){
+	positiontip(e);
+	if(tipcolor)
+		tipobj.style.backgroundColor=tipcolor;
+	tipobj.innerHTML=menucontents
+}
+
+function kill(){
+	tipobj.style.width="";
+	tipobj.style.height="";
+	tipobj.style.visibility="hidden"
+	offsetxpoint=10 //Customize x offset of tooltip
+	offsetypoint=-10 //Customize y offset of tooltip
+}
+
+function itempopup(e, itemid, item_data, server, price, gems){
+	if(disable_rollover == true)
+		return;
+
+	const isMobileDevice = /Mobi/i.test(window.navigator.userAgent)
+	if(isMobileDevice)
+		return;
+
+	if(!item_data)
+		item_data = 0;
+
+    if(!price)
+        price = 0;
+
+	if(!gems)
+		gems = 0;
+
+	offsetxpoint=0 //Customize x offset of tooltip
+	offsetypoint=20 //Customize y offset of tooltip
+
+	tipobj.className = '';
+	tipobj.style.width='300';
+	fixedtooltip(e, 'Retrieving data...');
+	getPopup(itemid, item_data, server, price, gems);
+}
+function popup(e, thetext, thecolor, thewidth){
+	tipobj.className = 'itemPop';
+	fixedtooltip(e, thetext, thecolor, thewidth);
+}
+function infopopup(e, thetext, thecolor, thewidth){
+	//tipobj.className = 'dhtmltooltip';
+	tipobj.className = 'tooltip';
+	thecolor = "#FFFFE7";
+	thewidth = 300;
+	fixedtooltip(e, thetext, thecolor, thewidth);
+}
+function statspopup(e, thetext, thecolor, thewidth){
+
+	const isMobileDevice = /Mobi/i.test(window.navigator.userAgent)
+	if(isMobileDevice)
+		return;
+		
+	thetext = "<table style=\"font-size:8pt;\">"+thetext+"</table>";
+	thecolor="#000000";
+	fixedtooltip(e, thetext, thecolor, thewidth);
+}
+
+window.mobileCheck = function() {
+  let check = false;
+  (function(a){if(/(android|bb\d+|meego).+mobile|avantgo|bada\/|blackberry|blazer|compal|elaine|fennec|hiptop|iemobile|ip(hone|od)|iris|kindle|lge |maemo|midp|mmp|mobile.+firefox|netfront|opera m(ob|in)i|palm( os)?|phone|p(ixi|re)\/|plucker|pocket|psp|series(4|6)0|symbian|treo|up\.(browser|link)|vodafone|wap|windows ce|xda|xiino/i.test(a)||/1207|6310|6590|3gso|4thp|50[1-6]i|770s|802s|a wa|abac|ac(er|oo|s\-)|ai(ko|rn)|al(av|ca|co)|amoi|an(ex|ny|yw)|aptu|ar(ch|go)|as(te|us)|attw|au(di|\-m|r |s )|avan|be(ck|ll|nq)|bi(lb|rd)|bl(ac|az)|br(e|v)w|bumb|bw\-(n|u)|c55\/|capi|ccwa|cdm\-|cell|chtm|cldc|cmd\-|co(mp|nd)|craw|da(it|ll|ng)|dbte|dc\-s|devi|dica|dmob|do(c|p)o|ds(12|\-d)|el(49|ai)|em(l2|ul)|er(ic|k0)|esl8|ez([4-7]0|os|wa|ze)|fetc|fly(\-|_)|g1 u|g560|gene|gf\-5|g\-mo|go(\.w|od)|gr(ad|un)|haie|hcit|hd\-(m|p|t)|hei\-|hi(pt|ta)|hp( i|ip)|hs\-c|ht(c(\-| |_|a|g|p|s|t)|tp)|hu(aw|tc)|i\-(20|go|ma)|i230|iac( |\-|\/)|ibro|idea|ig01|ikom|im1k|inno|ipaq|iris|ja(t|v)a|jbro|jemu|jigs|kddi|keji|kgt( |\/)|klon|kpt |kwc\-|kyo(c|k)|le(no|xi)|lg( g|\/(k|l|u)|50|54|\-[a-w])|libw|lynx|m1\-w|m3ga|m50\/|ma(te|ui|xo)|mc(01|21|ca)|m\-cr|me(rc|ri)|mi(o8|oa|ts)|mmef|mo(01|02|bi|de|do|t(\-| |o|v)|zz)|mt(50|p1|v )|mwbp|mywa|n10[0-2]|n20[2-3]|n30(0|2)|n50(0|2|5)|n7(0(0|1)|10)|ne((c|m)\-|on|tf|wf|wg|wt)|nok(6|i)|nzph|o2im|op(ti|wv)|oran|owg1|p800|pan(a|d|t)|pdxg|pg(13|\-([1-8]|c))|phil|pire|pl(ay|uc)|pn\-2|po(ck|rt|se)|prox|psio|pt\-g|qa\-a|qc(07|12|21|32|60|\-[2-7]|i\-)|qtek|r380|r600|raks|rim9|ro(ve|zo)|s55\/|sa(ge|ma|mm|ms|ny|va)|sc(01|h\-|oo|p\-)|sdk\/|se(c(\-|0|1)|47|mc|nd|ri)|sgh\-|shar|sie(\-|m)|sk\-0|sl(45|id)|sm(al|ar|b3|it|t5)|so(ft|ny)|sp(01|h\-|v\-|v )|sy(01|mb)|t2(18|50)|t6(00|10|18)|ta(gt|lk)|tcl\-|tdg\-|tel(i|m)|tim\-|t\-mo|to(pl|sh)|ts(70|m\-|m3|m5)|tx\-9|up(\.b|g1|si)|utst|v400|v750|veri|vi(rg|te)|vk(40|5[0-3]|\-v)|vm40|voda|vulc|vx(52|53|60|61|70|80|81|83|85|98)|w3c(\-| )|webc|whit|wi(g |nc|nw)|wmlb|wonu|x700|yas\-|your|zeto|zte\-/i.test(a.substr(0,4))) check = true;})(navigator.userAgent||navigator.vendor||window.opera);
+  return check;
+};
+
+function getPopup(itemid,dat,server,price,gems){
+	var myRand = parseInt(Math.random()*999999);
+	if(!server){
+		server = "";
+	}
+
+    if(!price) {
+        price = 0;
+    }
+
+	if(!gems) {
+		gems = 0;
+	}
+
+	send_url = "/item_rollover.php?id="+itemid+"&data="+dat+"&r="+myRand+"&itemserver="+server+"&pr="+price+"&gems="+gems;
+	requester = createRequester();
+	requester.onreadystatechange = function(){
+		if(requester.readyState == 4 && requester.status == 200){
+			tipobj.innerHTML = requester.responseText;
+		}
+	}
+	
+	requester.open("GET", send_url);
+	
+	if(OS == 'IE'){
+		requester.send();
+	}
+	else{
+		requester.send(null);
+	}
+}
+</script>
+	<center>
+
+	<!--  BEGIN NAVBAR  -->
+    <div class="header-container fixed-top">
+        <header class="header navbar navbar-expand-sm">
+
+
+            <ul class="navbar-item theme-brand flex-row">
+                <li class="nav-item">
+                    <a href="/home">
+                        <img src="/assets/img/outwarlogo.webp" class="navbar-logo" alt="logo">
+                    </a>
+                </li>
+            </ul>
+            <ul class="navbar-item theme-brand flex-row  ml-auto">
+                <li class="nav-item theme-text" style="margin-bottom: -5px; margin-right:1px">
+                    <a href="/world" class="nav-link topbutton"><img src="/img/explore_world.gif" class="navbar-logo" alt="logo"></a>
+                </li>
+                <li class="nav-item theme-text" style="margin-bottom: -5px; margin-right:1px">
+                    <a href="/dungeons" class="nav-link topbutton"><img src="/img/dungeons.gif" class="navbar-logo" alt="logo"></a>
+                </li>
+                <li class="nav-item theme-text" style="margin-bottom: -5px; margin-right:1px">
+                    <a href="/challenge" class="nav-link topbutton"><img src="/img/challenges.gif" class="navbar-logo" alt="logo"></a>
+                </li>
+                <li class="nav-item theme-text" style="margin-bottom: -5px; margin-right:1px">
+					<a href="/news" class="nav-link topbutton">  <img src="/img/news-active.gif" class="navbar-logo" alt="logo"> </a>                    
+                </li>
+                <li class="nav-item theme-text" style="margin-bottom: -5px;">
+                    <a href="/discordchat.php" class="nav-link topbutton">  <img src="/img/discord.gif" class="navbar-logo" alt="logo"> </a>
+                </li>
+            </ul>
+
+
+            <ul class="navbar-item flex-row margin-on-mob">
+
+                <li class="nav-item dropdown language-dropdown">
+
+                <a href="/world" class="nav-link topbutton"><img src="/img/explore_world.gif" class="navbar-logo" alt="logo"></a>
+
+                    <div class="dropdown-menu position-absolute" aria-labelledby="language-dropdown">
+                        <a class="dropdown-item d-flex" href="/world"><img src="/assets/img/exploreworld.webp" alt="logo"></a>
+                        <a class="dropdown-item d-flex" href="/dungeons"><img src="/assets/img/dungeons.webp" alt="logo"></a>
+                        <a class="dropdown-item d-flex" href="challenge"><img src="/assets/img/challenges.webp" alt="logo"></a>
+                        <a class="dropdown-item d-flex" href="/news"><img src="/assets/img/recentnews.webp" alt="logo"></a>
+                        <a class="dropdown-item d-flex" href="/discordchat.php"><img src="/assets/img/discord.webp" alt="logo"></a>
+                    </div>
+                </li>
+
+            </ul>
+        </header>
+    </div>
+    <!--  END NAVBAR  -->
+
+	<!-- INCLUDE TOOLBAR-->
+	<script>
+	function statsCopyClipboard() {
+		window.clipboardData.setData('Text', 'https://sigil.outwar.com/page?x=11111');
+	}
+
+	function swapCharacter() {
+		uid = document.getElementById('toolbar_uid').value;
+		if (uid > 0) { window.location = "/world?suid=" + uid + "&serverid=1"; }
+		if (uid < 1) { window.location = "/myaccount"; }
+	}
+
+	$(function () {
+
+
+	});
+</script>
+
+
+<div class="sub-header-container">
+	<header class="header navbar navbar-expand-sm">
+		<a href="javascript:void(0);" class="sidebarCollapse" data-placement="bottom"><svg
+				xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+				stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+				class="feather feather-menu">
+				<line x1="3" y1="12" x2="21" y2="12"></line>
+				<line x1="3" y1="6" x2="21" y2="6"></line>
+				<line x1="3" y1="18" x2="21" y2="18"></line>
+			</svg></a>
+
+		<ul class="navbar-nav flex-row mr-auto toolbar-nav">
+
+							<li class="nav-item more-dropdown">
+					<div class="dropdown  custom-dropdown-icon">
+						<select id="charselectdropdown" style="">
+							<optgroup label="My Characters">
+																	<option value="10001" >
+										CHAR_1									</option>
+																	<option value="10002" selected >
+										CHAR_2									</option>
+																	<option value="10003" >
+										CHAR_3									</option>
+																	<option value="10004" >
+										CHAR_4									</option>
+																	<option value="10005" >
+										CHAR_5									</option>
+																	<option value="10006" >
+										CHAR_6									</option>
+																	<option value="10007" >
+										CHAR_7									</option>
+																	<option value="10008" >
+										CHAR_8									</option>
+																	<option value="10009" >
+										CHAR_9									</option>
+																	<option value="10010" >
+										CHAR_10									</option>
+																	<option value="10011" >
+										CHAR_11									</option>
+																	<option value="10012" >
+										CHAR_12									</option>
+																	<option value="10013" >
+										CHAR_13									</option>
+																	<option value="10014" >
+										CHAR_14									</option>
+																	<option value="10015" >
+										CHAR_15									</option>
+																	<option value="10016" >
+										CHAR_16									</option>
+																	<option value="10017" >
+										CHAR_17									</option>
+																	<option value="10018" >
+										CHAR_18									</option>
+																	<option value="10019" >
+										CHAR_19									</option>
+																	<option value="10020" >
+										CHAR_20									</option>
+																	<option value="10021" >
+										CHAR_21									</option>
+																	<option value="10022" >
+										CHAR_22									</option>
+																	<option value="10023" >
+										CHAR_23									</option>
+																	<option value="10024" >
+										CHAR_24									</option>
+																	<option value="10025" >
+										CHAR_25									</option>
+																	<option value="10026" >
+										CHAR_26									</option>
+																	<option value="10027" >
+										CHAR_27									</option>
+																	<option value="10028" >
+										CHAR_28									</option>
+																	<option value="10029" >
+										CHAR_29									</option>
+																	<option value="10030" >
+										CHAR_30									</option>
+																	<option value="10031" >
+										CHAR_31									</option>
+																	<option value="10032" >
+										CHAR_32									</option>
+																	<option value="10033" >
+										CHAR_33									</option>
+																	<option value="10034" >
+										CHAR_34									</option>
+																	<option value="10035" >
+										CHAR_35									</option>
+																	<option value="10036" >
+										CHAR_36									</option>
+																	<option value="10037" >
+										CHAR_37									</option>
+																	<option value="10038" >
+										CHAR_38									</option>
+																	<option value="10039" >
+										CHAR_39									</option>
+																	<option value="10040" >
+										CHAR_40									</option>
+																	<option value="10041" >
+										CHAR_41									</option>
+																	<option value="10042" >
+										CHAR_42									</option>
+																	<option value="10043" >
+										CHAR_43									</option>
+																	<option value="10044" >
+										CHAR_44									</option>
+																	<option value="10045" >
+										CHAR_45									</option>
+																	<option value="10046" >
+										CHAR_46									</option>
+																	<option value="10047" >
+										CHAR_47									</option>
+																	<option value="10048" >
+										CHAR_48									</option>
+																	<option value="10049" >
+										CHAR_49									</option>
+																	<option value="10050" >
+										CHAR_50									</option>
+																	<option value="10051" >
+										CHAR_51									</option>
+																	<option value="10052" >
+										CHAR_52									</option>
+																	<option value="10053" >
+										CHAR_53									</option>
+																	<option value="10054" >
+										CHAR_54									</option>
+																	<option value="10055" >
+										CHAR_55									</option>
+																	<option value="10056" >
+										CHAR_56									</option>
+																	<option value="10057" >
+										CHAR_57									</option>
+																	<option value="10058" >
+										CHAR_58									</option>
+																	<option value="10059" >
+										CHAR_59									</option>
+																	<option value="10060" >
+										CHAR_60									</option>
+																	<option value="10061" >
+										CHAR_61									</option>
+																	<option value="10062" >
+										CHAR_62									</option>
+																	<option value="10063" >
+										CHAR_63									</option>
+																	<option value="10064" >
+										CHAR_64									</option>
+																	<option value="10065" >
+										CHAR_65									</option>
+																	<option value="10066" >
+										CHAR_66									</option>
+																	<option value="10067" >
+										CHAR_67									</option>
+																	<option value="10068" >
+										CHAR_68									</option>
+																	<option value="10069" >
+										CHAR_69									</option>
+																	<option value="10070" >
+										CHAR_70									</option>
+																	<option value="10071" >
+										CHAR_71									</option>
+																	<option value="10072" >
+										CHAR_72									</option>
+																	<option value="10073" >
+										CHAR_73									</option>
+																	<option value="10074" >
+										CHAR_74									</option>
+																	<option value="10075" >
+										CHAR_75									</option>
+																<option value="0">--Change Server--</option>
+
+							<optgroup label="Trustees">
+								
+						</select>
+					</div>
+				</li>
+
+				<script type="text/javascript">
+					var isLoading = false;
+					var areTrusteesLoaded = false;
+					var areTrusteesLoading = false;
+					$('#charselectdropdown').select2({
+						dropdownAutoWidth: true,
+						templateResult: formatState
+					});
+
+					$('#charselectdropdown').on('select2:select', function (e) {
+						var data = e.params.data;
+
+						if (data.id > 0) {
+							window.location = '/world?suid=' + data.id + '&serverid=1';
+						}
+						else {
+							window.location = '/myaccount';
+						}
+					});
+
+					$('#charselectdropdown').on('select2:opening', function (e) {
+						if (areTrusteesLoading)
+							return false;
+
+						if (areTrusteesLoaded)
+							return true;
+
+						areTrusteesLoading = true;
+
+						$.getJSON('/ajax/trusteeList.php?dropdown=1', function (data) {
+							$('#charselectdropdown optgroup[label="Trustees"]').empty();
+							$.each(data['results'][1]['children'], function (i, item) {
+								if (item.id == 11111)
+									return;
+
+								var newOption = new Option(item.text, item.id, false, false);
+								$('#charselectdropdown').append(newOption).trigger('change');;
+							});
+
+							areTrusteesLoaded = true;
+							areTrusteesLoading = false;
+
+							setTimeout(() => {
+								$('#charselectdropdown').select2('open');
+							}, 0);
+
+						});
+
+						return false;
+					});
+
+
+					function formatState(state) {
+						if (!state.id) {
+							return state.text;
+						}
+
+						if (state.id == 0) {
+							return $('<i>' + state.text + '</i>');
+						}
+
+						return state.text;
+					};
+				</script>
+
+						<li class="nav-item more-dropdown little-space hide-on-mob ml-3">
+				<a href="#" ONMOUSEOVER="statspopup(event,'<tr><td><b>Points:</b></td><td><font size=2 color=#00FF00>0.00</font></td></tr><tr><td><b>Premium:</b></td><td><font size=2 color=#00FF00>15.</font><font color=#00CC00>74</font><tr><td><b>Tokens:</b></td><td><font size=2 color=#00FF00>35</font><tr><td><b>Skill:</b></td><td>15</td></tr>')" ONMOUSEOUT="kill()"><img border="0"
+						src="/images/toolbar/Points.png" align="middle"></a>
+			</li>
+			<li class="nav-item more-dropdown little-space hide-on-mob">
+				<a href="#" ONMOUSEOVER="statspopup(event,'<tr><td><b>Gold:</b></td><td>2,180,582</td></tr>')" ONMOUSEOUT="kill()"><img border="0"
+						src="/images/toolbar/Gold.png" align="middle"></a>
+			</li>
+			
+			<li class="nav-item more-dropdown little-space hide-on-mob">
+				<p class="top-clock">
+					3:39am				</p>
+			</li>
+			
+			<li class="nav-item more-dropdown little-space hide-on-mob">
+				<p class="top-level" ONMOUSEOVER="statspopup(event,'<tr><td><b>Attack:</b></td><td>12,137</td></tr><tr><td><b>Hit Points:</b></td><td>23,888</td></tr><tr><td><b>Critical:</b></td><td>85%</td></tr><tr><td><b>Block:</b></td><td>15%</td></tr>')" ONMOUSEOUT="kill()">
+					<span>Level:</span> <span class="toolbar_level">
+						77					</span>
+				</p>
+			</li>
+			<li class="nav-item more-dropdown little-space hide-on-mob">
+				<p class="top-exp" ONMOUSEOVER="statspopup(event,'<!--<tr><td><b>From Underlings:</b></td><td>0</td></tr>--><tr><td><b>Enhancement Exp:</b></td><td>0</td></tr><tr><td><b>Needed to Level:</b></td><td>34,286,516</td></tr><tr><td><b>Growth Today:</b></td><td>0</td></tr><tr><td><b>Per Turn:</b></td><td>3,870</td></tr><tr><td><b>Minimum:</b></td><td>675,000,000</td></tr>')" ONMOUSEOUT="kill()">
+					<span>EXP:</span> <span class="toolbar_exp">
+						961,313,484					</span>
+				</p>
+			</li>
+			<li class="nav-item more-dropdown little-space hide-on-mob">
+				<p class="top-rage" ONMOUSEOVER="statspopup(event,'<tr><td><b>Per Turn:</b></td><td>4,150</td></tr><tr><td><b>Maximum:</b></td><td>41,150</td></tr><tr><td><b>Rampage:</b></td><td>80%</td></tr>')" ONMOUSEOUT="kill()"><span
+						style="color:#FFFFFF">RAGE:</span> <span class="toolbar_rage">
+						41,060					</span></p>
+			</li>
+
+							<li class="nav-item more-dropdown little-space hide-on-mob progress-top">
+					<div class="progress br-30" style="background-color:#252c56"
+						ONMOUSEOVER="statspopup(event,'Strength: 100')" ONMOUSEOUT="kill()">
+						<div class="progress-bar bg-danger bs-tooltip" role="progressbar"
+							style="width: 100%">
+								<div style="width:0%;height:8px;background-color:#990000;"></div>
+							</div>
+					</div>
+				</li>
+					</ul>
+
+		<ul class="navbar-item flex-row mr-auto mobile-little hide-on-desk">
+
+			<li class="nav-item mob-top dropdown language-dropdown">
+				<a href="javascript:void(0);" class="nav-link dropdown-toggle" id="language-dropdown"
+					data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+					<div class="dropdown-item d-flex little-space">
+						<p class="top-exp mr-1 menu_mid_size"><span>EXP:</span> <span class="toolbar_exp">
+								961,313,484<span></p>
+						<p class="top-rage"><span style="color:#FFFFFF">RAGE:</span> <span
+								class="toolbar_rage">
+								41,060<span></p>
+					</div>
+					<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+						stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+						class="feather feather-chevron-down" style="
+								position: absolute;
+								top: 13px;
+								left: 10px;
+							">
+						<polyline points="6 9 12 15 18 9"></polyline>
+					</svg>
+				</a>
+				<div class="dropdown-menu custom-dropdown-menu position-absolute" aria-labelledby="language-dropdown">
+					<div class="dropdown-item d-flex little-space">
+						<p class="top-clock">
+							3:39am						</p>
+					</div>
+					<div class="dropdown-item d-flex little-space">
+						<p class="top-level" ONMOUSEOVER="statspopup(event,'<tr><td><b>Attack:</b></td><td>12,137</td></tr><tr><td><b>Hit Points:</b></td><td>23,888</td></tr><tr><td><b>Critical:</b></td><td>85%</td></tr><tr><td><b>Block:</b></td><td>15%</td></tr>')" ONMOUSEOUT="kill()">
+							<span>Level:</span> <span class="toolbar_level">
+								77							</span>
+						</p>
+					</div>
+					<div class="dropdown-item d-flex little-space">
+						<p class="top-exp" ONMOUSEOVER="statspopup(event,'<!--<tr><td><b>From Underlings:</b></td><td>0</td></tr>--><tr><td><b>Enhancement Exp:</b></td><td>0</td></tr><tr><td><b>Needed to Level:</b></td><td>34,286,516</td></tr><tr><td><b>Growth Today:</b></td><td>0</td></tr><tr><td><b>Per Turn:</b></td><td>3,870</td></tr><tr><td><b>Minimum:</b></td><td>675,000,000</td></tr>')" ONMOUSEOUT="kill()">
+							<span>EXP:</span> <span class="toolbar_exp">
+								961,313,484							</span>
+						</p>
+					</div>
+					<div class="dropdown-item d-flex little-space">
+						<p class="top-rage" ONMOUSEOVER="statspopup(event,'<tr><td><b>Per Turn:</b></td><td>4,150</td></tr><tr><td><b>Maximum:</b></td><td>41,150</td></tr><tr><td><b>Rampage:</b></td><td>80%</td></tr>')" ONMOUSEOUT="kill()">
+							<span>RAGE:</span> <span class="toolbar_rage">
+								41,060							</span>
+						</p>
+					</div>
+
+					<div class="dropdown-item d-flex little-space">
+						<p class="top-points">
+							<b>Points: </b>
+							<td>
+								<font size=2 color=#00FF00>0.00</font>
+								<b class="pl-2">Premium: </b>
+							<td>
+								<font size=2 color=#00FF00>15.</font>
+								<font color=#00CC00>74</font>
+
+						</p>
+					</div>
+					<div class="dropdown-item d-flex little-space">
+						<p class="top-points">
+							<b>Tokens: </b>
+							<td>
+								<font size=2 color=#00FF00>35</font>
+								<b class="pl-2">Skill: </b>
+							<td>
+								15					</div>
+
+
+					<div class="dropdown-item d-flex little-space progress-top">
+						<div class="progress br-30">
+							<div class="progress-bar bg-danger bs-tooltip" role="progressbar"
+								style="width: 100%"
+								ONMOUSEOVER="statspopup(event,'Strenght: 100')"
+								ONMOUSEOUT="kill()">
+									<div style="width:0%;height:8px;background-color:#990000;"></div>
+								</div>
+						</div>
+					</div>
+					<div class="dropdown-item d-flex">
+													<a href="/weeklyquests" class="nav-link dropdown-toggle" id="notificationDropdown"
+								ONMOUSEOVER="statspopup(event,'Daily Quests!')" ONMOUSEOUT="kill()">
+								<img src="/images/toolbar/DailyQuest.png" class="navbar-logo" alt="logo">
+							</a>
+											</div>
+
+				</div>
+			</li>
+		</ul>
+
+		<ul class="navbar-item flex-row ml-auto">
+							<li class="nav-item dropdown notification-dropdown hide-on-mob">
+					<a href="/raidtools" class="nav-link dropdown-toggle"
+						ONMOUSEOVER="statspopup(event,'<tr><td><b>Today\'s new guardians:<br /><br />Q-SEC Commander has been spotted!<br><br>Zhulian Friar has been spotted!<br><br>Nayark the Mummified Sorcerer has been spotted!<br><br>Sarcrina the Astral Priestess has been spotted!<br><br>Ancient Magus Tarkin has been spotted!<br><br>Volgan the Living Ironbark has been spotted!<br><br>Crolvak, the Fire Master has been spotted!<br><br>Animation of Power has been spotted!<br><br>Jorun the Blazing Swordsman has been spotted!<br><br>Zikkir the Dark Archer has been spotted!<br><br>Envar, Demon of Lunacy has been spotted!<br><br>Banok, Demon of Insanity has been spotted!<br><br>Rezun, Demon of Madness has been spotted!<br><br>Animation of Versatility has been spotted!<br><br>Kretok, Descendant of Nature has been spotted!<br><br>Archdevil Yirkon has been spotted!<br><br>Dlanod, the Crazed Chancellor has been spotted!<br><br>Thanox, Balancer of Chaos has been spotted!<br><br>Keeper of Nature has been spotted!<br><br>Xynak, the Arcane Master has been spotted!<br><br>Agnar, Astral Betrayer has been spotted!<br><br>Felroc, Overseer of Hellfire has been spotted!<br><br>Rillax, Twin of Wisdom has been spotted!<br><br>Villax, Twin of Strength has been spotted!<br><br><b><a href=raidtools.php style=color:#00CC00>(Click for Raid Tools)</a></b></b></td></tr>','#000000',350)"
+						ONMOUSEOUT="kill()"><img src="/images/toolbar/Spawned.png" border="0"
+							alt="Spawned Raids"></a>
+				</li>
+											<li class="nav-item dropdown notification-dropdown hide-on-mob">
+					<a href="/weeklyquests" class="nav-link dropdown-toggle" id="notificationDropdown"
+						ONMOUSEOVER="statspopup(event,'Daily Quests!')" ONMOUSEOUT="kill()">
+						<img src="/images/toolbar/DailyQuest.png" class="navbar-logo" alt="logo">
+					</a>
+				</li>
+			
+			<li class="nav-item dropdown notification-dropdown">
+				<a href="javascript:void(0);" onclick="toggleEquipment();" class="nav-link dropdown-toggle"
+					id="notificationDropdown" ONMOUSEOVER="statspopup(event,'Click to view Equipment')"
+					ONMOUSEOUT="kill()">
+					<img src="/images/toolbar/Equipment.png" class="navbar-logo" alt="logo">
+				</a>
+			</li>
+			<li class="nav-item dropdown notification-dropdown">
+				<a onclick="toggleBackpack(null,11111);" href="javascript:void(0);"
+					class="nav-link dropdown-toggle" id="notificationDropdown"
+					ONMOUSEOVER="statspopup(event,'Click to view Backpack')" ONMOUSEOUT="kill()">
+					<img src="/images/toolbar/Backpack.png" class="navbar-logo" alt="logo">
+				</a>
+			</li>
+
+			<li class="nav-item dropdown user-profile-dropdown hide-on-mob">
+				<a onclick="toggleQuests();" href="javascript:void(0);" class="nav-link dropdown-toggle user"
+					id="userProfileDropdown" ONMOUSEOVER="statspopup(event,'Click to view Quests')" ONMOUSEOUT="kill()">
+					<img src="/images/toolbar/Quests.png" alt="avatar">
+				</a>
+			</li>
+		</ul>
+
+	</header>
+</div>
+<div class="sub-header-container2">
+	<div class="widget-content">
+		<div class="order-summary">
+			<div class="summary-list">
+				<div class="w-summary-details">
+					<div class="w-summary-stats">
+						<div class="progress"
+							ONMOUSEOVER="statspopup(event,'<b>286,313,484 / 320,600,000xp')"
+							ONMOUSEOUT="kill()">
+							<div id="expbar" class="progress-bar bg-gradient-success" role="progressbar"
+								style="width: 89.305515907673%"
+								aria-valuemin="0" aria-valuemax="100"></div>
+						</div>
+					</div>
+
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+<!-- <div id="t_exp" style="border:1px solid #666666;height: 5px; width: 992px;"  onmouseover="statspopup(event,'<tr><td><b>286,313,484 / 320,600,000xp</b></td></tr>')" onmouseout="kill();" >
+	<div id="expbar" style="height: 5px; width:89%; background-color:#009900; font-size: 1px;"></div>
+</div> -->
+    <!--  BEGIN MAIN CONTAINER  -->
+    <div class="main-container justify-content-center " id="container">
+        <div class="overlay"></div>
+
+		    <!--  BEGIN SIDEBAR  -->
+    <div class="sidebar-wrapper sidebar-theme">
+        <nav id="sidebar">
+            <div class="shadow-bottom"></div>
+            <ul class="list-unstyled menu-categories" id="accordionExample">
+                                    <!-- SERVER HOME -->
+                    <li class="menu">
+                        <a href="/myaccount" class="dropdown-toggle">
+                            <div class="">
+                                <i class="fa fa-address-card"></i>
+                                <span> MY RGA</span>
+                            </div>
+                        </a>
+                    </li>
+                                        <!-- CHARACTER HOME -->
+                    <li class="menu">
+                        <a href="/home" class="dropdown-toggle">
+                            <div class="">
+                                <i class="fa fa-home"></i>
+                                <span> HOME</span>
+                            </div>
+                        </a>
+                    </li>
+                    <!-- MEMBERS -->
+                    <li class="menu">
+                        <a href="#components" data-toggle="collapse" aria-expanded="false" class="dropdown-toggle">
+                            <div class="">
+                                <i class="fas fa-user fa-fw"></i>
+                                <span>CHARACTER</span>
+                            </div>
+                            <div>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                    class="feather feather-chevron-right">
+                                    <polyline points="9 18 15 12 9 6"></polyline>
+                                </svg>
+                            </div>
+                        </a>
+                        <ul class="collapse submenu list-unstyled" id="components" data-parent="#accordionExample">
+                            <li><a href="/profile"> PROFILE</a></li>
+                            <li><a href="/ow_messagecenter"> MESSAGE CENTER</a></li>
+                            <li><a href="/allies"> MY ALLIES</a></li>
+                            <li>
+                                <a class="dropdown-toggle collapsed" href="#pvpmenu" id="dropdown06" data-toggle="collapse"
+                                    aria-expanded="false">PVP <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
+                                        viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                        stroke-linecap="round" stroke-linejoin="round" class="feather feather-chevron-right">
+                                        <polyline points="9 18 15 12 9 6"></polyline>
+                                    </svg></a>
+                                <ul id="pvpmenu" class="list-unstyled sub-submenu collapse">
+                                    <li><a href="/pvptourney"> OPEN PVP TOURNEY</a></li>
+                                    <li><a href="/closedpvp"> PVP BRAWL</a></li>
+                                    <li><a href="/closedpvp?type=1"> FACTION BRAWL</a></li>
+                                </ul>
+                            </li>
+                            <li><a href="/gladiator"> GLADIATORS</a></li>
+                            <li><a href="/envoy_overview"> ENVOYS</a></li>
+                    </li>
+                    <li><a href="/collections"> COLLECTIONS</a></li>
+                                        <li><a href="/underlings"> UNDERLINGS</a></li>
+                    <li><a href="/achievements"> ACHIEVEMENTS</a></li>
+                    <li><a href="/user_preferences"> PREFERENCES</a></li>
+                    <li>
+                        <a href="https://rampidgaming.outwar.com/ppoverview_s2?owsrv=1&owchar=11111&rg_sess_id=REDACTED_SESS_ID"
+                            target="_blank"> PREFERRED PLAYER</a>
+                    </li>
+                    <li><a href="/?cmd=logout"> LOGOUT</a></li>
+                </ul>
+                </li>
+                <!-- MARKETPLACE -->
+                <li class="menu">
+                    <a href="#elements" data-toggle="collapse" aria-expanded="false" class="dropdown-toggle">
+                        <div class="">
+                            <i class="fa fa-shopping-cart fa-fw"></i>
+                            <span>MARKETPLACE</span>
+                        </div>
+                        <div>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                class="feather feather-chevron-right">
+                                <polyline points="9 18 15 12 9 6"></polyline>
+                            </svg>
+                        </div>
+                    </a>
+                    <ul class="collapse submenu list-unstyled" id="elements" data-parent="#accordionExample">
+                        <li><a href="/treasury?type=-1"> TREASURY</a></li>
+                                                    <li><a href="/treasury?type=192"> AMULET SHOP</a></li>
+                                                <li><a href="/blacksmith"> BLACKSMITH</a></li>
+                        <li><a href="/cauldron"> CAULDRON</a></li>
+                        <li><a href="/supplies"> SUPPLIES</a></li>
+                        <li><a href="/itemdb"> ITEM DATABASE</a></li>
+                    </ul>
+                </li>
+                <!-- RANKINGS -->
+                <li class="menu">
+                    <a href="/newrankings" aria-expanded="false" class="dropdown-toggle">
+                        <div class="">
+                            <i class="fa fa-trophy-alt fa-fw"></i>
+                            <span>RANKINGS</span>
+                        </div>
+                    </a>
+                </li>
+                <!-- ACTIONS -->
+                <li class="menu">
+                    <a href="#datatables" data-toggle="collapse" aria-expanded="false" class="dropdown-toggle">
+                        <div class="">
+                            <i class="fas fa-location-arrow fa-fw"></i>
+                            <span>ACTIONS</span>
+                        </div>
+                        <div>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                class="feather feather-chevron-right">
+                                <polyline points="9 18 15 12 9 6"></polyline>
+                            </svg>
+                        </div>
+                    </a>
+                    <ul class="collapse submenu list-unstyled" id="datatables" data-parent="#accordionExample">
+                        <li><a href="/attack_search"> ATTACK / SEARCH</a></li>
+                        <li><a href="/attacklog"> ATTACK LOG</a></li>
+                        <li><a href="/myhitlist"> MY HITLIST</a></li>
+                        <li><a href="/bounty"> BOUNTY LIST</a></li>
+                        <li><a href="/questlog"> QUEST LOG</a></li>
+                        <li><a href="/cast_skills"> SKILLS</a></li>
+                        <li><a href="/auto_skiller"> AUTO SKILLER</a></li>
+                        <li><a href="/vault"> VAULT</a></li>
+                        <li><a href="/augmentequip"> MANAGE AUGMENTS</a></li>
+                        <li><a href="/itemtransfer"> ITEM TRANSFER</a></li>
+                        <li><a href="/pointtransfer"> TRANSFER POINTS</a></li>
+                    </ul>
+                </li>
+                <!-- CREW -->
+                <li class="menu">
+                    <a href="#forms" data-toggle="collapse" aria-expanded="false" class="dropdown-toggle">
+                        <div class="">
+                            <i class="fas fa-shield fa-fw"></i>
+                            <span>CREW</span>
+                        </div>
+                        <div>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                class="feather feather-chevron-right">
+                                <polyline points="9 18 15 12 9 6"></polyline>
+                            </svg>
+                        </div>
+                    </a>
+                    <ul class="collapse submenu list-unstyled" id="forms" data-parent="#accordionExample">
+                                                    <li><a href="/crew_home"> CREW HOME</a></li>
+                            <li><a href="/crew_bossspawns"> RAID BOSSES</a></li>
+                            <li><a href="/crew_profile"> CREW PROFILE</a></li>
+                            <li><a href="/crew_vault"> CREW VAULT</a></li>
+                            <li><a href="/crew_hitlist"> CREW HITLIST</a></li>
+                            <li><a href="/primegods"> PRIME GODS</a></li>
+                            <li><a href="/raidtools"> GOD TELEPORT</a></li>
+                                                        <li><a href="/crew_leavecrew"> LEAVE CREW</a></li>
+                                            </ul>
+                </li>
+                <!-- CASINO -->
+                <li class="menu">
+                    <a href="#users" data-toggle="collapse" aria-expanded="false" class="dropdown-toggle">
+                        <div class="">
+                            <i class="fas fa-usd-square fa-fw"></i>
+                            <span>CASINO</span>
+                        </div>
+                        <div>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                class="feather feather-chevron-right">
+                                <polyline points="9 18 15 12 9 6"></polyline>
+                            </svg>
+                        </div>
+                    </a>
+                    <ul class="collapse submenu list-unstyled" id="users" data-parent="#accordionExample">
+                                                <li><a href="/scratch_ticket"> SCRATCH TICKETS</a></li>
+                        <li><a href="/raffle"> 50/50 RAFFLE</a></li>
+                        <li><a href="/kotw"> KING OF THE WEEK</a></li>
+                                            </ul>
+                </li>
+                <!-- CHALLENGES -->
+                <li class="menu">
+                    <a href="/challenge" class="dropdown-toggle">
+                        <div class="">
+                            <i class="fas fa-trophy fa-fw"></i>
+                            <span>CHALLENGES</span>
+                        </div>
+                    </a>
+                </li>
+                                    <li class="menu">
+                        <a href="/event?eventid=woz" class="dropdown-toggle">
+                            <div class="">
+                                <i class="fas fa-bolt fa-fw"></i>
+                                <span>WAR OF ZHUL</span>
+                            </div>
+                        </a>
+                    </li>
+                                <!-- EVENTS -->
+                                <!-- EXPLORE -->
+                <li class="menu">
+                    <a href="/world" class="dropdown-toggle">
+                        <div class="">
+                            <i class="fas fa-globe fa-fw"></i>
+                            <span>WORLD</span>
+                        </div>
+                    </a>
+                </li>
+                <!--<li>
+                    <div onclick="window.location='/trialofpower'"><h3><i class="fas fa-bolt fa-fw"></i> TRIAL OF PWR</h3></div>
+                </li>-->
+                <p>&nbsp;</p>
+                <a rel="shadowbox;height=494;width=775" class="sbox"
+                    href="https://rampidgaming.outwar.com/stripe_buy?game=ow&outwar=0&wsrv=$subDomain&lvl=$user[level]&rg_sess_id=REDACTED_SESS_ID"
+                    class="mt-3">
+                    <img src="/assets/img/getpoints.webp">
+                </a>
+                                    <p><a
+                            href="https://rampidgaming.outwar.com/ppoverview_s2.php?owsrv=1&owchar=11111&rg_sess_id=REDACTED_SESS_ID">Get
+                            preferred player</a></p>
+                                        </ul>
+        </nav>
+    </div>
+		<!-- Ad Code for World goes here -->
+
+
+        
+	
+
+<div class="modal fade" id="attackmodal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="attacktitle">Attack</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-x"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
+            </div>
+            <form id="attackform" method="post">
+
+            <div class="modal-body">
+            <div class="form-group text-left">
+                    <p>Attack Message</p>
+                    <input id="attackmessage" type="text" name="message" placeholder="enter message..." class="form-control">
+                    <input type="submit" class="mt-4 btn btn-primary" value="Attack!">
+                </div>
+                This attack will cost you <span id="ragelabel"></span> rage.
+                <input size="1" type="hidden" id="rage-value" name="rage">
+                <input type="hidden" name="hash" id="attackhash">
+            </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="securityconfirm" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="securityconfirm-title">Security Confirm</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-x"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
+            </div>
+            <div class="modal-body">
+
+                <div class="row">
+                    <div class="col-1" style="min-width:70px">
+                        <img id="securityconfirm-image" class="itemimage">
+                    </div>
+                    <div class="col">
+                        <p class="modal-text text-left" id="securityconfirm-text"></p>
+                    </div>
+                </div>
+
+                     <div class="form-group mt-3" id="secwordgroup">
+                            <label for="">What is your favorite movie?</label>
+                            <input type="password" name="answer" class="form-control" id="secanswer">
+                        </div> 
+
+                        <div class="form-group mt-3" id="qtygroup">
+                            <label>Quantity:</label>
+                            <input type="text" name="quantity" class="form-control" id="qtyspinner">
+                        </div> 
+</div>
+            <form>
+                <div class="modal-footer">       
+                
+                    <button class="btn" data-dismiss="modal"><span>Cancel</span></button>
+                    <button type="button" class="btn btn-primary" id="securityconfirm-submit"><div id="securityconfirm-spinner" style="display:none" class="spinner-border" role="status">
+                        <span class="sr-only"></span>
+                        </div>      <span id="securityconfirm-okbutton">Delete</span></button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Main Content starts Here -->
+<div id="content" class="main-content">
+    <div class="layout-px-spacing">
+
+        <!-- Original code here -->
+        <div id="tooltip" style="position:absolute;visibility:hidden"></div>
+
+        <div id="levelup" style="background-color: green;border: black;width: 100%; height=50px;display: none;"><table width=100% height=50 cellpadding=0 cellspacing=0 border=0>
+        <td background="/landing/levelupbg.jpg" height=50><div align="center">
+            <table width=600 height=50 cellpadding=0 cellspacing=0 border=0>
+            <td align="center" valign="middle"><a rel="shadowbox;height=510;width=778" class="sbox" href="levelup.php" onclick="javascript:hidelevelup();"><img src="/landing/levelupcenter.jpg" height="50" border=0></a></td>
+            </table></div>
+        </td>
+        </table></div>
+
+        <div class="row justify-content-center" id="content-header-row">
+<script>
+	function showskills() {
+		if (requester.readyState == 4 && requester.status == 200) {
+			document.getElementById('ppskills').innerHTML = requester.responseText;
+		}
+	}
+
+	function getskills(skillid) {
+		var uname = document.getElementById('target').value;
+		var send_url = "ppskills.php?id=" + skillid + "&n=" + uname;
+		var ppskills = document.getElementById('ppskills');
+
+		requester = createRequester();
+		requester.onreadystatechange = showskills;
+		requester.open("GET", send_url, true);
+
+		if (OS == 'IE') {
+			requester.send();
+		} else {
+			requester.send(null);
+		}
+	}
+
+	function loadinfo() {
+		if (requester.readyState == 4 && requester.status == 200) {
+			document.getElementById('infocell').innerHTML = requester.responseText;
+		}
+	}
+
+	function loadskill(skillid) {
+		var send_url = "skills_info.php?id=" + skillid;
+		var infocell = document.getElementById('infocell');
+		infocell.innerHTML = "<div style=\"font-weight:bold;font-size:14pt;\">Retrieving skill information...</div>";
+
+		requester = createRequester();
+		requester.onreadystatechange = loadinfo;
+		requester.open("GET", send_url, true);
+
+		if (OS == 'IE') {
+			requester.send();
+		} else {
+			requester.send(null);
+		}
+
+		return false;
+	}
+
+	function setppskill(skillid) {
+		document.getElementById('ppskillid').value = skillid;
+	}
+
+	function skillPresetPopup(e, thetext) {
+		tipobj.className = 'skillPresetPop';
+		fixedtooltip(e, thetext, '#000000');
+	}
+
+	function skillPresetConfirm(form, title, text) {
+		swal({
+			title: title,
+			text: text,
+			type: 'warning',
+			showCancelButton: true,
+			confirmButtonText: 'Yes',
+			cancelButtonText: 'Cancel',
+			padding: '2em',
+			allowOutsideClick: true
+		}).then(function (result) {
+			if (result.value) {
+				form.submit();
+			}
+		});
+
+		return false;
+	}
+</script>
+
+
+<style>
+	.skillsbox {
+		position: relative;
+		padding: 10px;
+		background: rgb(224 230 237 / 40%);
+		border-radius: 6px;
+		background-color: #0f1d31;
+	}
+
+	.skilliconinline {
+		display: inline;
+		vertical-align: top;
+		float: left;
+	}
+
+	.skill-preset-actions {
+		position: absolute;
+		left: 18px;
+		top: -2px;
+		display: flex;
+		text-align: left;
+		white-space: nowrap;
+		z-index: 3;
+	}
+
+	.skill-preset-column {
+		position: relative;
+		width: 98px;
+		box-sizing: border-box;
+		padding: 0;
+		vertical-align: top;
+	}
+
+	.skill-preset-column:not(:last-child) {
+		margin-right: 17px;
+	}
+
+	.skill-preset-column:not(:last-child):after {
+		content: "";
+		position: absolute;
+		top: 4px;
+		right: -9px;
+		width: 1px;
+		height: 39px;
+		background: #3b4a61;
+	}
+
+	.skill-preset-actions form {
+		display: block;
+		margin: 0;
+		padding: 0;
+	}
+
+	.skill-preset-btn {
+		width: 98px;
+		height: 19px;
+		box-sizing: border-box;
+		font-size: 13px;
+		font-weight: bold;
+		line-height: 17px;
+		padding: 0 6px;
+		margin: 0 0 1px 0;
+		border: 1px solid #2575dc;
+		border-radius: 3px;
+		background: #2575dc;
+		color: #ffffff;
+		cursor: pointer;
+	}
+
+	.skill-preset-btn-save {
+		border-color: #6f42c1;
+		background: #6f42c1;
+		margin-bottom: 3px;
+	}
+
+	.skill-preset-btn-trained {
+		border-color: #28a745;
+		background: #28a745;
+		color: #ffffff;
+	}
+
+	.skill-preset-btn:disabled {
+		border-color: #596273;
+		background: #596273;
+		color: #ffffff;
+		cursor: default;
+		opacity: .85;
+	}
+
+	.skill-preset-btn-trained:disabled {
+		border-color: #28a745;
+		background: #28a745;
+		color: #ffffff;
+		opacity: .85;
+	}
+
+	.skillPresetPop {
+		color: #ffffff;
+		background-image: none !important;
+	}
+
+	#basic .statbox,
+	#basic .widget-header,
+	#basic .widget-header .row,
+	#basic .widget-header .col-12 {
+		overflow: visible;
+	}
+</style>
+
+<div id="basic" class="col-12 layout-spacing align-self-center">
+	<div class="statbox widget box box-shadow mb-1 pt-2 pb-1">
+		<div class="widget-header">
+			<div class="row">
+				<div class="col-12" style="position: relative;">
+					<h2>Character Skills</h2>
+					<div class="skill-preset-actions">
+													<div class="skill-preset-column">
+								<form method="post"
+									onsubmit="return skillPresetConfirm(this, 'Save Skill Preset 1?', 'This will overwrite the saved preset.');">
+									<input type="hidden" name="skill_preset_action" value="save">
+									<input type="hidden" name="skill_preset" value="1">
+									<button type="submit" class="skill-preset-btn skill-preset-btn-save"
+										>Save Preset
+										1</button>
+								</form>
+								<form method="post"
+									onsubmit="return skillPresetConfirm(this, 'Train Skill Preset 1?', 'Are you sure you want to train this preset?');">
+									<input type="hidden" name="skill_preset_action" value="train">
+									<input type="hidden" name="skill_preset" value="1">
+									<button type="submit"
+										class="skill-preset-btn"
+										disabled										onmouseover="skillPresetPopup(event,&quot;&lt;b&gt;No Skill Tree&lt;\/b&gt;&lt;br&gt;Total Required SP: 0&lt;br&gt;Current Required SP: 0&lt;br&gt;Available SP: 15&lt;br&gt;&lt;br&gt;No skills saved&quot;)"
+										onmouseout="kill();">Train Preset 1</button>
+								</form>
+							</div>
+													<div class="skill-preset-column">
+								<form method="post"
+									onsubmit="return skillPresetConfirm(this, 'Save Skill Preset 2?', 'This will overwrite the saved preset.');">
+									<input type="hidden" name="skill_preset_action" value="save">
+									<input type="hidden" name="skill_preset" value="2">
+									<button type="submit" class="skill-preset-btn skill-preset-btn-save"
+										>Save Preset
+										2</button>
+								</form>
+								<form method="post"
+									onsubmit="return skillPresetConfirm(this, 'Train Skill Preset 2?', 'Are you sure you want to train this preset?');">
+									<input type="hidden" name="skill_preset_action" value="train">
+									<input type="hidden" name="skill_preset" value="2">
+									<button type="submit"
+										class="skill-preset-btn"
+										disabled										onmouseover="skillPresetPopup(event,&quot;&lt;b&gt;No Skill Tree&lt;\/b&gt;&lt;br&gt;Total Required SP: 0&lt;br&gt;Current Required SP: 0&lt;br&gt;Available SP: 15&lt;br&gt;&lt;br&gt;No skills saved&quot;)"
+										onmouseout="kill();">Train Preset 2</button>
+								</form>
+							</div>
+													<div class="skill-preset-column">
+								<form method="post"
+									onsubmit="return skillPresetConfirm(this, 'Save Skill Preset 3?', 'This will overwrite the saved preset.');">
+									<input type="hidden" name="skill_preset_action" value="save">
+									<input type="hidden" name="skill_preset" value="3">
+									<button type="submit" class="skill-preset-btn skill-preset-btn-save"
+										>Save Preset
+										3</button>
+								</form>
+								<form method="post"
+									onsubmit="return skillPresetConfirm(this, 'Train Skill Preset 3?', 'Are you sure you want to train this preset?');">
+									<input type="hidden" name="skill_preset_action" value="train">
+									<input type="hidden" name="skill_preset" value="3">
+									<button type="submit"
+										class="skill-preset-btn"
+										disabled										onmouseover="skillPresetPopup(event,&quot;&lt;b&gt;No Skill Tree&lt;\/b&gt;&lt;br&gt;Total Required SP: 0&lt;br&gt;Current Required SP: 0&lt;br&gt;Available SP: 15&lt;br&gt;&lt;br&gt;No skills saved&quot;)"
+										onmouseout="kill();">Train Preset 3</button>
+								</form>
+							</div>
+											</div>
+					<span style="position: absolute;right:10px;top:0px">
+						<p>
+							15 sp
+						</p>
+					</span>
+				</div>
+			</div>
+
+		</div>
+	</div>
+	<div class="widget-content widget-content-area">
+		<div class="row">
+			<div class="col-12 col-lg-6 col 50 ">
+				<div class="skillsbox text-left">
+					Current Effects
+					<div class="w-100">
+									<img align="absmiddle" border="0" src="/images/skills/empower.png" hspace="2" width="25" height="25"
+				alt="Empower"
+				ONMOUSEOVER="popup(event,'<b>Level 9 Empower</b><br />You absorb a jolt of energy, making you stronger and raising your ATK by 450.<br />2 hours 51 mins left<br>Cast By PLAYER',808080)"
+				ONMOUSEOUT="kill()">
+								</div>
+				</div>
+			</div>
+
+			<div class="col-12 col-lg-6 col 50 ">
+				<div class="skillsbox text-left">
+					Cast Skills
+					<div class="w-100">
+								<img align="absmiddle" border="0" src="/images/skills/empower.png" hspace="2" width="25" height="25"
+			ONMOUSEOVER="popup(event,'<b>Level 9 Empower</b><br>You absorb a jolt of energy, making you stronger and raising your ATK by 450.<br>171 mins left<br>Cast On PLAYER','808080')"
+			ONMOUSEOUT="kill()">
+						</div>
+				</div>
+			</div>
+		</div>
+
+		<div class="row">
+			<div class="col-12 col-lg-7 simple-tab">
+				<ul class="nav nav-tabs  mb-3 mt-3" id="simpletab" role="tablist">
+					<li class="nav-item">
+						<a class="nav-link active" href="/cast_skills.php" role="tab"
+							aria-selected="true">Class</a>
+					</li>
+					<li class="nav-item">
+						<a class="nav-link " href="cast_skills.php?C=4" role="tab"
+							aria-selected="false">Ferocity</a>
+					</li>
+					<li class="nav-item">
+						<a class="nav-link " href="cast_skills.php?C=5" role="tab"
+							aria-selected="false">Preservation</a>
+					</li>
+					<li class="nav-item">
+						<a class="nav-link " href="cast_skills.php?C=6" role="tab"
+							aria-selected="false">Affliction</a>
+					</li>
+					<li class="nav-item">
+						<a class="nav-link " href="cast_skills.php?C=7" role="tab"
+							aria-selected="false">Misc</a>
+					</li>
+				</ul>
+
+				<div>
+					<ul class="list-group list-group-media">
+
+													<li class="list-group-item list-group-item-action" onclick="loadskill(3);">
+								<div class="media align-items-center">
+									<div class="mr-3">
+										<img src="images/skills/empower.png" alt="Empower">
+									</div>
+									<div class="media-body text-left">
+										<h6 class="tx-inverse">
+											Empower											(1+8)										</h6>
+										<p class="mg-b-0">
+											You absorb a jolt of energy, making you stronger and raising your ATK by 450.										</p>
+									</div>
+									<div class="ml-3">
+										<a href="cast_skills.php?C=2&T=3" >Train</a>
+									</div>
+								</div>
+							</li>
+														<li class="list-group-item list-group-item-action" onclick="loadskill(4);">
+								<div class="media align-items-center">
+									<div class="mr-3">
+										<img src="images/skills/stealth.png" alt="Stealth">
+									</div>
+									<div class="media-body text-left">
+										<h6 class="tx-inverse">
+											Stealth											(1+8)										</h6>
+										<p class="mg-b-0">
+											You become quieter, tougher, and hard to see. Your HP is raised by 500.										</p>
+									</div>
+									<div class="ml-3">
+										<a href="cast_skills.php?C=2&T=4" >Train</a>
+									</div>
+								</div>
+							</li>
+														<li class="list-group-item list-group-item-action" onclick="loadskill(7);">
+								<div class="media align-items-center">
+									<div class="mr-3">
+										<img src="images/skills/onguard.png" alt="On Guard">
+									</div>
+									<div class="media-body text-left">
+										<h6 class="tx-inverse">
+											On Guard											(0+8)										</h6>
+										<p class="mg-b-0">
+											You never tire. Your strength cannot be stolen in battle.										</p>
+									</div>
+									<div class="ml-3">
+										<a href="cast_skills.php?C=2&T=7" >Train</a>
+									</div>
+								</div>
+							</li>
+														<li class="list-group-item list-group-item-action" onclick="loadskill(27);">
+								<div class="media align-items-center">
+									<div class="mr-3">
+										<img src="images/skills/teleport.png" alt="Teleport">
+									</div>
+									<div class="media-body text-left">
+										<h6 class="tx-inverse">
+											Teleport											(1)										</h6>
+										<p class="mg-b-0">
+											Summon a portal to send you to various places in Diamond City.										</p>
+									</div>
+									<div class="ml-3">
+																			</div>
+								</div>
+							</li>
+														<li class="list-group-item list-group-item-action" onclick="loadskill(22);">
+								<div class="media align-items-center">
+									<div class="mr-3">
+										<img src="images/skills/vitaminx.png" alt="Vitamin X">
+									</div>
+									<div class="media-body text-left">
+										<h6 class="tx-inverse">
+											Vitamin X											(2+8)										</h6>
+										<p class="mg-b-0">
+											You inject yourself with the mysterious Vitamin X. Intense power flows swiftly through your veins.<br /> Your ATK is raised by 800 and Crit by 10.										</p>
+									</div>
+									<div class="ml-3">
+										<a href="cast_skills.php?C=2&T=22" >Train</a>
+									</div>
+								</div>
+							</li>
+														<li class="list-group-item list-group-item-action" onclick="loadskill(28);">
+								<div class="media align-items-center">
+									<div class="mr-3">
+										<img src="images/skills/fortify.png" alt="Fortify">
+									</div>
+									<div class="media-body text-left">
+										<h6 class="tx-inverse">
+											Fortify											(2+8)										</h6>
+										<p class="mg-b-0">
+											You set up a defensive position in the streets of Diamond City.<br /> This raises your HP by 750 and BLOCK by 6.										</p>
+									</div>
+									<div class="ml-3">
+										<a href="cast_skills.php?C=2&T=28" >Train</a>
+									</div>
+								</div>
+							</li>
+														<li class="list-group-item list-group-item-action" onclick="loadskill(25);">
+								<div class="media align-items-center">
+									<div class="mr-3">
+										<img src="images/skills/streetsmarts.png" alt="Street Smarts">
+									</div>
+									<div class="media-body text-left">
+										<h6 class="tx-inverse">
+											Street Smarts											(0+8)										</h6>
+										<p class="mg-b-0">
+											Your experience can not be stripped.										</p>
+									</div>
+									<div class="ml-3">
+										<a href="cast_skills.php?C=2&T=25" >Train</a>
+									</div>
+								</div>
+							</li>
+														<li class="list-group-item list-group-item-action" onclick="loadskill(3182);">
+								<div class="media align-items-center">
+									<div class="mr-3">
+										<img src="images/skills/masterferoskill.png" alt="Masterful Ferocity">
+									</div>
+									<div class="media-body text-left">
+										<h6 class="tx-inverse">
+											Masterful Ferocity											(Unlock at 80)										</h6>
+										<p class="mg-b-0">
+											All damage taken from DC mobs is reduced by 0.5%.										</p>
+									</div>
+									<div class="ml-3">
+																			</div>
+								</div>
+							</li>
+														<li class="list-group-item list-group-item-action" onclick="loadskill(3183);">
+								<div class="media align-items-center">
+									<div class="mr-3">
+										<img src="images/skills/masterpresskill.png" alt="Masterful Preservation">
+									</div>
+									<div class="media-body text-left">
+										<h6 class="tx-inverse">
+											Masterful Preservation											(Unlock at 80)										</h6>
+										<p class="mg-b-0">
+											Increases all elemental damages by 3.										</p>
+									</div>
+									<div class="ml-3">
+																			</div>
+								</div>
+							</li>
+														<li class="list-group-item list-group-item-action" onclick="loadskill(3184);">
+								<div class="media align-items-center">
+									<div class="mr-3">
+										<img src="images/skills/masteraffskill.png" alt="Masterful Affliction">
+									</div>
+									<div class="media-body text-left">
+										<h6 class="tx-inverse">
+											Masterful Affliction											(Unlock at 80)										</h6>
+										<p class="mg-b-0">
+											Strip and Gain 2% more EXP from players.										</p>
+									</div>
+									<div class="ml-3">
+																			</div>
+								</div>
+							</li>
+												</ul>
+
+				</div>
+			</div>
+			<div class="col-12 col-lg-5">
+				<div class="statbox widget box box-shadow">
+					<div class="widget-header">
+						<div class="row">
+							<div class="col-xl-12 col-md-12 col-sm-12 col-12">
+								<h4>Cast Skill</h4>
+							</div>
+						</div>
+					</div>
+					<div class="widget-content widget-content-area pt-0" style="min-height:350px" id="infocell">
+						<h6>Click on a skill for more info</h6>
+					</div>
+				</div>
+
+				<div class="statbox widget box box-shadow mt-3">
+					<div class="widget-header">
+						<div class="row">
+							<div class="col-xl-12 col-md-12 col-sm-12 col-12">
+								<h4>Skill Log</h4>
+							</div>
+						</div>
+					</div>
+					<div class="widget-content pt-0" style="min-height:300px">
+
+						<div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+							<table class="table table-bordered table-striped mb-4">
+								<tr><td><small>7-23-26 3:30am</small></td><td>Cast Empower on PLAYER</td><tr><td><small>7-23-26 3:29am</small></td><td>Trained Teleport Level 1</td>							</table>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+
+        
+<style>
+#foot_box {
+position: relative;
+width: 973px;
+background-color:#2b2b2b;
+font-size: 10px;
+font-weight: bold;
+text-align: center;
+padding: 10px;
+}
+
+#foot_box #foot_right {
+    position: absolute;
+    top: 3px;
+    right: 0px;
+    width: 100px;
+    vertical-align: middle;
+    border-style: none;
+    border: 0px;
+    background-color: #2b2b2b;
+    text-align: center;
+}
+
+</style>
+
+</div> <!-- end row -->
+        
+            </div>
+            <div class="footer-wrapper">
+                <div class="footer-section f-section-1">
+                    <p class="">
+                        <a target="_blank" href="/privacy">Privacy Policy |</a>
+                        <a target="_blank" href="/outwar_tos">Terms of Service  |</a>
+                        <a target="_blank" href="/purchasepolicy">Purchase Policy  | </a>
+                        <a target="_blank" href="/contact">Contact Info</a>
+                    </p>
+                </div>
+                <div class="footer-section f-section-2">
+                    <p class="footer-socials">
+                        <a href="https://facebook.com/Outwar-227661533046"><img src="/assets/img/facebook.webp"></a>
+                        <a href="https://discord.com/invite/outwar">
+                            <svg aria-hidden="true" focusable="false" data-prefix="fab" data-icon="discord" class="svg-inline--fa fa-discord fa-w-14" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><path fill="#fff" d="M297.216 243.2c0 15.616-11.52 28.416-26.112 28.416-14.336 0-26.112-12.8-26.112-28.416s11.52-28.416 26.112-28.416c14.592 0 26.112 12.8 26.112 28.416zm-119.552-28.416c-14.592 0-26.112 12.8-26.112 28.416s11.776 28.416 26.112 28.416c14.592 0 26.112-12.8 26.112-28.416.256-15.616-11.52-28.416-26.112-28.416zM448 52.736V512c-64.494-56.994-43.868-38.128-118.784-107.776l13.568 47.36H52.48C23.552 451.584 0 428.032 0 398.848V52.736C0 23.552 23.552 0 52.48 0h343.04C424.448 0 448 23.552 448 52.736zm-72.96 242.688c0-82.432-36.864-149.248-36.864-149.248-36.864-27.648-71.936-26.88-71.936-26.88l-3.584 4.096c43.52 13.312 63.744 32.512 63.744 32.512-60.811-33.329-132.244-33.335-191.232-7.424-9.472 4.352-15.104 7.424-15.104 7.424s21.248-20.224 67.328-33.536l-2.56-3.072s-35.072-.768-71.936 26.88c0 0-36.864 66.816-36.864 149.248 0 0 21.504 37.12 78.08 38.912 0 0 9.472-11.52 17.152-21.248-32.512-9.728-44.8-30.208-44.8-30.208 3.766 2.636 9.976 6.053 10.496 6.4 43.21 24.198 104.588 32.126 159.744 8.96 8.96-3.328 18.944-8.192 29.44-15.104 0 0-12.8 20.992-46.336 30.464 7.68 9.728 16.896 20.736 16.896 20.736 56.576-1.792 78.336-38.912 78.336-38.912z"></path></svg>
+                        </a>
+                    </p>
+                </div>
+            </div>
+
+        </div>
+    </div>
+    <script src="/assets/js/app.js"></script>
+    <script>
+        $(document).ready(function() {
+            App.init();
+        });
+    </script>
+    <script src="/assets/js/custom.js"></script>
+    <!-- END GLOBAL MANDATORY SCRIPTS -->
+
+    <!-- BEGIN PAGE LEVEL PLUGINS/CUSTOM SCRIPTS -->
+    <script src="/plugins/apex/apexcharts.min.js"></script>
+    <script src="/plugins/font-icons/feather/feather.min.js"></script>
+    <script type="text/javascript">
+        feather.replace();
+    </script>
+  </body>
+  </html>
+  
+
+

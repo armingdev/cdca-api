@@ -5,6 +5,7 @@ use App\Models\CharacterSkill;
 use App\Models\Rga;
 use App\Models\Skill;
 use App\Models\User;
+use Database\Seeders\SkillSeeder;
 use Illuminate\Support\Facades\Http;
 use Laravel\Sanctum\Sanctum;
 
@@ -54,6 +55,64 @@ it('casts a skill for a character', function () {
     $this->postJson("/api/v1/characters/{$character->id}/cast", ['skill_id' => 4])
         ->assertOk()
         ->assertJsonPath('message', 'Cast Stealth.');
+});
+
+it('syncs a character\'s skills from the game', function () {
+    $character = Character::factory()->for($this->rga)->create();
+    (new SkillSeeder)->run();
+
+    Http::fake([
+        '*skills_info.php*' => Http::response(gameFixture('skills/skills_info_misc_triworld.html')),
+        '*cast_skills.php?C=7*' => Http::response(gameFixture('skills/cast_skills_misc_tab.html')),
+        '*cast_skills.php*' => Http::response(gameFixture('skills/cast_skills_page.html')),
+    ]);
+
+    $this->postJson("/api/v1/characters/{$character->id}/skills/sync")
+        ->assertOk()
+        ->assertJsonPath('skill_points', 15)
+        ->assertJsonPath('active_buffs', 1);
+
+    expect($character->fresh()->skill_points)->toBe(15);
+
+    $skills = $this->getJson("/api/v1/characters/{$character->id}/skills")->assertOk()->json('data');
+    $empower = collect($skills)->firstWhere('skill_id', 3);
+
+    expect($empower['trained_level'])->toBe(1)
+        ->and($empower['bonus_level'])->toBe(8)
+        ->and($empower['effective_level'])->toBe(9)
+        ->and($empower['castable'])->toBeTrue();
+});
+
+it('forbids syncing another user\'s character skills', function () {
+    $other = Character::factory()->for(Rga::factory()->for(User::factory()))->create();
+
+    $this->postJson("/api/v1/characters/{$other->id}/skills/sync")->assertForbidden();
+});
+
+it('trains a skill for a character', function () {
+    $character = Character::factory()->for($this->rga)->create(['skill_points' => 5]);
+    (new SkillSeeder)->run();
+
+    Http::fake([
+        '*skills_info.php*' => Http::response(gameFixture('skills/skills_info_trained_recharging.html')),
+        '*cast_skills.php*' => Http::response(gameFixture('skills/cast_skills_page.html')),
+    ]);
+
+    // The fixture's skill log confirms "Trained Teleport Level 1".
+    $this->postJson("/api/v1/characters/{$character->id}/skills/27/train")
+        ->assertOk()
+        ->assertJsonPath('new_level', 1);
+});
+
+it('rejects training a misc skill with a validation error', function () {
+    $character = Character::factory()->for($this->rga)->create(['skill_points' => 5]);
+    Skill::create(['id' => 46, 'name' => 'Shield Wall', 'school' => 'misc', 'rage_cost' => 200]);
+
+    $this->postJson("/api/v1/characters/{$character->id}/skills/46/train")
+        ->assertStatus(422);
+
+    Http::fake();
+    Http::assertNothingSent();
 });
 
 it('lists the skill catalog filtered by school', function () {

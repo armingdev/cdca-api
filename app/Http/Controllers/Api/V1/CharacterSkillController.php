@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Game\Skills\SkillCaster;
+use App\Game\Skills\SkillSyncService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CastSkillRequest;
 use App\Http\Requests\UpdateCharacterSkillsRequest;
@@ -42,6 +43,52 @@ class CharacterSkillController extends Controller
         return CharacterSkillResource::collection(
             $character->skills()->where('cast_on_start', true)->with('skill')->get()
         );
+    }
+
+    /**
+     * Sync the character's skill state (levels, points, buffs) from the game.
+     */
+    public function sync(Character $character): JsonResponse
+    {
+        Gate::authorize('update', $character);
+
+        $result = SkillSyncService::forCharacter($character)->sync();
+
+        return response()->json([
+            'message' => "Synced {$result->rowsSynced} skill(s).",
+            'rows_synced' => $result->rowsSynced,
+            'skills_discovered' => $result->skillsDiscovered,
+            'skill_points' => $result->skillPoints,
+            'school' => $result->school,
+            'active_buffs' => $result->activeBuffs,
+            'skills' => CharacterSkillResource::collection(
+                $character->skills()->with('skill')->get()
+            ),
+        ]);
+    }
+
+    /**
+     * Train one skill (spends a skill point; guarded by school lock, unlock
+     * level, single-level, and point balance).
+     */
+    public function train(Character $character, Skill $skill): JsonResponse
+    {
+        Gate::authorize('update', $character);
+
+        $result = SkillSyncService::forCharacter($character)->train($skill);
+
+        if (! $result->success) {
+            return response()->json(['message' => $result->message], 422);
+        }
+
+        return response()->json([
+            'message' => $result->message,
+            'new_level' => $result->newLevel,
+            'skill_points' => $result->skillPointsRemaining,
+            'skill' => new CharacterSkillResource(
+                $character->skills()->with('skill')->where('skill_id', $skill->id)->firstOrFail()
+            ),
+        ]);
     }
 
     /**

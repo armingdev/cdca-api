@@ -30,6 +30,8 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('characters', CharacterController::class)->only(['index', 'show']);
         Route::get('characters/{character}/skills', [CharacterSkillController::class, 'index']);
         Route::put('characters/{character}/skills', [CharacterSkillController::class, 'update']);
+        Route::post('characters/{character}/skills/sync', [CharacterSkillController::class, 'sync']);
+        Route::post('characters/{character}/skills/{skill}/train', [CharacterSkillController::class, 'train']);
         Route::post('characters/{character}/cast', [CharacterSkillController::class, 'cast']);
         Route::get('characters/{character}/battles', [StatsController::class, 'battles']);
         Route::get('characters/{character}/stats', [StatsController::class, 'summary']);

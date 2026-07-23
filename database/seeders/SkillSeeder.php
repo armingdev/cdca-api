@@ -14,6 +14,12 @@ use Illuminate\Database\Seeder;
  */
 class SkillSeeder extends Seeder
 {
+    /** Skills gated behind character level 80 (the Masterful trio). */
+    private const array UNLOCK_AT_80 = [3182, 3183, 3184];
+
+    /** Skills that max at level 1 (their Train link disappears once trained). */
+    private const array SINGLE_LEVEL = [27];
+
     /**
      * @var array<string, list<int>>
      */
@@ -38,6 +44,8 @@ class SkillSeeder extends Seeder
                 'rage_cost' => (int) $skill['rage'],
                 'cooldown_minutes' => $this->minutes($skill['cooldown'] ?? null),
                 'duration_minutes' => $this->minutes($skill['duration'] ?? null),
+                'unlock_level' => in_array($id, self::UNLOCK_AT_80, true) ? 80 : null,
+                'single_level' => in_array($id, self::SINGLE_LEVEL, true),
                 'description' => $skill['desc'] ?? null,
             ]);
         }
