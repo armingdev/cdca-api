@@ -6,9 +6,11 @@ use App\Game\Auth\CharacterSyncService;
 use App\Game\Auth\LoginService;
 use App\Game\Exceptions\GameException;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\AttachRgaSessionRequest;
 use App\Http\Requests\StoreRgaRequest;
 use App\Http\Resources\CharacterResource;
 use App\Http\Resources\RgaResource;
+use App\Http\Resources\RgaSessionResource;
 use App\Models\Rga;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -61,6 +63,43 @@ class RgaController extends Controller
         }
 
         return RgaResource::make($rga->fresh())->response();
+    }
+
+    /**
+     * Adopt a session pasted from the user's browser (rg_sess_id cookie) —
+     * shares the browser's session instead of booting it with a fresh login.
+     */
+    public function attachSession(AttachRgaSessionRequest $request, Rga $rga, LoginService $loginService): JsonResponse
+    {
+        Gate::authorize('update', $rga);
+
+        try {
+            $loginService->attachSession(
+                $rga,
+                $request->validated('rg_sess_id'),
+                $request->validated('token'),
+                $request->validated('cuserid2'),
+            );
+        } catch (GameException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
+        }
+
+        return RgaResource::make($rga->fresh())->response();
+    }
+
+    /**
+     * Reveal the stored session cookies so the user can reuse them in a
+     * browser or another tool.
+     */
+    public function showSession(Rga $rga): RgaSessionResource|JsonResponse
+    {
+        Gate::authorize('view', $rga);
+
+        if (empty($rga->cookies['rg_sess_id'] ?? null)) {
+            return response()->json(['message' => 'No session captured for this RGA.'], 404);
+        }
+
+        return RgaSessionResource::make($rga);
     }
 
     /**

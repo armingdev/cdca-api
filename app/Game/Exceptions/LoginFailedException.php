@@ -13,4 +13,9 @@ class LoginFailedException extends GameException
     {
         return new self('Login response did not set an rg_sess_id cookie.');
     }
+
+    public static function sessionRejected(): self
+    {
+        return new self('The session id is invalid or expired — the game did not recognize it.');
+    }
 }
