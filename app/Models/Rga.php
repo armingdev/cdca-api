@@ -22,6 +22,7 @@ class Rga extends Model
         'username',
         'password',
         'cookies',
+        'security_answer',
         'status',
         'last_login_at',
     ];
@@ -29,6 +30,7 @@ class Rga extends Model
     protected $hidden = [
         'password',
         'cookies',
+        'security_answer',
     ];
 
     /**
@@ -39,6 +41,7 @@ class Rga extends Model
         return [
             'password' => 'encrypted',
             'cookies' => 'encrypted:array',
+            'security_answer' => 'encrypted',
             'last_login_at' => 'datetime',
         ];
     }

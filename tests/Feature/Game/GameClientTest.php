@@ -36,3 +36,15 @@ it('detects a session collision and invalidates the rga', function () {
         ->toThrow(SessionCollisionException::class)
         ->and($rga->fresh()->status)->toBe(Rga::STATUS_INVALID);
 });
+
+it('detects the ajax logged-out error box and invalidates the rga', function () {
+    $rga = Rga::factory()->withSession()->create();
+
+    Http::fake([
+        'www.outwar.com/*' => Http::response('<font>You must be logged in to view this page.</font>'),
+    ]);
+
+    expect(fn () => GameClient::forRga($rga)->get('ajax/trusteeList.php', ['dropdown' => 1]))
+        ->toThrow(SessionCollisionException::class)
+        ->and($rga->fresh()->status)->toBe(Rga::STATUS_INVALID);
+});

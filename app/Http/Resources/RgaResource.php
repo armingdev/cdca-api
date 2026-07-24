@@ -21,6 +21,7 @@ class RgaResource extends JsonResource
             'username' => $this->username,
             'status' => $this->status,
             'has_session' => $this->hasSession(),
+            'has_security_answer' => $this->security_answer !== null,
             'characters_count' => $this->whenCounted('characters'),
             'characters' => CharacterResource::collection($this->whenLoaded('characters')),
             'last_login_at' => $this->last_login_at,

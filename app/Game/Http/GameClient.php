@@ -25,6 +25,9 @@ class GameClient
 {
     private const string BOOT_SENTINEL = 'Rampid Gaming Login';
 
+    /** Ajax endpoints answer 200 with this error box when the session is dead. */
+    private const string LOGGED_OUT_SENTINEL = 'You must be logged in to view this page';
+
     private function __construct(
         private readonly Rga $rga,
         private readonly ?Character $character,
@@ -141,12 +144,15 @@ class GameClient
     }
 
     /**
-     * Every response is checked for the boot sentinel: the game returning its
-     * login page mid-session means someone logged in elsewhere.
+     * Every response is checked for the session-dead sentinels: the login
+     * page mid-session (someone logged in elsewhere) or the ajax logged-out
+     * error box (expired session).
      */
     private function guard(Response $response): void
     {
-        if (str_contains($response->body(), self::BOOT_SENTINEL)) {
+        $body = $response->body();
+
+        if (str_contains($body, self::BOOT_SENTINEL) || str_contains($body, self::LOGGED_OUT_SENTINEL)) {
             $this->rga->update(['status' => Rga::STATUS_INVALID]);
 
             throw SessionCollisionException::booted();

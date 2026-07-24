@@ -78,6 +78,17 @@ class Navigator
         return $this->loadCurrentRoom();
     }
 
+    /**
+     * GET /world.php?teleport=1 teleports to a bar (302 → /world; lands in
+     * the Dusty Glass Tavern). The cheap way to reach a trainer for leveling.
+     */
+    public function teleportToBar(): RoomBlob
+    {
+        $this->client->get('world.php', ['teleport' => 1]);
+
+        return $this->loadCurrentRoom();
+    }
+
     private function request(int $room, int $lastRoom): RoomBlob
     {
         $response = $this->client->get('ajax_changeroomb.php', [
@@ -90,6 +101,13 @@ class Navigator
         if ($blob->hasError()) {
             if (str_contains($blob->error, '#301')) {
                 throw DesyncException::hashError($blob->error);
+            }
+
+            // "Error moving rooms. Please click Explore…" = rejected move
+            // (non-adjacent target / stale position) — recoverable by
+            // reloading and re-planning, unlike a genuinely gated room.
+            if (str_contains($blob->error, 'Error moving rooms')) {
+                throw DesyncException::moveRejected($room, $blob->error);
             }
 
             throw new GatedRoomException($room, $blob->error);

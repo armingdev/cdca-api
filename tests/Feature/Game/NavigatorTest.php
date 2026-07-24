@@ -80,3 +80,29 @@ it('resets to the start room via world?room=1', function () {
 
     Http::assertSent(fn ($request) => str_contains($request->url(), 'world?room=1'));
 });
+
+it('classifies a rejected move as a recoverable desync', function () {
+    $character = Character::factory()->for(Rga::factory()->withSession())->create();
+
+    Http::fake([
+        '*ajax_changeroomb.php*' => Http::response(roomJson(0, [], 'Error moving rooms. Please click Explore in the menu and try again.')),
+    ]);
+
+    Navigator::forCharacter($character)->stepTo(12, 10);
+})->throws(DesyncException::class);
+
+it('teleports to a bar and reloads the room', function () {
+    $character = Character::factory()->for(Rga::factory()->withSession())->create();
+
+    Http::fake([
+        '*world.php*' => Http::response('', 302, ['Location' => '/world']),
+        '*ajax_changeroomb.php*' => Http::response(roomJson(258)),
+    ]);
+
+    $blob = Navigator::forCharacter($character)->teleportToBar();
+
+    expect($blob->curRoom)->toBe(258);
+
+    Http::assertSent(fn ($request) => str_contains($request->url(), 'world.php')
+        && str_contains($request->url(), 'teleport=1'));
+});
