@@ -19,6 +19,7 @@ class StoreRgaRequest extends FormRequest
         return [
             'username' => ['required', 'string', 'max:255', 'unique:rgas,username'],
             'password' => ['required', 'string'],
+            'security_answer' => ['sometimes', 'nullable', 'string', 'max:255'],
         ];
     }
 }

@@ -17,4 +17,9 @@ class DesyncException extends GameException
     {
         return new self("Per-request hash error (retryable): {$error}");
     }
+
+    public static function moveRejected(int $target, string $error): self
+    {
+        return new self("Move to room {$target} rejected (recoverable): {$error}");
+    }
 }

@@ -118,6 +118,7 @@ class RunController extends Controller
                 stopRage: $stopRage,
                 maxKills: $request->integer('max_kills'),
                 levelUp: $levelUp,
+                dropJunk: $request->boolean('drop_junk'),
             ))->toArray(),
 
             RunMode::Quest => (new QuestRunConfig(

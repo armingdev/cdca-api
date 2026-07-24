@@ -1,0 +1,1415 @@
+[
+  {
+    "Id": "1",
+    "Name": "Afro Pick"
+  },
+  {
+    "Id": "2",
+    "Name": "Agate Necklace"
+  },
+  {
+    "Id": "3",
+    "Name": "Anchor Boots"
+  },
+  {
+    "Id": "4",
+    "Name": "Arid Shield"
+  },
+  {
+    "Id": "5",
+    "Name": "Army Hat"
+  },
+  {
+    "Id": "6",
+    "Name": "Arrow Pendant"
+  },
+  {
+    "Id": "7",
+    "Name": "Aztec Amulet"
+  },
+  {
+    "Id": "8",
+    "Name": "Black Karate Belt"
+  },
+  {
+    "Id": "9",
+    "Name": "Boa-Hide Shield"
+  },
+  {
+    "Id": "10",
+    "Name": "Bomber Jacket"
+  },
+  {
+    "Id": "11",
+    "Name": "Boots Of Willpower"
+  },
+  {
+    "Id": "12",
+    "Name": "Booty Shorts"
+  },
+  {
+    "Id": "13",
+    "Name": "Brawl Shorts"
+  },
+  {
+    "Id": "14",
+    "Name": "Brawler Shorts"
+  },
+  {
+    "Id": "15",
+    "Name": "Brittney Shorts"
+  },
+  {
+    "Id": "16",
+    "Name": "Canyon Belt Buckle"
+  },
+  {
+    "Id": "17",
+    "Name": "Casing Helmet"
+  },
+  {
+    "Id": "18",
+    "Name": "Chainsaw"
+  },
+  {
+    "Id": "19",
+    "Name": "Clown Shoes"
+  },
+  {
+    "Id": "20",
+    "Name": "Cobble Shoes"
+  },
+  {
+    "Id": "21",
+    "Name": "Combat Boots"
+  },
+  {
+    "Id": "22",
+    "Name": "Crown"
+  },
+  {
+    "Id": "23",
+    "Name": "Dagger of Potential"
+  },
+  {
+    "Id": "24",
+    "Name": "Dermis Boots"
+  },
+  {
+    "Id": "25",
+    "Name": "Dioch Charm"
+  },
+  {
+    "Id": "26",
+    "Name": "Disc Gun"
+  },
+  {
+    "Id": "27",
+    "Name": "Doomed Charm"
+  },
+  {
+    "Id": "28",
+    "Name": "Dragon Armor"
+  },
+  {
+    "Id": "29",
+    "Name": "Dragon Pendant"
+  },
+  {
+    "Id": "30",
+    "Name": "Echo Shield"
+  },
+  {
+    "Id": "31",
+    "Name": "Engraved Armor"
+  },
+  {
+    "Id": "32",
+    "Name": "Flak Jacket"
+  },
+  {
+    "Id": "33",
+    "Name": "Flamethrower"
+  },
+  {
+    "Id": "34",
+    "Name": "Flay Boots"
+  },
+  {
+    "Id": "35",
+    "Name": "Glossy Skullcap"
+  },
+  {
+    "Id": "36",
+    "Name": "Glowing Spike Collar"
+  },
+  {
+    "Id": "37",
+    "Name": "Golden Gun"
+  },
+  {
+    "Id": "38",
+    "Name": "Grenade Launcher"
+  },
+  {
+    "Id": "39",
+    "Name": "Haggard Axe"
+  },
+  {
+    "Id": "40",
+    "Name": "Heavenly Sword"
+  },
+  {
+    "Id": "41",
+    "Name": "Heavy Body Armor"
+  },
+  {
+    "Id": "42",
+    "Name": "Helmet of Potential"
+  },
+  {
+    "Id": "43",
+    "Name": "Ice Shield"
+  },
+  {
+    "Id": "44",
+    "Name": "Ifrits Shield"
+  },
+  {
+    "Id": "45",
+    "Name": "Impossible Ring"
+  },
+  {
+    "Id": "46",
+    "Name": "Insulated Helmet"
+  },
+  {
+    "Id": "47",
+    "Name": "Internal Power Ring"
+  },
+  {
+    "Id": "48",
+    "Name": "Iron Mask"
+  },
+  {
+    "Id": "49",
+    "Name": "Japanese Clogs"
+  },
+  {
+    "Id": "50",
+    "Name": "Jock Strap"
+  },
+  {
+    "Id": "51",
+    "Name": "Kayak Charm"
+  },
+  {
+    "Id": "52",
+    "Name": "Kilt"
+  },
+  {
+    "Id": "53",
+    "Name": "Kitty Thong"
+  },
+  {
+    "Id": "54",
+    "Name": "Large Riot Shield"
+  },
+  {
+    "Id": "55",
+    "Name": "Liquid Sword"
+  },
+  {
+    "Id": "56",
+    "Name": "Mask Of Horror"
+  },
+  {
+    "Id": "57",
+    "Name": "Meteorite Ring"
+  },
+  {
+    "Id": "58",
+    "Name": "Motorcross Armor"
+  },
+  {
+    "Id": "59",
+    "Name": "Ocean Ring"
+  },
+  {
+    "Id": "60",
+    "Name": "Outrageous Shield"
+  },
+  {
+    "Id": "61",
+    "Name": "Pants of Potential"
+  },
+  {
+    "Id": "62",
+    "Name": "Petal Ring"
+  },
+  {
+    "Id": "63",
+    "Name": "Pharaohs Ring"
+  },
+  {
+    "Id": "64",
+    "Name": "Pimp Shorts"
+  },
+  {
+    "Id": "65",
+    "Name": "Platinum Band"
+  },
+  {
+    "Id": "66",
+    "Name": "Reinforced Moccasins"
+  },
+  {
+    "Id": "67",
+    "Name": "Remnant Belt Buckle"
+  },
+  {
+    "Id": "68",
+    "Name": "Repelling Belt"
+  },
+  {
+    "Id": "69",
+    "Name": "Resistant Body Armor"
+  },
+  {
+    "Id": "70",
+    "Name": "Restraint Belt"
+  },
+  {
+    "Id": "71",
+    "Name": "Roman Armor"
+  },
+  {
+    "Id": "72",
+    "Name": "Roman Shield"
+  },
+  {
+    "Id": "73",
+    "Name": "Royal Ringmail"
+  },
+  {
+    "Id": "74",
+    "Name": "Scan Belt"
+  },
+  {
+    "Id": "75",
+    "Name": "Sectional Body Armor"
+  },
+  {
+    "Id": "76",
+    "Name": "Sheered Moccasins"
+  },
+  {
+    "Id": "77",
+    "Name": "Shield of Potential"
+  },
+  {
+    "Id": "78",
+    "Name": "Shotgun"
+  },
+  {
+    "Id": "79",
+    "Name": "Shotgun Belt"
+  },
+  {
+    "Id": "80",
+    "Name": "Skull Helmet"
+  },
+  {
+    "Id": "81",
+    "Name": "Spider Shoes"
+  },
+  {
+    "Id": "82",
+    "Name": "Spike Boots"
+  },
+  {
+    "Id": "83",
+    "Name": "Sprocket Belt Buckle"
+  },
+  {
+    "Id": "84",
+    "Name": "Star Shield"
+  },
+  {
+    "Id": "85",
+    "Name": "Steel-toe Boots"
+  },
+  {
+    "Id": "86",
+    "Name": "Storm Pants"
+  },
+  {
+    "Id": "87",
+    "Name": "Sunglasses"
+  },
+  {
+    "Id": "88",
+    "Name": "Suspenders"
+  },
+  {
+    "Id": "89",
+    "Name": "Swim Shorts"
+  },
+  {
+    "Id": "90",
+    "Name": "Tactical Belt"
+  },
+  {
+    "Id": "91",
+    "Name": "Tinted Goggles"
+  },
+  {
+    "Id": "92",
+    "Name": "Web Shield"
+  },
+  {
+    "Id": "93",
+    "Name": "Withered belt"
+  },
+  {
+    "Id": "94",
+    "Name": "Worn Jeans"
+  },
+  {
+    "Id": "95",
+    "Name": "Yinyang Amulet"
+  },
+  {
+    "Id": "96",
+    "Name": "Bolster Shield"
+  },
+  {
+    "Id": "97",
+    "Name": "Paintball Armor"
+  },
+  {
+    "Id": "98",
+    "Name": "Stout Buckler"
+  },
+  {
+    "Id": "99",
+    "Name": "Vintage Belt"
+  },
+  {
+    "Id": "100",
+    "Name": "Tower Shield"
+  },
+  {
+    "Id": "101",
+    "Name": "Storm Trooper Armor"
+  },
+  {
+    "Id": "102",
+    "Name": "Hard Steel Ring"
+  },
+  {
+    "Id": "103",
+    "Name": "Loop Ring"
+  },
+  {
+    "Id": "104",
+    "Name": "Assault Rifle"
+  },
+  {
+    "Id": "105",
+    "Name": "Hard Steel Ring of Persuasion"
+  },
+  {
+    "Id": "106",
+    "Name": "Chain Mail"
+  },
+  {
+    "Id": "107",
+    "Name": "Katana"
+  },
+  {
+    "Id": "108",
+    "Name": "War Helm"
+  },
+  {
+    "Id": "109",
+    "Name": "Boots of the Slayer"
+  },
+  {
+    "Id": "110",
+    "Name": "Fighter Pants"
+  },
+  {
+    "Id": "111",
+    "Name": "Krishna Pendant"
+  },
+  {
+    "Id": "112",
+    "Name": "The Magic Beer Can"
+  },
+  {
+    "Id": "113",
+    "Name": "Guards of Courage"
+  },
+  {
+    "Id": "114",
+    "Name": "Defender of Courage"
+  },
+  {
+    "Id": "115",
+    "Name": "Dune Shield"
+  },
+  {
+    "Id": "116",
+    "Name": "Suspenders of Persuasion"
+  },
+  {
+    "Id": "117",
+    "Name": "Restraint Belf of Persuasion"
+  },
+  {
+    "Id": "118",
+    "Name": "Sunglasses of Persuasion"
+  },
+  {
+    "Id": "119",
+    "Name": "Scan Belt of Persuasion"
+  },
+  {
+    "Id": "120",
+    "Name": "Glossy Skullcap of Persuasion"
+  },
+  {
+    "Id": "121",
+    "Name": "Yellow Ring"
+  },
+  {
+    "Id": "122",
+    "Name": "Tower Shield of Malice"
+  },
+  {
+    "Id": "123",
+    "Name": "Remnant Belt Buckle of Persuasion"
+  },
+  {
+    "Id": "124",
+    "Name": "Remnant Belt Buckle of Malice"
+  },
+  {
+    "Id": "125",
+    "Name": "Brown Pants"
+  },
+  {
+    "Id": "126",
+    "Name": "Jock Strap"
+  },
+  {
+    "Id": "127",
+    "Name": "Gold Studded Belt"
+  },
+  {
+    "Id": "128",
+    "Name": "Ice Shield"
+  },
+  {
+    "Id": "129",
+    "Name": "Cobble Shoes"
+  },
+  {
+    "Id": "130",
+    "Name": "Sheered Moccasins of Malice"
+  },
+  {
+    "Id": "131",
+    "Name": "Outrageous Shield of Malice"
+  },
+  {
+    "Id": "132",
+    "Name": "Helmet of Willpower"
+  },
+  {
+    "Id": "133",
+    "Name": "Hippie Dress"
+  },
+  {
+    "Id": "134",
+    "Name": "Carve Shield"
+  },
+  {
+    "Id": "135",
+    "Name": "Combat Helmet"
+  },
+  {
+    "Id": "136",
+    "Name": "Headgear"
+  },
+  {
+    "Id": "137",
+    "Name": "Plastic Boots"
+  },
+  {
+    "Id": "138",
+    "Name": "Orange Camo Hat of Persuasion"
+  },
+  {
+    "Id": "139",
+    "Name": "Skull Pendant"
+  },
+  {
+    "Id": "140",
+    "Name": "Red Karate Belt"
+  },
+  {
+    "Id": "141",
+    "Name": "Hammer Pants"
+  },
+  {
+    "Id": "142",
+    "Name": "Urban Camo"
+  },
+  {
+    "Id": "143",
+    "Name": "Embroidered Leather"
+  },
+  {
+    "Id": "144",
+    "Name": "Copper Helmet"
+  },
+  {
+    "Id": "145",
+    "Name": "Worn Out Sneakers"
+  },
+  {
+    "Id": "146",
+    "Name": "Stretch Pants"
+  },
+  {
+    "Id": "147",
+    "Name": "Goalie Mask"
+  },
+  {
+    "Id": "148",
+    "Name": "Rustplate"
+  },
+  {
+    "Id": "149",
+    "Name": "Pinch Shoes"
+  },
+  {
+    "Id": "150",
+    "Name": "Safari Hat"
+  },
+  {
+    "Id": "151",
+    "Name": "Plaid Pants"
+  },
+  {
+    "Id": "152",
+    "Name": "Rocky Shorts"
+  },
+  {
+    "Id": "153",
+    "Name": "Celtic Amulet"
+  },
+  {
+    "Id": "154",
+    "Name": "Gold Ring of Splendor"
+  },
+  {
+    "Id": "155",
+    "Name": "Star Shield of Malice"
+  },
+  {
+    "Id": "156",
+    "Name": "Reinforced Moccasins of Persuasion"
+  },
+  {
+    "Id": "157",
+    "Name": "Krishna Pendant"
+  },
+  {
+    "Id": "158",
+    "Name": "Club Jeans"
+  },
+  {
+    "Id": "159",
+    "Name": "Sprocket Belt Buckle of Persuasion"
+  },
+  {
+    "Id": "160",
+    "Name": "Web Belt"
+  },
+  {
+    "Id": "161",
+    "Name": "Paintball Mask"
+  },
+  {
+    "Id": "162",
+    "Name": "Hoodie"
+  },
+  {
+    "Id": "163",
+    "Name": "Pimp Suit"
+  },
+  {
+    "Id": "164",
+    "Name": "Crystal Shield"
+  },
+  {
+    "Id": "165",
+    "Name": "Pimp Shoes"
+  },
+  {
+    "Id": "166",
+    "Name": "Construction Sign"
+  },
+  {
+    "Id": "167",
+    "Name": "Roman Sword"
+  },
+  {
+    "Id": "168",
+    "Name": "Gold Studded Belt"
+  },
+  {
+    "Id": "169",
+    "Name": "Tool Belt"
+  },
+  {
+    "Id": "170",
+    "Name": "Construction Hat"
+  },
+  {
+    "Id": "171",
+    "Name": "Cowboy Belt Buckle"
+  },
+  {
+    "Id": "172",
+    "Name": "Full-Face Helmet"
+  },
+  {
+    "Id": "173",
+    "Name": "Ribbon Amulet"
+  },
+  {
+    "Id": "174",
+    "Name": "Kukri"
+  },
+  {
+    "Id": "175",
+    "Name": "Gunslingers Belt"
+  },
+  {
+    "Id": "176",
+    "Name": "Ankh Pendant"
+  },
+  {
+    "Id": "177",
+    "Name": "Camo belt"
+  },
+  {
+    "Id": "178",
+    "Name": "Waist Pack"
+  },
+  {
+    "Id": "179",
+    "Name": "Mages Hat"
+  },
+  {
+    "Id": "180",
+    "Name": "Shrouded Helmet"
+  },
+  {
+    "Id": "181",
+    "Name": "Shield of the Few"
+  },
+  {
+    "Id": "182",
+    "Name": "Roman Helmet"
+  },
+  {
+    "Id": "183",
+    "Name": "Mesh Shoes"
+  },
+  {
+    "Id": "184",
+    "Name": "Tanto Sword"
+  },
+  {
+    "Id": "185",
+    "Name": "Jewel Encrusted Gold Ring"
+  },
+  {
+    "Id": "186",
+    "Name": "Tie-dye Pants"
+  },
+  {
+    "Id": "187",
+    "Name": "Indian Breastplate"
+  },
+  {
+    "Id": "188",
+    "Name": "Roller Blades"
+  },
+  {
+    "Id": "189",
+    "Name": "Construction Boots"
+  },
+  {
+    "Id": "190",
+    "Name": "Pimp Hat"
+  },
+  {
+    "Id": "191",
+    "Name": "Flotation Belt"
+  },
+  {
+    "Id": "192",
+    "Name": "Army Cutoffs"
+  },
+  {
+    "Id": "193",
+    "Name": "Spear of Courage"
+  },
+  {
+    "Id": "194",
+    "Name": "Trash Can Lid"
+  },
+  {
+    "Id": "195",
+    "Name": "Flair Jeans"
+  },
+  {
+    "Id": "196",
+    "Name": "Cloak"
+  },
+  {
+    "Id": "197",
+    "Name": "Striped Belt"
+  },
+  {
+    "Id": "198",
+    "Name": "Goalie Skates"
+  },
+  {
+    "Id": "199",
+    "Name": "Red Pants"
+  },
+  {
+    "Id": "200",
+    "Name": "Kama"
+  },
+  {
+    "Id": "201",
+    "Name": "Lopaz Ring"
+  },
+  {
+    "Id": "202",
+    "Name": "Peridot Amulet"
+  },
+  {
+    "Id": "203",
+    "Name": "Construction Vest"
+  },
+  {
+    "Id": "204",
+    "Name": "Kite Shield"
+  },
+  {
+    "Id": "205",
+    "Name": "Zulu Shield"
+  },
+  {
+    "Id": "206",
+    "Name": "Gauntlet"
+  },
+  {
+    "Id": "207",
+    "Name": "Rastafari Hat"
+  },
+  {
+    "Id": "208",
+    "Name": "Construction Jackhammer"
+  },
+  {
+    "Id": "209",
+    "Name": "Dermis Boots of Persuasion"
+  },
+  {
+    "Id": "210",
+    "Name": "Iron Shield"
+  },
+  {
+    "Id": "211",
+    "Name": "Fire Badge Belt"
+  },
+  {
+    "Id": "212",
+    "Name": "Life Vest"
+  },
+  {
+    "Id": "213",
+    "Name": "Bronze Circlet"
+  },
+  {
+    "Id": "214",
+    "Name": "Chaos Amulet"
+  },
+  {
+    "Id": "215",
+    "Name": "Amethyst Amulet"
+  },
+  {
+    "Id": "216",
+    "Name": "Vine Shield"
+  },
+  {
+    "Id": "217",
+    "Name": "Used Jack-Boots"
+  },
+  {
+    "Id": "218",
+    "Name": "Combine Ring"
+  },
+  {
+    "Id": "219",
+    "Name": "Orange Camo Hat"
+  },
+  {
+    "Id": "220",
+    "Name": "Heartagram"
+  },
+  {
+    "Id": "221",
+    "Name": "Pimp Cup"
+  },
+  {
+    "Id": "222",
+    "Name": "Uzi"
+  },
+  {
+    "Id": "223",
+    "Name": "Goth Pants"
+  },
+  {
+    "Id": "224",
+    "Name": "Boomerang"
+  },
+  {
+    "Id": "225",
+    "Name": "Silver Belt Buckle"
+  },
+  {
+    "Id": "226",
+    "Name": "Rainboots"
+  },
+  {
+    "Id": "227",
+    "Name": "Engineer Cap"
+  },
+  {
+    "Id": "228",
+    "Name": "Santa Hat"
+  },
+  {
+    "Id": "229",
+    "Name": "Repelling Belt of Persuasion"
+  },
+  {
+    "Id": "230",
+    "Name": "Pimp Cane"
+  },
+  {
+    "Id": "231",
+    "Name": "Opulent Breastplate"
+  },
+  {
+    "Id": "232",
+    "Name": "Chuck Taylors"
+  },
+  {
+    "Id": "233",
+    "Name": "Scorpion Belt Buckle"
+  },
+  {
+    "Id": "234",
+    "Name": "Gunslingers Belt of Persuasion"
+  },
+  {
+    "Id": "235",
+    "Name": "Parka"
+  },
+  {
+    "Id": "236",
+    "Name": "Construction Sign of Malice"
+  },
+  {
+    "Id": "237",
+    "Name": "Warm-up Pants"
+  },
+  {
+    "Id": "238",
+    "Name": "Clasp Belt Buckle"
+  },
+  {
+    "Id": "239",
+    "Name": "Dune Shield of Defense"
+  },
+  {
+    "Id": "240",
+    "Name": "Withered Belt of Persuasion"
+  },
+  {
+    "Id": "241",
+    "Name": "Checkered Skirt"
+  },
+  {
+    "Id": "242",
+    "Name": "Gunslingers Belt of Malice"
+  },
+  {
+    "Id": "243",
+    "Name": "Ripped Jeans"
+  },
+  {
+    "Id": "244",
+    "Name": "Dog Collar"
+  },
+  {
+    "Id": "245",
+    "Name": "Gangster Hat"
+  },
+  {
+    "Id": "246",
+    "Name": "Track Shoes"
+  },
+  {
+    "Id": "247",
+    "Name": "Trench Coat"
+  },
+  {
+    "Id": "248",
+    "Name": "Roman Sandals"
+  },
+  {
+    "Id": "249",
+    "Name": "Snowshoes"
+  },
+  {
+    "Id": "250",
+    "Name": "Pickaxe"
+  },
+  {
+    "Id": "251",
+    "Name": "Shin Pads"
+  },
+  {
+    "Id": "252",
+    "Name": "Topaz Ring"
+  },
+  {
+    "Id": "253",
+    "Name": "Heritage Tophat"
+  },
+  {
+    "Id": "254",
+    "Name": "Tanto Sword of Malice"
+  },
+  {
+    "Id": "255",
+    "Name": "Leatherscale Belt"
+  },
+  {
+    "Id": "256",
+    "Name": "Cubic Amulet"
+  },
+  {
+    "Id": "257",
+    "Name": "Blue Camo"
+  },
+  {
+    "Id": "258",
+    "Name": "Platinum Diamond Necklace"
+  },
+  {
+    "Id": "259",
+    "Name": "Foundry Helmet"
+  },
+  {
+    "Id": "260",
+    "Name": "Cricket Bat"
+  },
+  {
+    "Id": "261",
+    "Name": "Chrome Ring"
+  },
+  {
+    "Id": "262",
+    "Name": "Gauntlet of Malice"
+  },
+  {
+    "Id": "263",
+    "Name": "Leather Pants"
+  },
+  {
+    "Id": "264",
+    "Name": "Small Metal Shield"
+  },
+  {
+    "Id": "265",
+    "Name": "Bone Choker"
+  },
+  {
+    "Id": "266",
+    "Name": "Knuckle Duster"
+  },
+  {
+    "Id": "267",
+    "Name": "Paintball Gun"
+  },
+  {
+    "Id": "268",
+    "Name": "Ruby Ring of Persuasion"
+  },
+  {
+    "Id": "269",
+    "Name": "Om Amulet"
+  },
+  {
+    "Id": "270",
+    "Name": "Studded Belt"
+  },
+  {
+    "Id": "271",
+    "Name": "Slope Shoes"
+  },
+  {
+    "Id": "272",
+    "Name": "Purple Capris"
+  },
+  {
+    "Id": "273",
+    "Name": "Pot Lid Shield"
+  },
+  {
+    "Id": "274",
+    "Name": "Flower Jeans"
+  },
+  {
+    "Id": "275",
+    "Name": "Star Belt Buckle"
+  },
+  {
+    "Id": "276",
+    "Name": "Chuck Taylors of Persuasion"
+  },
+  {
+    "Id": "278",
+    "Name": "Tool Belt of Malice"
+  },
+
+  {
+    "Id": "279",
+    "Name": "Halberd"
+  },
+  {
+    "Id": "280",
+    "Name": "Plaid Shorts"
+  },
+  {
+    "Id": "281",
+    "Name": "Great Sword"
+  },
+  {
+    "Id": "282",
+    "Name": "Construction Lunchpale"
+  },
+  {
+    "Id": "283",
+    "Name": "Water Ring"
+  },
+  {
+    "Id": "284",
+    "Name": "Pimp Ring"
+  },
+  {
+    "Id": "285",
+    "Name": "Pumps"
+  },
+  {
+    "Id": "286",
+    "Name": "Sword Breaker"
+  },
+  {
+    "Id": "287",
+    "Name": "Victorian Choker"
+  },
+  {
+    "Id": "288",
+    "Name": "Roman Helmet of Persuasion"
+  },
+  {
+    "Id": "289",
+    "Name": "Beaded Belt"
+  },
+  {
+    "Id": "290",
+    "Name": "Sledge Hammer of Persuasion"
+  },
+  {
+    "Id": "291",
+    "Name": "Turquoise Ring"
+  },
+  {
+    "Id": "292",
+    "Name": "Karate Chest Guard"
+  },
+  {
+    "Id": "293",
+    "Name": "Pimp Shoes of Persuasion"
+  },
+  {
+    "Id": "294",
+    "Name": "Iron Shield of Defense"
+  },
+  {
+    "Id": "295",
+    "Name": "Lunar Ring"
+  },
+  {
+    "Id": "296",
+    "Name": "Shrouded Helmet of Persuasion"
+  },
+  {
+    "Id": "297",
+    "Name": "Anchor Boots of Persuasion"
+  },
+  {
+    "Id": "298",
+    "Name": "Roman Ring"
+  },
+  {
+    "Id": "299",
+    "Name": "Bone Blade"
+  },
+  {
+    "Id": "300",
+    "Name": "Indian Breastplate of Persuasion"
+  },
+  {
+    "Id": "301",
+    "Name": "Blue Karate Belt"
+  },
+  {
+    "Id": "302",
+    "Name": "Wooden Clogs"
+  },
+  {
+    "Id": "303",
+    "Name": "Meat Hook"
+  },
+  {
+    "Id": "304",
+    "Name": "Pimp Cane of Persuasion"
+  },
+  {
+    "Id": "305",
+    "Name": "Repelling Belt of Malice"
+  },
+  {
+    "Id": "306",
+    "Name": "Roller Blades of Malice"
+  },
+  {
+    "Id": "307",
+    "Name": "Flotation Belt of Persuasion"
+  },
+  {
+    "Id": "308",
+    "Name": "Helmet"
+  },
+  {
+    "Id": "309",
+    "Name": "Black Dress Shoes"
+  },
+  {
+    "Id": "310",
+    "Name": "Referee Shirt"
+  },
+  {
+    "Id": "311",
+    "Name": "Gas Mask"
+  },
+  {
+    "Id": "312",
+    "Name": "Parka of Persuasion"
+  },
+  {
+    "id": "313",
+    "Name": "Egyptian Udjat"
+  },
+  {
+    "id": "314",
+    "Name": "Darkwood Shield"
+  },
+  {
+    "id": "315",
+    "Name": "Striped Belt of Persuasion"
+  },
+  {
+    "id": "316",
+    "Name": "Scar Axe"
+  },
+  {
+    "id": "317",
+    "Name": "Boulder Buckler"
+  },
+  {
+    "id": "318",
+    "Name": "Striped Cloak"
+  },
+  {
+    "id": "319",
+    "Name": "Terrain Boots"
+  },
+  {
+    "id": "320",
+    "Name": "Moccasins"
+  },
+  {
+    "id": "321",
+    "Name": "Fur-Lined Trench Coat"
+  },
+  {
+    "id": "322",
+    "Name": "Wooden Shield"
+  },
+  {
+    "id": "323",
+    "Name": "Powerful Wooden Clogs"
+  },
+  {
+    "id": "324",
+    "Name": "Jungle Hat"
+  },
+  {
+    "id": "325",
+    "Name": "Grey Pants"
+  },
+  {
+    "id": "326",
+    "Name":"Hackwood Shield"
+  },
+  {
+    "id":"327",
+    "Name":"Baseball Bat"
+  },
+  {
+    "id": "328",
+    "Name":"Garnet Ring"
+  },
+  {
+    "id": "329",
+    "Name":"Triangle Amulet"
+  },
+  {
+    "id": "330",
+    "Name":"Chestguard"
+  },
+  {
+    "id": "331",
+    "Name":"Sledge Hammer"
+  },
+  {
+    "id": "332",
+    "Name":"Cheap Boots"
+  },
+  {
+    "id": "333",
+    "Name":"Baggy Jeans"
+  },
+  {
+    "id": "334",
+    "Name":"Hooded Cloak"
+  },
+  {
+    "id": "335",
+    "Name":"Moccasins of Persuasion"
+  },
+  {
+    "id": "336",
+    "Name":"Jungle Camo"
+  },
+  {
+    "id": "337",
+    "Name":"White Pants"
+  },
+  {
+    "id": "338",
+    "Name":"Jade Ring"
+  },
+  {
+    "id": "339",
+    "Name":"Viking Helmet"
+  },
+  {
+    "id": "340",
+    "Name":"Vulcan Amulet"
+  },
+  {
+    "id": "341",
+    "Name":"Lime Pendant of Persuasion"
+  },
+  {
+    "id": "342",
+    "Name":"Rubber Winter Boots"
+  },
+  {
+    "id": "343",
+    "Name":"Tattered Trench Coat"
+  },
+  {
+    "id": "344",
+    "Name":"Black Dress Shoes of Persuasion"
+  },
+  {
+    "id": "345",
+    "Name":"Gauntlet of Defense"
+  },
+  {
+    "id": "346",
+    "Name":"Ruby Ring"
+  },
+  {
+    "id": "347",
+    "Name":"Translucent Ring"
+  },
+  {
+    "id": "348",
+    "Name":"Used Handgun"
+  },
+  {
+    "id": "349",
+    "Name":"Diamond Ring"
+  },
+  {
+    "id": "350",
+    "Name":"Golden Cross Pendant"
+  },
+  {
+    "id": "351",
+    "Name":"Baseball Bat"
+  },
+  {
+    "id": "352",
+    "Name":"Leather Vest"
+  },
+  {
+    "id": "353",
+    "Name":"Insulated Boots"
+  },
+  {
+    "id": "354",
+    "Name":"Delivery Shorts"
+  }
+]

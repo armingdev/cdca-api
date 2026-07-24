@@ -8,6 +8,7 @@ use App\Game\Data\MobSighting;
 use App\Game\Data\RoomBlob;
 use App\Game\Enums\BattleOutcome;
 use App\Game\Exceptions\GameException;
+use App\Game\Items\JunkDropper;
 use App\Game\World\Navigator;
 use App\Game\World\RoomGraph;
 use App\Models\BattleEvent;
@@ -36,6 +37,7 @@ class MobRunner
         private readonly Navigator $navigator,
         private readonly AttackService $attacker,
         private readonly StatsService $stats,
+        private readonly ?JunkDropper $junkDropper = null,
     ) {}
 
     public static function forCharacter(Character $character, MobRunConfig $config): self
@@ -46,6 +48,7 @@ class MobRunner
             Navigator::forCharacter($character),
             AttackService::forCharacter($character),
             StatsService::forCharacter($character),
+            JunkDropper::forCharacter($character),
         );
     }
 
@@ -60,6 +63,20 @@ class MobRunner
     {
         $log ??= fn (string $message) => null;
 
+        try {
+            return $this->loop($log, $shouldStop, $onBattle);
+        } finally {
+            $this->dropJunk($log);
+        }
+    }
+
+    /**
+     * @param  Closure(string): void  $log
+     * @param  Closure(): bool|null  $shouldStop
+     * @param  Closure(BattleEvent): void|null  $onBattle
+     */
+    private function loop(Closure $log, ?Closure $shouldStop, ?Closure $onBattle): MobRunSummary
+    {
         $targetRooms = Mob::whereIn('name', $this->config->mobNames)
             ->with('rooms:id')
             ->get()
@@ -141,6 +158,26 @@ class MobRunner
         }
 
         return null;
+    }
+
+    /**
+     * End-of-run junk sweep (opt-in). Never lets a cleanup failure mask the
+     * run's own outcome or exception.
+     *
+     * @param  Closure(string): void  $log
+     */
+    private function dropJunk(Closure $log): void
+    {
+        if (! $this->config->dropJunk || $this->junkDropper === null) {
+            return;
+        }
+
+        try {
+            $summary = $this->junkDropper->dropJunk($log);
+            $log("Junk sweep: dropped {$summary->dropped} of {$summary->scanned} loose items.");
+        } catch (GameException $exception) {
+            $log("Junk sweep failed: {$exception->getMessage()}");
+        }
     }
 
     /**

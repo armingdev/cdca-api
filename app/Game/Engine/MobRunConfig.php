@@ -15,6 +15,7 @@ final readonly class MobRunConfig
         public int $stopRage = 2500,
         public int $maxKills = 0,
         public bool $levelUp = false,
+        public bool $dropJunk = false,
     ) {}
 
     /**
@@ -27,6 +28,7 @@ final readonly class MobRunConfig
             stopRage: (int) ($config['stop_rage'] ?? 2500),
             maxKills: (int) ($config['max_kills'] ?? 0),
             levelUp: (bool) ($config['level_up'] ?? false),
+            dropJunk: (bool) ($config['drop_junk'] ?? false),
         );
     }
 
@@ -40,6 +42,7 @@ final readonly class MobRunConfig
             'stop_rage' => $this->stopRage,
             'max_kills' => $this->maxKills,
             'level_up' => $this->levelUp,
+            'drop_junk' => $this->dropJunk,
         ];
     }
 }

@@ -26,9 +26,15 @@ class RgaAddCommand extends Command
 
         $password = password(label: 'RGA password', required: true);
 
+        $securityAnswer = text(
+            label: 'Security-question answer (optional — needed for item deletion)',
+            hint: 'The "What is your favorite movie?" answer; leave empty to skip.',
+        );
+
         $rga = Rga::create([
             'username' => $username,
             'password' => $password,
+            'security_answer' => $securityAnswer !== '' ? $securityAnswer : null,
         ]);
 
         $this->info("RGA #{$rga->id} ({$rga->username}) registered.");
