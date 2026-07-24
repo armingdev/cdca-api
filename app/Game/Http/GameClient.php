@@ -23,10 +23,10 @@ use Throwable;
  */
 class GameClient
 {
-    private const string BOOT_SENTINEL = 'Rampid Gaming Login';
+    public const string BOOT_SENTINEL = 'Rampid Gaming Login';
 
     /** Ajax endpoints answer 200 with this error box when the session is dead. */
-    private const string LOGGED_OUT_SENTINEL = 'You must be logged in to view this page';
+    public const string LOGGED_OUT_SENTINEL = 'You must be logged in to view this page';
 
     private function __construct(
         private readonly Rga $rga,

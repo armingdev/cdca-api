@@ -24,6 +24,8 @@ Route::prefix('v1')->group(function () {
         // RGAs (game accounts) + their session actions.
         Route::apiResource('rgas', RgaController::class)->except(['update']);
         Route::post('rgas/{rga}/login', [RgaController::class, 'login']);
+        Route::post('rgas/{rga}/session', [RgaController::class, 'attachSession']);
+        Route::get('rgas/{rga}/session', [RgaController::class, 'showSession']);
         Route::post('rgas/{rga}/sync-characters', [RgaController::class, 'syncCharacters']);
 
         // Characters + per-character skill selection / casting.
