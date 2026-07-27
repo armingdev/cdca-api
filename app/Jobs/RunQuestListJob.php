@@ -40,6 +40,12 @@ class RunQuestListJob extends RunJob
             },
         );
 
+        if ($summary->endReason === RunEndReason::RageExhausted && $participant->run->require_circumspect) {
+            return $this->waitForCircumspect($character, $summary->stopReason, [
+                'position' => $summary->nextPosition,
+            ]);
+        }
+
         $status = match ($summary->endReason) {
             RunEndReason::ExternalStop => RunStatus::Stopped,
             RunEndReason::ExternalPause => RunStatus::Paused,

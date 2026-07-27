@@ -265,12 +265,12 @@ it('casts on-start skills before the run when cast_on_start is set', function ()
         ->and(CharacterSkill::where('character_id', $character->id)->where('skill_id', 4)->value('last_cast_at'))->not->toBeNull();
 });
 
-it('gates the run off when Circumspect is required but cannot be made active', function () {
+it('parks the run waiting for Circumspect when it is required but on cooldown', function () {
     fakeCombatWorld();
 
     $character = Character::factory()->for(Rga::factory()->withSession())->create();
     Skill::create(['id' => Skill::CIRCUMSPECT_ID, 'name' => 'Circumspect', 'school' => 'ferocity', 'rage_cost' => 20, 'cooldown_minutes' => 720, 'duration_minutes' => 60]);
-    // Cast 70m ago: buff expired, still on cooldown → cannot re-activate.
+    // Cast 70m ago: buff expired, still on cooldown → wait out the recharge.
     CharacterSkill::create(['character_id' => $character->id, 'skill_id' => Skill::CIRCUMSPECT_ID, 'last_cast_at' => now()->subMinutes(70)]);
 
     $participant = RunParticipant::factory()
@@ -284,9 +284,15 @@ it('gates the run off when Circumspect is required but cannot be made active', f
 
     makeRunJob($participant)->handle(app(LoginService::class));
 
-    expect($participant->fresh()->status)->toBe(RunStatus::Stopped)
-        ->and($participant->fresh()->last_activity)->toContain('Circumspect not active')
-        ->and($participant->fresh()->wins)->toBe(0);
+    $participant->refresh();
+
+    // Cooldown ends 650m out; resume lands there plus the 2-minute buffer.
+    expect($participant->status)->toBe(RunStatus::Waiting)
+        ->and($participant->last_activity)->toContain('Waiting for Circumspect')
+        ->and($participant->wins)->toBe(0)
+        ->and($participant->finished_at)->toBeNull()
+        ->and($participant->resume_at->diffInMinutes(now()->addMinutes(652), true))->toBeLessThan(2)
+        ->and($participant->run->fresh()->status)->toBe(RunStatus::Waiting);
 });
 
 it('starts a pvp run and queues a RunPvpJob with the target config', function () {

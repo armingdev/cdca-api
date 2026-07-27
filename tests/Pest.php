@@ -83,6 +83,17 @@ function makeRunJob(RunParticipant $participant): RunJob
 }
 
 /**
+ * Minimal valid skills_info.php page (Circumspect-shaped, not recharging) so
+ * pre-run skill syncs in the fake worlds parse instead of throwing; cooldown
+ * windows then derive from local last_cast_at bookkeeping.
+ */
+function fakeSkillInfoHtml(): string
+{
+    return '<div><h5>Circumspect - Level 1</h5>Reduces the rage cost of fighting.</div>'
+        .'<b>Rage Cost:</b><br> 20 <b>Cooldown:</b><br> 720 mins <b>Duration:</b><br> 60 mins';
+}
+
+/**
  * Stateful fake game for combat tests: two mapped rooms (1 –E– 2), a Kix
  * Harvester in room 2 that dies after one successful attack, configurable
  * rage. Pair with rooms/mob seeded via seedCombatWorld().
@@ -128,6 +139,10 @@ function fakeCombatWorld(int $rage = 5000): void
             return Http::response(json_encode([
                 'exp' => '1,000', 'rage' => number_format($rage), 'level' => '60', 'width' => 0,
             ]));
+        }
+
+        if (str_contains($url, 'skills_info.php')) {
+            return Http::response(fakeSkillInfoHtml());
         }
 
         if (str_contains($url, 'cast_skills.php')) {
@@ -212,8 +227,10 @@ function questMobJson(string $name, int $mobId, int $spawnId, string $hash, int 
  * Stateful fake of quest 742 (Street Crawler, step 3378): serves the real
  * captured mob_talk fixtures by kill count. Under 5 → incomplete (no finish
  * link); 5+ → complete (finish link); the finish href → the reward page.
+ * Returns a setter to change the reported rage mid-test (Http::fake callbacks
+ * stack first-wins, so re-faking cannot override an earlier catch-all).
  */
-function fakeQuestWorld(int $rage = 50000): void
+function fakeQuestWorld(int $rage = 50000): Closure
 {
     $position = 1;
     $killed = 0;
@@ -232,11 +249,19 @@ function fakeQuestWorld(int $rage = 50000): void
         ]);
     };
 
-    Http::fake(function ($request) use (&$position, &$killed, $roomBlob, $rage) {
+    Http::fake(function ($request) use (&$position, &$killed, $roomBlob, &$rage) {
         $url = $request->url();
 
         if (str_contains($url, 'userstats.php')) {
             return Http::response(json_encode(['exp' => '1,000', 'rage' => number_format($rage), 'level' => '20', 'width' => 0]));
+        }
+
+        if (str_contains($url, 'skills_info.php')) {
+            return Http::response(fakeSkillInfoHtml());
+        }
+
+        if (str_contains($url, 'cast_skills.php') && $request->method() === 'POST') {
+            return Http::response('Status: You just cast a skill');
         }
 
         if (str_contains($url, 'mob_talk.php')) {
@@ -273,6 +298,10 @@ function fakeQuestWorld(int $rage = 50000): void
 
         return Http::response('<html>world</html>');
     });
+
+    return function (int $newRage) use (&$rage): void {
+        $rage = $newRage;
+    };
 }
 
 /**

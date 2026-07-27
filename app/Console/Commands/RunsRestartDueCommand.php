@@ -15,12 +15,13 @@ class RunsRestartDueCommand extends Command
 {
     public function handle(RunDispatcher $dispatcher): int
     {
+        // Only fully completed runs restart: stopped runs were disarmed by the
+        // stop itself, and waiting/paused runs are mid-cycle, not finished.
         $due = Run::query()
             ->whereNotNull('restart_every_minutes')
-            ->whereIn('status', [RunStatus::Completed, RunStatus::Stopped])
+            ->where('status', RunStatus::Completed)
             ->get()
-            ->filter(fn (Run $run) => $run->status === RunStatus::Completed
-                && $run->last_started_at !== null
+            ->filter(fn (Run $run) => $run->last_started_at !== null
                 && $run->last_started_at->addMinutes($run->restart_every_minutes)->isPast());
 
         foreach ($due as $run) {

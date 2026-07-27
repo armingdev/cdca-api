@@ -31,6 +31,10 @@ class RunMobJob extends RunJob
 
         $progress = ['kills_done' => $killsDone + $summary->wins];
 
+        if ($summary->endReason === RunEndReason::RageExhausted && $participant->run->require_circumspect) {
+            return $this->waitForCircumspect($character, $summary->stopReason, $progress);
+        }
+
         $status = match ($summary->endReason) {
             RunEndReason::ExternalStop => RunStatus::Stopped,
             RunEndReason::ExternalPause => RunStatus::Paused,

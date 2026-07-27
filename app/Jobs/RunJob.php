@@ -7,6 +7,7 @@ use App\Game\Engine\ParticipantOutcome;
 use App\Game\Enums\BattleOutcome;
 use App\Game\Enums\RunSignal;
 use App\Game\Enums\RunStatus;
+use App\Game\Skills\CircumspectGate;
 use App\Game\Skills\SkillCaster;
 use App\Game\Skills\SkillSyncService;
 use App\Models\BattleEvent;
@@ -82,7 +83,12 @@ abstract class RunJob implements ShouldQueue
             }
 
             if (! $this->applySkillOptions($character, $participant, $log)) {
-                $participant->transition(RunStatus::Stopped, 'Circumspect not active — run gated.');
+                $resumeAt = app(CircumspectGate::class)->resumeAtFor($character);
+                $participant->transition(
+                    RunStatus::Waiting,
+                    "Waiting for Circumspect — resumes {$resumeAt->format('Y-m-d H:i')}.",
+                    resumeAt: $resumeAt,
+                );
 
                 return;
             }
@@ -114,6 +120,26 @@ abstract class RunJob implements ShouldQueue
         } finally {
             $participant->run->refreshStatus();
         }
+    }
+
+    /**
+     * The Circumspect cycle outcome shared by all modes: park the participant
+     * until Circumspect's cooldown ends (fresh server reading when reachable),
+     * carrying the mode's progress into the next cycle. Rage regenerates
+     * during the cooldown, so waking at recharge time restarts a full window.
+     *
+     * @param  array<string, mixed>|null  $progress
+     */
+    protected function waitForCircumspect(Character $character, string $reason, ?array $progress = null): ParticipantOutcome
+    {
+        $resumeAt = app(CircumspectGate::class)->resumeAtFor($character, refresh: true);
+
+        return new ParticipantOutcome(
+            RunStatus::Waiting,
+            rtrim($reason, '.').". Waiting for Circumspect — resumes {$resumeAt->format('Y-m-d H:i')}.",
+            $resumeAt,
+            $progress,
+        );
     }
 
     /**

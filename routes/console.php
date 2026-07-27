@@ -9,6 +9,7 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('outwar:runs-restart-due')->everyMinute();
+Schedule::command('outwar:runs-resume-due')->everyMinute()->withoutOverlapping()->onOneServer();
 
 // Horizon's metrics dashboard stays blank unless snapshots are taken.
 Schedule::command('horizon:snapshot')->everyFiveMinutes();
