@@ -108,12 +108,8 @@ class Run extends Model
 
         $this->participants()
             ->whereIn('status', [RunStatus::Pending, RunStatus::Waiting, RunStatus::Paused])
-            ->update([
-                'status' => RunStatus::Stopped,
-                'resume_at' => null,
-                'finished_at' => now(),
-                'last_activity' => 'Stopped.',
-            ]);
+            ->get()
+            ->each(fn (RunParticipant $participant) => $participant->transition(RunStatus::Stopped, 'Stopped.'));
 
         $this->refreshStatus();
     }
@@ -132,11 +128,8 @@ class Run extends Model
 
         $this->participants()
             ->whereIn('status', [RunStatus::Pending, RunStatus::Waiting])
-            ->update([
-                'status' => RunStatus::Paused,
-                'resume_at' => null,
-                'last_activity' => 'Paused.',
-            ]);
+            ->get()
+            ->each(fn (RunParticipant $participant) => $participant->transition(RunStatus::Paused, 'Paused.'));
 
         $this->refreshStatus();
     }

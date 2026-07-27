@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Game\Auth\LoginService;
 use App\Game\Engine\ParticipantOutcome;
 use App\Game\Enums\BattleOutcome;
+use App\Game\Enums\CharacterActivity;
 use App\Game\Enums\RunSignal;
 use App\Game\Enums\RunStatus;
 use App\Game\Skills\CircumspectGate;
@@ -75,6 +76,7 @@ abstract class RunJob implements ShouldQueue
 
         $participant->update(['status' => RunStatus::Running, 'started_at' => now()]);
         $character = $participant->character;
+        $character->update(['status' => CharacterActivity::Running]);
         $log = fn (string $message) => $participant->update(['last_activity' => Str::limit($message, 250)]);
 
         try {

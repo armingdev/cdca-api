@@ -10,6 +10,7 @@ Artisan::command('inspire', function () {
 
 Schedule::command('outwar:runs-restart-due')->everyMinute();
 Schedule::command('outwar:runs-resume-due')->everyMinute()->withoutOverlapping()->onOneServer();
+Schedule::command('outwar:stats-refresh-stale')->everyFiveMinutes()->withoutOverlapping()->onOneServer();
 
 // Horizon's metrics dashboard stays blank unless snapshots are taken.
 Schedule::command('horizon:snapshot')->everyFiveMinutes();

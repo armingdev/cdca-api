@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Game\Enums\CharacterActivity;
 use App\Game\Enums\RunStatus;
 use Carbon\CarbonInterface;
 use Database\Factories\RunParticipantFactory;
@@ -95,5 +96,8 @@ class RunParticipant extends Model
         }
 
         $this->update($attributes);
+
+        // The fleet grid's live "status" column mirrors the participant.
+        $this->character?->update(['status' => CharacterActivity::fromRunStatus($status)]);
     }
 }

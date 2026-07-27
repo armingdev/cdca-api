@@ -1,10 +1,12 @@
 <?php
 
+use App\Jobs\RefreshCharacterStatsJob;
 use App\Models\Character;
 use App\Models\Rga;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Laravel\Sanctum\Sanctum;
 
 beforeEach(function () {
@@ -42,8 +44,10 @@ it('forbids viewing another user\'s RGA', function () {
     $this->getJson("/api/v1/rgas/{$other->id}")->assertForbidden();
 });
 
-it('logs an RGA in and captures its session', function () {
+it('logs an RGA in, captures its session, and queues a stat refresh per character', function () {
+    Queue::fake();
     $rga = Rga::factory()->for($this->user)->create();
+    Character::factory()->for($rga)->count(2)->create();
 
     Http::fake(['www.outwar.com/index.php' => Http::response('', 302, [
         'Set-Cookie' => ['rg_sess_id=abc; domain=.outwar.com', 'token=def; domain=.outwar.com', 'cuserid2=1; domain=.outwar.com'],
@@ -52,6 +56,20 @@ it('logs an RGA in and captures its session', function () {
     $this->postJson("/api/v1/rgas/{$rga->id}/login")
         ->assertOk()
         ->assertJsonPath('data.has_session', true);
+
+    Queue::assertPushed(RefreshCharacterStatsJob::class, 2);
+});
+
+it('queues a fleet-wide stat refresh on demand and rejects it without a session', function () {
+    Queue::fake();
+    $connected = Rga::factory()->for($this->user)->withSession()->create();
+    Character::factory()->for($connected)->count(3)->create();
+
+    $this->postJson("/api/v1/rgas/{$connected->id}/refresh-stats")->assertStatus(202);
+    Queue::assertPushed(RefreshCharacterStatsJob::class, 3);
+
+    $disconnected = Rga::factory()->for($this->user)->create();
+    $this->postJson("/api/v1/rgas/{$disconnected->id}/refresh-stats")->assertStatus(422);
 });
 
 it('attaches a browser session after live verification', function () {

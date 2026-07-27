@@ -11,6 +11,7 @@ use App\Http\Requests\StoreRgaRequest;
 use App\Http\Resources\CharacterResource;
 use App\Http\Resources\RgaResource;
 use App\Http\Resources\RgaSessionResource;
+use App\Jobs\RefreshCharacterStatsJob;
 use App\Models\Rga;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -50,7 +51,9 @@ class RgaController extends Controller
     }
 
     /**
-     * Log the RGA in to the game and capture its session cookies.
+     * Log the RGA in to the game and capture its session cookies. Kicks off
+     * a stat refresh for every known character so the fleet grid is live
+     * right after connecting.
      */
     public function login(Rga $rga, LoginService $loginService): JsonResponse
     {
@@ -61,6 +64,8 @@ class RgaController extends Controller
         } catch (GameException $exception) {
             return response()->json(['message' => $exception->getMessage()], 422);
         }
+
+        $this->queueStatsRefresh($rga);
 
         return RgaResource::make($rga->fresh())->response();
     }
@@ -83,6 +88,8 @@ class RgaController extends Controller
         } catch (GameException $exception) {
             return response()->json(['message' => $exception->getMessage()], 422);
         }
+
+        $this->queueStatsRefresh($rga);
 
         return RgaResource::make($rga->fresh())->response();
     }
@@ -119,6 +126,36 @@ class RgaController extends Controller
             return response()->json(['message' => $exception->getMessage()], 422);
         }
 
+        $this->queueStatsRefresh($rga);
+
         return CharacterResource::collection($characters);
+    }
+
+    /**
+     * Queue a stat refresh for every character on the RGA (202 — the grid
+     * fills in as the jobs land).
+     */
+    public function refreshStats(Rga $rga): JsonResponse
+    {
+        Gate::authorize('update', $rga);
+
+        if (! $rga->hasSession()) {
+            return response()->json(['message' => 'No active session — log the RGA in first.'], 422);
+        }
+
+        $queued = $this->queueStatsRefresh($rga);
+
+        return response()->json(['message' => "Queued {$queued} stat refresh(es)."], 202);
+    }
+
+    private function queueStatsRefresh(Rga $rga): int
+    {
+        $characters = $rga->characters()->get();
+
+        foreach ($characters as $character) {
+            RefreshCharacterStatsJob::dispatch($character);
+        }
+
+        return $characters->count();
     }
 }
