@@ -16,7 +16,6 @@ class QuestListItem extends Model
         'quest_list_id',
         'position',
         'quest_id',
-        'npc_name',
         'label',
     ];
 
@@ -39,8 +38,16 @@ class QuestListItem extends Model
         return $this->belongsTo(QuestList::class);
     }
 
+    /**
+     * @return BelongsTo<Quest, $this>
+     */
+    public function quest(): BelongsTo
+    {
+        return $this->belongsTo(Quest::class);
+    }
+
     public function displayName(): string
     {
-        return $this->label ?? "Quest {$this->quest_id}";
+        return $this->label ?? $this->quest->name;
     }
 }

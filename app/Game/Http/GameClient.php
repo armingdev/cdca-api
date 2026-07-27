@@ -29,7 +29,7 @@ class GameClient
     public const string LOGGED_OUT_SENTINEL = 'You must be logged in to view this page';
 
     private function __construct(
-        private readonly Rga $rga,
+        private readonly ?Rga $rga,
         private readonly ?Character $character,
         private readonly string $baseUrl,
     ) {}
@@ -46,6 +46,15 @@ class GameClient
             : config('outwar.login_host');
 
         return new self($rga, null, $baseUrl);
+    }
+
+    /**
+     * Cookieless client for public pages (e.g. show_quest.php) — throttled
+     * like every other game client, but risks no character session.
+     */
+    public static function forServer(int $serverId): self
+    {
+        return new self(null, null, config("outwar.servers.{$serverId}.host"));
     }
 
     /**
@@ -111,7 +120,7 @@ class GameClient
 
     private function cookieJar(): CookieJar
     {
-        $cookies = $this->rga->cookies ?? [];
+        $cookies = $this->rga?->cookies ?? [];
 
         if ($this->character !== null) {
             $cookies['ow_userid'] = (string) $this->character->suid;
@@ -127,7 +136,11 @@ class GameClient
      */
     private function throttle(): void
     {
-        $key = 'outwar:last_request:'.($this->character !== null ? 'char:'.$this->character->id : 'rga:'.$this->rga->id);
+        $key = 'outwar:last_request:'.match (true) {
+            $this->character !== null => 'char:'.$this->character->id,
+            $this->rga !== null => 'rga:'.$this->rga->id,
+            default => 'anon:'.$this->baseUrl,
+        };
         $gapMs = random_int((int) config('outwar.http.throttle_min_ms'), (int) config('outwar.http.throttle_max_ms'));
 
         $last = Cache::get($key);
@@ -150,6 +163,10 @@ class GameClient
      */
     private function guard(Response $response): void
     {
+        if ($this->rga === null) {
+            return;
+        }
+
         $body = $response->body();
 
         if (str_contains($body, self::BOOT_SENTINEL) || str_contains($body, self::LOGGED_OUT_SENTINEL)) {

@@ -18,9 +18,10 @@ it('runs the list in order: completes available quests, skips already-completed 
 
     $character = Character::factory()->for(Rga::factory()->withSession())->create();
 
+    $catalog = seedQuestCatalog();
     $list = QuestList::create(['name' => 'Armins List']);
-    $list->addQuest(742, 'Stella', 'Street Crawler');   // available → runs to completion
-    $list->addQuest(743, 'Stella', 'Cleansing');        // not offered → skipped
+    $list->addQuest($catalog[742]->id);   // available → runs to completion
+    $list->addQuest($catalog[743]->id);   // not offered → skipped
 
     $summary = QuestListRunner::forCharacter($character, new QuestListRunConfig(questListId: $list->id))
         ->run(log: fn (string $m) => null);
@@ -37,8 +38,9 @@ it('stops the whole list when a quest gets stuck at the rage floor', function ()
 
     $character = Character::factory()->for(Rga::factory()->withSession())->create();
 
+    $catalog = seedQuestCatalog();
     $list = QuestList::create(['name' => 'Armins List']);
-    $list->addQuest(742, 'Stella', 'Street Crawler');
+    $list->addQuest($catalog[742]->id);
 
     $summary = QuestListRunner::forCharacter($character, new QuestListRunConfig(questListId: $list->id, stopRage: 2500))
         ->run(log: fn (string $m) => null);
@@ -52,8 +54,9 @@ it('drives the whole list through the outwar:questlist-run command', function ()
     fakeQuestWorld();
 
     $character = Character::factory()->for(Rga::factory()->withSession())->create();
+    $catalog = seedQuestCatalog();
     $list = QuestList::create(['name' => 'Armins List']);
-    $list->addQuest(742, 'Stella', 'Street Crawler');
+    $list->addQuest($catalog[742]->id);
 
     $this->artisan('outwar:questlist-run', ['character' => $character->id, 'list' => 'Armins List'])
         ->assertSuccessful()

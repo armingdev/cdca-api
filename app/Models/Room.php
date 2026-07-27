@@ -5,6 +5,7 @@ namespace App\Models;
 use Database\Factories\RoomFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Room extends Model
@@ -20,6 +21,7 @@ class Room extends Model
     protected $fillable = [
         'id',
         'name',
+        'area_id',
         'north',
         'east',
         'south',
@@ -56,6 +58,14 @@ class Room extends Model
     public function mobs(): BelongsToMany
     {
         return $this->belongsToMany(Mob::class)->withPivot('last_seen_at');
+    }
+
+    /**
+     * @return BelongsTo<Area, $this>
+     */
+    public function area(): BelongsTo
+    {
+        return $this->belongsTo(Area::class);
     }
 
     /**

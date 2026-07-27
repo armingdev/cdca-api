@@ -17,11 +17,10 @@ class QuestListItemController extends Controller
 
         $questList->addQuest(
             questId: $request->integer('quest_id'),
-            npcName: $request->string('npc_name')->toString(),
             label: $request->input('label'),
         );
 
-        return QuestListResource::make($questList->fresh()->load('items'));
+        return QuestListResource::make($questList->fresh()->load('items.quest'));
     }
 
     public function destroy(QuestList $questList, int $position): JsonResponse|QuestListResource
@@ -32,6 +31,6 @@ class QuestListItemController extends Controller
             return response()->json(['message' => "No item at position {$position}."], 404);
         }
 
-        return QuestListResource::make($questList->fresh()->load('items'));
+        return QuestListResource::make($questList->fresh()->load('items.quest'));
     }
 }

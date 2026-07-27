@@ -17,8 +17,7 @@ class StoreQuestListItemRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'quest_id' => ['required', 'integer', 'min:1'],
-            'npc_name' => ['required', 'string', 'max:255'],
+            'quest_id' => ['required', 'integer', 'exists:quests,id'],
             'label' => ['sometimes', 'nullable', 'string', 'max:255'],
         ];
     }

@@ -20,9 +20,16 @@ class QuestListItemResource extends JsonResource
             'id' => $this->id,
             'position' => $this->position,
             'quest_id' => $this->quest_id,
-            'npc_name' => $this->npc_name,
             'label' => $this->label,
-            'display_name' => $this->displayName(),
+            'quest' => $this->whenLoaded('quest', fn () => [
+                'id' => $this->quest->id,
+                'game_quest_id' => $this->quest->game_quest_id,
+                'name' => $this->quest->name,
+                'giver' => $this->quest->giver,
+                'required_level' => $this->quest->required_level,
+                'total_exp' => $this->quest->total_exp,
+            ]),
+            'display_name' => $this->whenLoaded('quest', fn () => $this->displayName(), $this->label),
         ];
     }
 }

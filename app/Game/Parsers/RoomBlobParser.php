@@ -46,6 +46,24 @@ class RoomBlobParser
             mobs: array_values($mobs),
             doors: is_array($data['doorsData'] ?? null) ? $data['doorsData'] : null,
             error: $error,
+            questHelpDirection: $this->questHelpDirection($data),
         );
+    }
+
+    /**
+     * The quest-helper compass rides in questHelpData as a d-pad image name
+     * ("dpadcenter_south.jpg") while "find my target" is on; null = no pointer.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function questHelpDirection(array $data): ?string
+    {
+        $image = $data['questHelpData'] ?? null;
+
+        if (is_string($image) && preg_match('/dpadcenter_(north|south|east|west)/', $image, $m)) {
+            return $m[1];
+        }
+
+        return null;
     }
 }

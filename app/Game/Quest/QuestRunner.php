@@ -17,6 +17,7 @@ use App\Game\World\RoomGraph;
 use App\Models\BattleEvent;
 use App\Models\Character;
 use App\Models\Mob;
+use App\Models\QuestItem;
 use Closure;
 
 /**
@@ -29,6 +30,8 @@ use Closure;
  */
 class QuestRunner
 {
+    private const int MAX_COMPASS_STEPS = 150;
+
     private int $stepsCompleted = 0;
 
     private int $expGained = 0;
@@ -152,6 +155,10 @@ class QuestRunner
             QuestObjectiveType::Talk => [],
         };
 
+        if ($mobNames === [] && $objective->type === QuestObjectiveType::Collect) {
+            $mobNames = $this->learnSourcesViaHelper($objective, $log);
+        }
+
         if ($mobNames === []) {
             $log("No known way to fulfill '{$objective->target}' ({$objective->type->value}).");
 
@@ -177,18 +184,94 @@ class QuestRunner
     }
 
     /**
-     * Mobs empirically known to drop the item, from recorded battle drops.
+     * Last-resort source discovery for a collect item nothing in the DB knows
+     * about: turn on the game's own "find my target" compass and follow it
+     * room by room (the room blob carries a direction until we stand in the
+     * designated target room). The destination is stored on the quest item,
+     * and the mobs sighted there become the farm targets — their drops then
+     * pin the true sources in battle_events for every future run.
+     *
+     * @param  Closure(string): void  $log
+     * @return list<string>
+     */
+    private function learnSourcesViaHelper(QuestObjective $objective, Closure $log): array
+    {
+        $toggle = collect($this->questService->helperToggles())
+            ->first(fn ($candidate) => $candidate->isCollect() && $candidate->itemName === $objective->target);
+
+        if ($toggle === null) {
+            $log("No quest-helper toggle found for '{$objective->target}'.");
+
+            return [];
+        }
+
+        $log("Following the quest-helper compass for '{$objective->target}'…");
+        $this->questService->setQuestHelp($toggle, true);
+
+        try {
+            $blob = $this->navigator->loadCurrentRoom();
+
+            for ($steps = 0; $blob->questHelpDirection !== null; $steps++) {
+                $next = $blob->exits[$blob->questHelpDirection] ?? null;
+
+                if ($next === null || $steps >= self::MAX_COMPASS_STEPS) {
+                    $log("Compass walk aborted (step {$steps}, direction '{$blob->questHelpDirection}').");
+
+                    return [];
+                }
+
+                $blob = $this->navigator->stepTo($next, $blob->curRoom);
+                $this->graph->addRoom($blob->curRoom, $blob->exits);
+            }
+
+            $item = QuestItem::firstOrNew(['name' => $objective->target]);
+            $item->source_mobs ??= [];
+            $item->target_room_id = $blob->curRoom;
+            $item->helper_verified_at = now();
+            $item->save();
+
+            $mobNames = collect($blob->mobs)->pluck('name')->unique()->values()->all();
+            $log(sprintf(
+                'Compass arrived in room %d after %d step(s); farming %s.',
+                $blob->curRoom,
+                $steps,
+                $mobNames === [] ? 'nothing — room is empty' : implode(', ', $mobNames),
+            ));
+
+            return $mobNames;
+        } finally {
+            try {
+                $this->questService->setQuestHelp($toggle, false);
+            } catch (GameException) {
+                // Leaving the compass on is harmless; never mask the real outcome.
+            }
+        }
+    }
+
+    /**
+     * Mobs known to drop the item: the seeded catalog (xowh QuestItems)
+     * plus mobs empirically observed dropping it in recorded battles.
+     * Seeded names are filtered to mobs we have mapped, so MobRunner only
+     * ever hunts findable targets.
      *
      * @return list<string>
      */
     private function sourceMobsFor(string $itemName): array
     {
-        return BattleEvent::query()
+        $observed = BattleEvent::query()
             ->where('drop_name', $itemName)
             ->whereNotNull('mob_id')
             ->distinct()
             ->pluck('mob_id')
-            ->pipe(fn ($ids) => Mob::whereIn('id', $ids)->pluck('name')->all());
+            ->pipe(fn ($ids) => Mob::whereIn('id', $ids)->pluck('name'));
+
+        $seeded = QuestItem::where('name', $itemName)->first()?->source_mobs ?? [];
+
+        return $observed
+            ->merge(Mob::whereIn('name', $seeded)->pluck('name'))
+            ->unique()
+            ->values()
+            ->all();
     }
 
     /**
