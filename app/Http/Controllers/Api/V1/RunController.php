@@ -136,6 +136,23 @@ class RunController extends Controller
     }
 
     /**
+     * Delete a finished run (and its participants via cascade). Live or
+     * parked runs must be stopped first.
+     */
+    public function destroy(Run $run): JsonResponse
+    {
+        Gate::authorize('delete', $run);
+
+        if (! $run->status->isFinished()) {
+            throw ValidationException::withMessages(['run' => ['Stop the run before deleting it.']]);
+        }
+
+        $run->delete();
+
+        return response()->json(['message' => 'Run deleted.']);
+    }
+
+    /**
      * Battle events across the run's characters (newest first, paginated).
      */
     public function battles(Request $request, Run $run): AnonymousResourceCollection

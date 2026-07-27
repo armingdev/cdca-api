@@ -16,4 +16,9 @@ class RunPolicy
     {
         return $run->user_id === $user->id;
     }
+
+    public function delete(User $user, Run $run): bool
+    {
+        return $run->user_id === $user->id;
+    }
 }

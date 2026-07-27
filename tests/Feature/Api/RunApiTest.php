@@ -174,6 +174,21 @@ it('stops parked participants immediately when a paused run is stopped', functio
         ->and($paused->fresh()->finished_at)->not->toBeNull();
 });
 
+it('deletes only finished runs', function () {
+    $finished = Run::factory()->for($this->user)->state(['status' => RunStatus::Completed])->create();
+    RunParticipant::factory()->for($finished)->for(Character::factory()->for($this->rga))->create(['status' => RunStatus::Completed]);
+
+    $this->deleteJson("/api/v1/runs/{$finished->id}")->assertOk();
+    expect(Run::find($finished->id))->toBeNull()
+        ->and(RunParticipant::where('run_id', $finished->id)->count())->toBe(0);
+
+    $live = Run::factory()->for($this->user)->state(['status' => RunStatus::Running])->create();
+    $this->deleteJson("/api/v1/runs/{$live->id}")->assertStatus(422);
+
+    $foreign = Run::factory()->for(User::factory())->state(['status' => RunStatus::Completed])->create();
+    $this->deleteJson("/api/v1/runs/{$foreign->id}")->assertForbidden();
+});
+
 it('lists only the user\'s runs and forbids others', function () {
     Run::factory()->for($this->user)->create();
     $other = Run::factory()->for(User::factory())->create();

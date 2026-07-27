@@ -44,6 +44,30 @@ it('forbids viewing another user\'s RGA', function () {
     $this->getJson("/api/v1/rgas/{$other->id}")->assertForbidden();
 });
 
+it('updates the password and security answer, keeping them encrypted and the username immutable', function () {
+    $rga = Rga::factory()->for($this->user)->create(['username' => 'linuxx']);
+
+    $this->putJson("/api/v1/rgas/{$rga->id}", [
+        'username' => 'hijacked',
+        'password' => 'newpass123',
+        'security_answer' => 'The Matrix',
+    ])->assertOk()
+        ->assertJsonPath('data.username', 'linuxx')
+        ->assertJsonPath('data.has_security_answer', true);
+
+    $rga->refresh();
+    expect($rga->username)->toBe('linuxx')
+        ->and($rga->password)->toBe('newpass123')
+        ->and($rga->security_answer)->toBe('The Matrix');
+
+    $raw = DB::table('rgas')->where('id', $rga->id)->first();
+    expect($raw->password)->not->toContain('newpass123')
+        ->and($raw->security_answer)->not->toContain('Matrix');
+
+    $other = Rga::factory()->for(User::factory())->create();
+    $this->putJson("/api/v1/rgas/{$other->id}", ['password' => 'x'])->assertForbidden();
+});
+
 it('logs an RGA in, captures its session, and queues a stat refresh per character', function () {
     Queue::fake();
     $rga = Rga::factory()->for($this->user)->create();

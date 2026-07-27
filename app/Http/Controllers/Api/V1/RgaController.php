@@ -8,6 +8,7 @@ use App\Game\Exceptions\GameException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\AttachRgaSessionRequest;
 use App\Http\Requests\StoreRgaRequest;
+use App\Http\Requests\UpdateRgaRequest;
 use App\Http\Resources\CharacterResource;
 use App\Http\Resources\RgaResource;
 use App\Http\Resources\RgaSessionResource;
@@ -39,6 +40,19 @@ class RgaController extends Controller
         Gate::authorize('view', $rga);
 
         return RgaResource::make($rga->loadCount('characters'));
+    }
+
+    /**
+     * Change the RGA's password and/or security answer (both encrypted at
+     * rest). The username is immutable — a different account is a new RGA.
+     */
+    public function update(UpdateRgaRequest $request, Rga $rga): RgaResource
+    {
+        Gate::authorize('update', $rga);
+
+        $rga->update($request->validated());
+
+        return RgaResource::make($rga->fresh()->loadCount('characters'));
     }
 
     public function destroy(Rga $rga): JsonResponse
