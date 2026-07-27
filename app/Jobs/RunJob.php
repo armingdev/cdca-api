@@ -8,6 +8,7 @@ use App\Game\Enums\BattleOutcome;
 use App\Game\Enums\CharacterActivity;
 use App\Game\Enums\RunSignal;
 use App\Game\Enums\RunStatus;
+use App\Game\Exceptions\SessionCollisionException;
 use App\Game\Skills\CircumspectGate;
 use App\Game\Skills\SkillCaster;
 use App\Game\Skills\SkillSyncService;
@@ -19,6 +20,7 @@ use Closure;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -36,6 +38,9 @@ abstract class RunJob implements ShouldQueue
 
     /** Engine iterations between authoritative DB status reads backing up the cache signal. */
     private const int DB_SIGNAL_CHECK_EVERY = 25;
+
+    /** Session-collision re-logins tolerated per cycle before failing loudly. */
+    private const int MAX_RELOGIN_ATTEMPTS = 3;
 
     public int $timeout = 7200;
 
@@ -74,9 +79,38 @@ abstract class RunJob implements ShouldQueue
             return;
         }
 
-        $participant->update(['status' => RunStatus::Running, 'started_at' => now()]);
         $character = $participant->character;
+
+        // One character, one worker — the enrollment guard makes a second
+        // driver near-impossible, so a held lock is a loud failure, not a
+        // silent retry. TTL outlives the job so a hard-killed worker frees it.
+        $lock = Cache::lock("character-run:{$character->id}", $this->timeout + 600);
+
+        if (! $lock->get()) {
+            $participant->transition(RunStatus::Failed, 'Character is already driven by another worker.');
+            $participant->run->refreshStatus();
+
+            return;
+        }
+
+        try {
+            $this->drive($participant, $character, $loginService);
+        } finally {
+            $lock->release();
+        }
+    }
+
+    private function drive(RunParticipant $participant, Character $character, LoginService $loginService): void
+    {
+        $participant->update(['status' => RunStatus::Running, 'started_at' => now()]);
         $character->update(['status' => CharacterActivity::Running]);
+
+        $run = $participant->run;
+
+        if ($run->status === RunStatus::Pending) {
+            $run->update(['status' => RunStatus::Running]);
+        }
+
         $log = fn (string $message) => $participant->update(['last_activity' => Str::limit($message, 250)]);
 
         try {
@@ -113,8 +147,11 @@ abstract class RunJob implements ShouldQueue
                 $outcome->status,
                 $outcome->reason,
                 $outcome->resumeAt,
-                $outcome->progress,
+                // A clean engine return proves the session works again.
+                array_merge($outcome->progress ?? [], ['relogin_attempts' => 0]),
             );
+        } catch (SessionCollisionException) {
+            $this->recoverSession($participant, $character, $loginService);
         } catch (Throwable $exception) {
             $participant->transition(RunStatus::Failed, $exception->getMessage());
 
@@ -122,6 +159,56 @@ abstract class RunJob implements ShouldQueue
         } finally {
             $participant->run->refreshStatus();
         }
+    }
+
+    /**
+     * Session-collision self-heal: one re-login attempt per RGA at a time
+     * (the lock stops a 75-character stampede — siblings just wait for the
+     * winner's session), then park briefly and let the resume scheduler
+     * re-drive the participant. Bounded by a per-cycle attempt budget so a
+     * genuinely broken account fails loudly instead of looping forever.
+     */
+    private function recoverSession(RunParticipant $participant, Character $character, LoginService $loginService): void
+    {
+        $attempts = (int) ($participant->progress['relogin_attempts'] ?? 0) + 1;
+
+        if ($attempts > self::MAX_RELOGIN_ATTEMPTS) {
+            $participant->transition(
+                RunStatus::Failed,
+                'Session lost repeatedly — giving up after '.self::MAX_RELOGIN_ATTEMPTS.' re-login attempts.',
+                progress: ['relogin_attempts' => $attempts],
+            );
+
+            return;
+        }
+
+        $rga = $character->rga;
+        $lock = Cache::lock("rga-relogin:{$rga->id}", 120);
+
+        if ($lock->get()) {
+            try {
+                $loginService->login($rga->fresh());
+            } catch (Throwable $exception) {
+                $participant->transition(
+                    RunStatus::Failed,
+                    Str::limit("Session lost and re-login failed: {$exception->getMessage()}", 250),
+                    progress: ['relogin_attempts' => $attempts],
+                );
+
+                return;
+            } finally {
+                $lock->release();
+            }
+        }
+
+        // Either this worker just restored the session or a sibling is doing
+        // it right now — resume shortly and re-check at pickup.
+        $participant->transition(
+            RunStatus::Waiting,
+            'Session dropped — recovered, resuming shortly.',
+            resumeAt: now()->addMinute(),
+            progress: ['relogin_attempts' => $attempts],
+        );
     }
 
     /**

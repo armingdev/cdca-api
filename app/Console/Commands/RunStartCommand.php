@@ -8,6 +8,7 @@ use App\Game\Engine\QuestListRunConfig;
 use App\Game\Engine\QuestRunConfig;
 use App\Game\Engine\RunLauncher;
 use App\Game\Enums\RunMode;
+use App\Game\Exceptions\CharactersBusyException;
 use App\Models\Character;
 use App\Models\QuestList;
 use Illuminate\Console\Attributes\Description;
@@ -65,15 +66,21 @@ class RunStartCommand extends Command
 
         $startAt = $this->option('start-at') !== null ? Carbon::parse($this->option('start-at')) : null;
 
-        $run = $launcher->launch(
-            mode: $mode,
-            characters: $characters,
-            config: $config,
-            castOnStart: (bool) $this->option('cast-on-start'),
-            requireCircumspect: (bool) $this->option('require-circ'),
-            restartEveryMinutes: $this->option('restart-every') !== null ? (int) $this->option('restart-every') : null,
-            startAt: $startAt,
-        );
+        try {
+            $run = $launcher->launch(
+                mode: $mode,
+                characters: $characters,
+                config: $config,
+                castOnStart: (bool) $this->option('cast-on-start'),
+                requireCircumspect: (bool) $this->option('require-circ'),
+                restartEveryMinutes: $this->option('restart-every') !== null ? (int) $this->option('restart-every') : null,
+                startAt: $startAt,
+            );
+        } catch (CharactersBusyException $exception) {
+            $this->error($exception->getMessage());
+
+            return self::FAILURE;
+        }
 
         $startAt = $run->start_at;
 

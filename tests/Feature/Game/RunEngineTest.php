@@ -120,7 +120,11 @@ it('re-dispatches completed runs whose restart interval elapsed', function () {
         'status' => RunStatus::Completed,
         'last_started_at' => now()->subMinutes(90),
     ])->create();
-    RunParticipant::factory()->for($due)->create(['status' => RunStatus::Completed, 'wins' => 7]);
+    RunParticipant::factory()->for($due)->create([
+        'status' => RunStatus::Completed,
+        'wins' => 7,
+        'progress' => ['kills_done' => 7, 'cycles_done' => 2],
+    ]);
 
     $notDue = Run::factory()->restartEvery(60)->state([
         'status' => RunStatus::Completed,
@@ -135,6 +139,7 @@ it('re-dispatches completed runs whose restart interval elapsed', function () {
     expect($due->fresh()->status)->toBe(RunStatus::Running)
         ->and($due->participants()->first()->status)->toBe(RunStatus::Pending)
         ->and($due->participants()->first()->wins)->toBe(7)
+        ->and($due->participants()->first()->progress)->toBeNull()
         ->and($notDue->fresh()->status)->toBe(RunStatus::Completed);
 
     Queue::assertPushed(RunMobJob::class, 1);

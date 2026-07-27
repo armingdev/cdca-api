@@ -10,6 +10,7 @@ use App\Game\Engine\RunDispatcher;
 use App\Game\Engine\RunLauncher;
 use App\Game\Enums\RunMode;
 use App\Game\Enums\RunStatus;
+use App\Game\Exceptions\CharactersBusyException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreRunRequest;
 use App\Http\Resources\BattleEventResource;
@@ -50,16 +51,20 @@ class RunController extends Controller
 
         $config = $this->buildConfig($mode, $request, $user->id);
 
-        $run = $launcher->launch(
-            mode: $mode,
-            characters: $characters,
-            config: $config,
-            castOnStart: $request->boolean('cast_on_start'),
-            requireCircumspect: $request->boolean('require_circumspect'),
-            restartEveryMinutes: $request->filled('restart_every_minutes') ? $request->integer('restart_every_minutes') : null,
-            startAt: $request->filled('start_at') ? Carbon::parse($request->validated('start_at')) : null,
-            user: $user,
-        );
+        try {
+            $run = $launcher->launch(
+                mode: $mode,
+                characters: $characters,
+                config: $config,
+                castOnStart: $request->boolean('cast_on_start'),
+                requireCircumspect: $request->boolean('require_circumspect'),
+                restartEveryMinutes: $request->filled('restart_every_minutes') ? $request->integer('restart_every_minutes') : null,
+                startAt: $request->filled('start_at') ? Carbon::parse($request->validated('start_at')) : null,
+                user: $user,
+            );
+        } catch (CharactersBusyException $exception) {
+            throw ValidationException::withMessages(['characters' => [$exception->getMessage()]]);
+        }
 
         return RunResource::make($run->load('participants.character'))->response()->setStatusCode(201);
     }

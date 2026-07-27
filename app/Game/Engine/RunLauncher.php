@@ -4,8 +4,10 @@ namespace App\Game\Engine;
 
 use App\Game\Enums\RunMode;
 use App\Game\Enums\RunStatus;
+use App\Game\Exceptions\CharactersBusyException;
 use App\Models\Character;
 use App\Models\Run;
+use App\Models\RunParticipant;
 use App\Models\User;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -22,6 +24,8 @@ class RunLauncher
     /**
      * @param  Collection<int, Character>  $characters
      * @param  array<string, mixed>  $config  the mode's config array (MobRunConfig::toArray(), etc.)
+     *
+     * @throws CharactersBusyException when a character is already enrolled in an unfinished run
      */
     public function launch(
         RunMode $mode,
@@ -37,13 +41,15 @@ class RunLauncher
             $startAt = $startAt->addDay();
         }
 
+        $this->guardAgainstBusyCharacters($characters);
+
         $run = Run::create([
             'user_id' => $user?->id,
             'mode' => $mode,
             'config' => $config,
             'cast_on_start' => $castOnStart,
             'require_circumspect' => $requireCircumspect,
-            'status' => RunStatus::Running,
+            'status' => $startAt?->isFuture() ?? false ? RunStatus::Pending : RunStatus::Running,
             'restart_every_minutes' => $restartEveryMinutes,
             'start_at' => $startAt,
             'last_started_at' => $startAt ?? now(),
@@ -55,5 +61,27 @@ class RunLauncher
         }
 
         return $run;
+    }
+
+    /**
+     * One character, one worker: reject enrollment while any earlier
+     * participant of the character is still pending, live, or parked.
+     *
+     * @param  Collection<int, Character>  $characters
+     */
+    private function guardAgainstBusyCharacters(Collection $characters): void
+    {
+        $busyNames = RunParticipant::query()
+            ->whereIn('character_id', $characters->pluck('id'))
+            ->whereNotIn('status', [RunStatus::Stopped, RunStatus::Completed, RunStatus::Failed])
+            ->with('character:id,name')
+            ->get()
+            ->pluck('character.name')
+            ->unique()
+            ->values();
+
+        if ($busyNames->isNotEmpty()) {
+            throw CharactersBusyException::forCharacters($busyNames->all());
+        }
     }
 }

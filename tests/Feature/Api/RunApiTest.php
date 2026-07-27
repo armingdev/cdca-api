@@ -77,6 +77,23 @@ it('accepts and stores the mob pass options', function () {
     ])->assertStatus(422)->assertJsonValidationErrorFor('attack_interval_seconds');
 });
 
+it('rejects a run for a character already enrolled in an active run', function () {
+    Queue::fake();
+    $character = Character::factory()->for($this->rga)->create();
+    RunParticipant::factory()
+        ->for(Run::factory()->for($this->user)->state(['status' => RunStatus::Running]))
+        ->for($character)
+        ->create(['status' => RunStatus::Running]);
+
+    $this->postJson('/api/v1/runs', [
+        'mode' => 'mob',
+        'characters' => [$character->id],
+        'mobs' => ['Kix Harvester'],
+    ])->assertStatus(422)->assertJsonValidationErrorFor('characters');
+
+    Queue::assertNothingPushed();
+});
+
 it('rejects a run that uses characters the user does not own', function () {
     Queue::fake();
     $foreign = Character::factory()->for(Rga::factory()->for(User::factory()))->create();

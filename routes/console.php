@@ -8,7 +8,7 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
-Schedule::command('outwar:runs-restart-due')->everyMinute();
+Schedule::command('outwar:runs-restart-due')->everyMinute()->withoutOverlapping()->onOneServer();
 Schedule::command('outwar:runs-resume-due')->everyMinute()->withoutOverlapping()->onOneServer();
 Schedule::command('outwar:stats-refresh-stale')->everyFiveMinutes()->withoutOverlapping()->onOneServer();
 

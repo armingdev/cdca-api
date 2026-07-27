@@ -20,16 +20,20 @@ class RunsRestartDueCommand extends Command
         $due = Run::query()
             ->whereNotNull('restart_every_minutes')
             ->where('status', RunStatus::Completed)
-            ->get()
-            ->filter(fn (Run $run) => $run->last_started_at !== null
-                && $run->last_started_at->addMinutes($run->restart_every_minutes)->isPast());
+            ->whereNotNull('last_started_at')
+            ->whereRaw('last_started_at + make_interval(mins => restart_every_minutes) <= now()')
+            ->get();
 
         foreach ($due as $run) {
             $run->update(['status' => RunStatus::Running, 'last_started_at' => now()]);
 
             foreach ($run->participants as $participant) {
+                // Wins stay cumulative across restarts; progress resets so
+                // the new cycle is a clean pass 1.
                 $participant->update([
                     'status' => RunStatus::Pending,
+                    'progress' => null,
+                    'resume_at' => null,
                     'started_at' => null,
                     'finished_at' => null,
                 ]);

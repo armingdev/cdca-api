@@ -6,6 +6,7 @@ use App\Game\Exceptions\SessionCollisionException;
 use App\Models\Character;
 use App\Models\Rga;
 use GuzzleHttp\Cookie\CookieJar;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
@@ -132,28 +133,43 @@ class GameClient
 
     /**
      * Sleep so consecutive requests for the same character keep a jittered
-     * minimum gap — the per-character politeness throttle.
+     * minimum gap — the per-character politeness throttle. Serialized by an
+     * atomic lock (held through the sleep) so concurrent workers on the same
+     * key cannot race the read-then-write and burst; if the lock cannot be
+     * acquired in time, fall through with a plain full-gap sleep.
      */
     private function throttle(): void
     {
+        $gapMs = random_int((int) config('outwar.http.throttle_min_ms'), (int) config('outwar.http.throttle_max_ms'));
+
+        if ($gapMs <= 0) {
+            return;
+        }
+
         $key = 'outwar:last_request:'.match (true) {
             $this->character !== null => 'char:'.$this->character->id,
             $this->rga !== null => 'rga:'.$this->rga->id,
             default => 'anon:'.$this->baseUrl,
         };
-        $gapMs = random_int((int) config('outwar.http.throttle_min_ms'), (int) config('outwar.http.throttle_max_ms'));
 
-        $last = Cache::get($key);
+        try {
+            Cache::lock("{$key}:lock", 10)->block(15, function () use ($key, $gapMs): void {
+                $last = Cache::get($key);
 
-        if ($last !== null) {
-            $elapsedMs = (microtime(true) - (float) $last) * 1000;
+                if ($last !== null) {
+                    $elapsedMs = (microtime(true) - (float) $last) * 1000;
 
-            if ($elapsedMs < $gapMs) {
-                Sleep::usleep((int) (($gapMs - $elapsedMs) * 1000));
-            }
+                    if ($elapsedMs < $gapMs) {
+                        Sleep::usleep((int) (($gapMs - $elapsedMs) * 1000));
+                    }
+                }
+
+                Cache::put($key, microtime(true), 300);
+            });
+        } catch (LockTimeoutException) {
+            Sleep::usleep($gapMs * 1000);
+            Cache::put($key, microtime(true), 300);
         }
-
-        Cache::put($key, microtime(true), 300);
     }
 
     /**
