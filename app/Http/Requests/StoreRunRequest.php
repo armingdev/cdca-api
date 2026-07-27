@@ -35,6 +35,8 @@ class StoreRunRequest extends FormRequest
             'mobs.*' => ['string', 'max:255'],
             'max_kills' => ['sometimes', 'integer', 'min:0'],
             'drop_junk' => ['sometimes', 'boolean'],
+            'run_count' => ['sometimes', 'nullable', 'integer', 'min:0'],
+            'attack_interval_seconds' => ['sometimes', 'nullable', 'integer', 'min:60', 'max:86400'],
 
             // quest mode
             'npc' => ['required_if:mode,quest', 'string', 'max:255'],

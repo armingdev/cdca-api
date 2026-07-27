@@ -18,9 +18,6 @@ enum RunEndReason: string
     /** Rage fell below the stop floor and could not be recovered. */
     case RageExhausted = 'rage_exhausted';
 
-    /** A pass finished and the configured attack interval should elapse before the next. */
-    case IntervalWait = 'interval_wait';
-
     /** No way to make progress: unfulfillable objective, unmapped giver, dead link. */
     case Stuck = 'stuck';
 

@@ -163,6 +163,10 @@ class RunController extends Controller
                 maxKills: $request->integer('max_kills'),
                 levelUp: $levelUp,
                 dropJunk: $request->boolean('drop_junk'),
+                runCount: $request->integer('run_count'),
+                attackIntervalSeconds: $request->filled('attack_interval_seconds')
+                    ? $request->integer('attack_interval_seconds')
+                    : null,
             ))->toArray(),
 
             RunMode::Quest => (new QuestRunConfig(

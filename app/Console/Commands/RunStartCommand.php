@@ -29,6 +29,8 @@ use Illuminate\Support\Collection;
     {--message= : (pvp mode) Optional attack message}
     {--stop-rage=2500 : Per-character rage floor}
     {--max-kills=0 : (mob mode) Stop each character after this many wins (0 = unlimited)}
+    {--run-count=0 : (mob mode) Full passes per character (0 = unbounded while cycling)}
+    {--attack-interval= : (mob mode) Seconds to wait between passes (min 60)}
     {--level-up : Level up (refills rage) instead of stopping when rage is low}
     {--cast-on-start : Cast the character\'s selected skills before the run begins}
     {--require-circ : Only run while Circumspect is active (cast it if possible, else gate off)}
@@ -141,6 +143,10 @@ class RunStartCommand extends Command
             stopRage: (int) $this->option('stop-rage'),
             maxKills: (int) $this->option('max-kills'),
             levelUp: (bool) $this->option('level-up'),
+            runCount: (int) $this->option('run-count'),
+            attackIntervalSeconds: $this->option('attack-interval') !== null
+                ? max((int) $this->option('attack-interval'), 60)
+                : null,
         ))->toArray();
     }
 

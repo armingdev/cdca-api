@@ -55,6 +55,28 @@ it('starts a pvp run', function () {
     Queue::assertPushed(RunPvpJob::class, 1);
 });
 
+it('accepts and stores the mob pass options', function () {
+    Queue::fake();
+    $character = Character::factory()->for($this->rga)->create();
+
+    $this->postJson('/api/v1/runs', [
+        'mode' => 'mob',
+        'characters' => [$character->id],
+        'mobs' => ['Kix Harvester'],
+        'run_count' => 3,
+        'attack_interval_seconds' => 300,
+    ])->assertCreated()
+        ->assertJsonPath('data.config.run_count', 3)
+        ->assertJsonPath('data.config.attack_interval_seconds', 300);
+
+    $this->postJson('/api/v1/runs', [
+        'mode' => 'mob',
+        'characters' => [$character->id],
+        'mobs' => ['Kix Harvester'],
+        'attack_interval_seconds' => 5,
+    ])->assertStatus(422)->assertJsonValidationErrorFor('attack_interval_seconds');
+});
+
 it('rejects a run that uses characters the user does not own', function () {
     Queue::fake();
     $foreign = Character::factory()->for(Rga::factory()->for(User::factory()))->create();
