@@ -3,16 +3,19 @@
 namespace App\Game\Quest;
 
 use App\Game\Data\AvailableQuest;
+use App\Game\Data\QuestHelperToggle;
 use App\Game\Data\QuestStepPage;
 use App\Game\Http\GameClient;
 use App\Game\Parsers\MobTalkParser;
 use App\Game\Parsers\NpcPopupParser;
+use App\Game\Parsers\WorldQuestHelperParser;
 use App\Models\Character;
 
 /**
- * The HTTP + parse layer for quests: NPC popup (available quests) and
- * mob_talk step views / finishes. Stateless beyond the client — the
- * QuestRunner owns the walk-and-advance logic.
+ * The HTTP + parse layer for quests: NPC popup (available quests), mob_talk
+ * step views / finishes, and the quest-helper tracker + "find my target"
+ * toggle. Stateless beyond the client — the QuestRunner owns the
+ * walk-and-advance logic.
  */
 class QuestService
 {
@@ -20,6 +23,7 @@ class QuestService
         private readonly GameClient $client,
         private readonly NpcPopupParser $popupParser,
         private readonly MobTalkParser $stepParser,
+        private readonly WorldQuestHelperParser $helperParser,
     ) {}
 
     public static function forCharacter(Character $character): self
@@ -28,6 +32,7 @@ class QuestService
             GameClient::forCharacter($character),
             app(NpcPopupParser::class),
             app(MobTalkParser::class),
+            app(WorldQuestHelperParser::class),
         );
     }
 
@@ -65,5 +70,32 @@ class QuestService
     public function finishStep(string $finishHref): QuestStepPage
     {
         return $this->stepParser->parse($this->client->get($finishHref)->body());
+    }
+
+    /**
+     * The "find my target" toggles of every active-quest objective.
+     *
+     * @return list<QuestHelperToggle>
+     */
+    public function helperToggles(): array
+    {
+        return $this->helperParser->parse($this->client->get('world_questHelper.php')->body());
+    }
+
+    /**
+     * Toggle "find my target" for one objective. While on, every room blob
+     * carries the compass (RoomBlob::questHelpDirection).
+     */
+    public function setQuestHelp(QuestHelperToggle $toggle, bool $on): void
+    {
+        $this->client->get('quest_help.php', [
+            'questid' => $toggle->questId,
+            'mobid' => $toggle->mobId,
+            'itemname' => $toggle->itemName,
+            'stepid' => $toggle->stepId,
+            'conditionid' => $toggle->conditionId,
+            'state' => $on ? 1 : 0,
+            'json' => 1,
+        ]);
     }
 }

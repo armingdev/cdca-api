@@ -4,6 +4,7 @@ use App\Game\Engine\QuestRunConfig;
 use App\Game\Exceptions\GameException;
 use App\Game\Quest\QuestRunner;
 use App\Models\Character;
+use App\Models\QuestItem;
 use App\Models\Rga;
 
 // The stateful fake quest world (fakeQuestWorld / seedQuestWorld) lives in tests/Pest.php.
@@ -49,6 +50,78 @@ it('reports a clear failure when the giver is not mapped', function () {
 
     expect(fn () => QuestRunner::forCharacter($character, new QuestRunConfig(npcName: 'Nobody', questId: 742))->run())
         ->toThrow(GameException::class, 'not in the mapped world');
+});
+
+it('fulfills a collect objective by farming the seeded source mob', function () {
+    $character = Character::factory()->for(Rga::factory()->withSession())->create();
+
+    seedCollectQuestWorld();
+    QuestItem::factory()->create([
+        'name' => 'Holy Elemental Crystal',
+        'source_mobs' => ['Holy Elemental Keeper'],
+    ]);
+
+    fakeCollectQuestWorld();
+
+    $log = [];
+    $summary = QuestRunner::forCharacter($character, new QuestRunConfig(
+        npcName: 'Rune Master',
+        questId: 1449,
+    ))->run(log: function (string $m) use (&$log) {
+        $log[] = $m;
+    });
+
+    expect($summary->completed)->toBeTrue()
+        ->and($summary->kills)->toBe(1)
+        ->and($summary->stopReason)->toBe('Quest complete.')
+        ->and(collect($log)->contains(fn ($l) => str_contains($l, 'Objective: Holy Elemental Crystal 0/1 collect')))->toBeTrue();
+});
+
+it('learns collect sources by following the quest-helper compass when nothing is known', function () {
+    $character = Character::factory()->for(Rga::factory()->withSession())->create();
+
+    seedCollectQuestWorld();
+    // No QuestItem seeded and no battle drops — the runner knows nothing.
+
+    fakeCollectQuestWorld();
+
+    $log = [];
+    $summary = QuestRunner::forCharacter($character, new QuestRunConfig(
+        npcName: 'Rune Master',
+        questId: 1449,
+    ))->run(log: function (string $m) use (&$log) {
+        $log[] = $m;
+    });
+
+    expect($summary->completed)->toBeTrue()
+        ->and($summary->kills)->toBe(1)
+        ->and(collect($log)->contains(fn ($l) => str_contains($l, 'quest-helper compass')))->toBeTrue()
+        ->and(collect($log)->contains(fn ($l) => str_contains($l, 'Compass arrived in room 2')))->toBeTrue();
+
+    $item = QuestItem::where('name', 'Holy Elemental Crystal')->first();
+
+    expect($item->target_room_id)->toBe(2)
+        ->and($item->helper_verified_at)->not->toBeNull();
+});
+
+it('stops with a clear reason when a collect item has no known source and no helper toggle', function () {
+    $character = Character::factory()->for(Rga::factory()->withSession())->create();
+
+    seedCollectQuestWorld();
+
+    fakeCollectQuestWorld(helper: false);
+
+    $log = [];
+    $summary = QuestRunner::forCharacter($character, new QuestRunConfig(
+        npcName: 'Rune Master',
+        questId: 1449,
+    ))->run(log: function (string $m) use (&$log) {
+        $log[] = $m;
+    });
+
+    expect($summary->completed)->toBeFalse()
+        ->and($summary->stopReason)->toBe("Could not make progress on objective 'Holy Elemental Crystal'.")
+        ->and(collect($log)->contains(fn ($l) => str_contains($l, 'No known way to fulfill')))->toBeTrue();
 });
 
 it('drives the whole flow through the outwar:quest command', function () {

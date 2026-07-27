@@ -1,0 +1,79 @@
+{
+ "error": "",
+ "pic": "dcstreet.jpg",
+ "actionid": "0",
+ "description": "Not much else remains on the north side Morgan?s way after Synge?s last attack on the city. On the south side, look for the Subway and entrance to Rallis.",
+ "name": "Morgan's Way",
+ "mapData": "<!-- map html omitted -->",
+ "north": "62",
+ "south": "60",
+ "east": "0",
+ "west": "0",
+ "curRoom": "61",
+ "roomDetailsNew": [
+  {
+   "name": "Withered Ravager",
+   "level": "80",
+   "rage": "5000",
+   "h": "HASH_REDACTED",
+   "encid": "ENC_REDACTED",
+   "mobId": "4717",
+   "spawnId": "313733",
+   "image": "mobs/witheredravager.jpg",
+   "type": 2
+  },
+  {
+   "name": "Withered Ravager",
+   "level": "80",
+   "rage": "5000",
+   "h": "HASH_REDACTED",
+   "encid": "ENC_REDACTED",
+   "mobId": "4717",
+   "spawnId": "313752",
+   "image": "mobs/witheredravager.jpg",
+   "type": 2
+  },
+  {
+   "name": "Zhulian Paragon",
+   "level": "90",
+   "rage": "5000",
+   "h": "HASH_REDACTED",
+   "encid": "ENC_REDACTED",
+   "mobId": "4742",
+   "spawnId": "314077",
+   "image": "mobs/mobl22.jpg",
+   "type": 2
+  },
+  {
+   "name": "Zhulian Paragon",
+   "level": "90",
+   "rage": "5000",
+   "h": "HASH_REDACTED",
+   "encid": "ENC_REDACTED",
+   "mobId": "4742",
+   "spawnId": "314101",
+   "image": "mobs/mobl22.jpg",
+   "type": 2
+  }
+ ],
+ "tavernData": "",
+ "doorsData": null,
+ "mapTileTypes": [
+  "maptile/dc/dc_117.gif",
+  "maptile/dc/dc_145.gif",
+  "maptile/dc/dc_146.gif",
+  "maptile/dc/dc_147.gif",
+  "maptile/dc/dc_148.gif",
+  "maptile/dc/dc_175.gif",
+  "maptile/dc/dc_178.gif",
+  "maptile/dc/dc_205.gif",
+  "maptile/dc/dc_206.gif",
+  "maptile/dc/dc_207.gif",
+  "maptile/dc/dc_208.gif",
+  "rooms/tile_doorsgreen.jpg",
+  "maptile/dc/dc_238.gif",
+  "maptile/dc/dc_265.gif",
+  "maptile/dc/dc_266.gif",
+  "maptile/dc/dc_268.gif"
+ ]
+}

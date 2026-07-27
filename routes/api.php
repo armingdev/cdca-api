@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CharacterController;
 use App\Http\Controllers\Api\V1\CharacterSkillController;
+use App\Http\Controllers\Api\V1\QuestController;
 use App\Http\Controllers\Api\V1\QuestListController;
 use App\Http\Controllers\Api\V1\QuestListItemController;
 use App\Http\Controllers\Api\V1\RgaController;
@@ -40,6 +41,11 @@ Route::prefix('v1')->group(function () {
 
         // Skill catalog (read-only).
         Route::get('skills', [SkillController::class, 'index']);
+
+        // Quest catalog (read-only, crawled from the game).
+        Route::get('quests', [QuestController::class, 'index']);
+        Route::get('quests/givers', [QuestController::class, 'givers']);
+        Route::get('quests/{quest}', [QuestController::class, 'show']);
 
         // World data (read-only).
         Route::get('world/rooms/{room}', [WorldController::class, 'showRoom']);

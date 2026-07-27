@@ -58,3 +58,12 @@ it('treats "0" exits as no exit', function () {
 it('throws on a non-json body', function () {
     new RoomBlobParser()->parse('<html>Rampid Gaming Login</html>');
 })->throws(ParseException::class);
+
+it('reads the quest-helper compass direction while help is on', function () {
+    $pointing = new RoomBlobParser()->parse(gameFixture('room_blob_questhelp_pointing.json'));
+    $arrived = new RoomBlobParser()->parse(gameFixture('room_blob_questhelp_arrived.json'));
+
+    expect($pointing->questHelpDirection)->toBe('south')
+        ->and($arrived->questHelpDirection)->toBeNull()
+        ->and($arrived->curRoom)->toBe(61);
+});

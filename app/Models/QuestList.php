@@ -32,15 +32,14 @@ class QuestList extends Model
     }
 
     /**
-     * Append a quest to the end of the list. (Not named `append` — that
-     * collides with Eloquent's appended-attributes method.)
+     * Append a catalog quest to the end of the list. (Not named `append` —
+     * that collides with Eloquent's appended-attributes method.)
      */
-    public function addQuest(int $questId, string $npcName, ?string $label = null): QuestListItem
+    public function addQuest(int $questId, ?string $label = null): QuestListItem
     {
         return $this->items()->create([
             'position' => (int) $this->items()->max('position') + 1,
             'quest_id' => $questId,
-            'npc_name' => $npcName,
             'label' => $label,
         ]);
     }

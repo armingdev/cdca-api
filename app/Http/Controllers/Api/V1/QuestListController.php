@@ -31,7 +31,7 @@ class QuestListController extends Controller
     {
         Gate::authorize('view', $questList);
 
-        return QuestListResource::make($questList->load('items'));
+        return QuestListResource::make($questList->load('items.quest'));
     }
 
     public function destroy(QuestList $questList): JsonResponse

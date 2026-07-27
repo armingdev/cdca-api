@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Quest;
 use App\Models\QuestList;
 
 it('creates a quest list', function () {
@@ -18,35 +19,53 @@ it('rejects creating a duplicate list', function () {
         ->expectsOutputToContain('already exists');
 });
 
-it('adds a quest to a list', function () {
+it('adds a quest to a list by game quest id', function () {
     QuestList::create(['name' => 'Armins List']);
+    $quest = Quest::factory()->create(['game_quest_id' => 742, 'name' => 'Street Crawler', 'giver' => 'Stella']);
 
     $this->artisan('outwar:questlist', [
         'action' => 'add',
         'name' => 'Armins List',
         '--quest' => 742,
-        '--npc' => 'Stella',
-        '--label' => 'Street Crawler',
-    ])->assertSuccessful()->expectsOutputToContain('Added Street Crawler at position 1');
+    ])->assertSuccessful()->expectsOutputToContain('Added Street Crawler (giver: Stella) at position 1');
 
     $item = QuestList::where('name', 'Armins List')->first()->items()->first();
 
-    expect($item->quest_id)->toBe(742)
-        ->and($item->npc_name)->toBe('Stella')
+    expect($item->quest_id)->toBe($quest->id)
         ->and($item->position)->toBe(1);
 });
 
-it('requires --quest and --npc when adding', function () {
+it('adds a quest to a list by exact name', function () {
+    QuestList::create(['name' => 'Armins List']);
+    Quest::factory()->create(['name' => 'Street Crawler', 'giver' => 'Stella']);
+
+    $this->artisan('outwar:questlist', [
+        'action' => 'add',
+        'name' => 'Armins List',
+        '--quest' => 'Street Crawler',
+    ])->assertSuccessful()->expectsOutputToContain('Added Street Crawler');
+});
+
+it('rejects adding a quest missing from the catalog', function () {
     QuestList::create(['name' => 'Armins List']);
 
-    $this->artisan('outwar:questlist', ['action' => 'add', 'name' => 'Armins List', '--quest' => 742])
+    $this->artisan('outwar:questlist', ['action' => 'add', 'name' => 'Armins List', '--quest' => 999])
+        ->assertFailed()
+        ->expectsOutputToContain('not in the catalog');
+});
+
+it('requires --quest when adding', function () {
+    QuestList::create(['name' => 'Armins List']);
+
+    $this->artisan('outwar:questlist', ['action' => 'add', 'name' => 'Armins List'])
         ->assertFailed()
         ->expectsOutputToContain('needs --quest');
 });
 
 it('shows a list with its quests', function () {
     $list = QuestList::create(['name' => 'Armins List']);
-    $list->addQuest(742, 'Stella', 'Street Crawler');
+    $quest = Quest::factory()->create(['name' => 'Street Crawler', 'giver' => 'Stella']);
+    $list->addQuest($quest->id);
 
     $this->artisan('outwar:questlist', ['action' => 'show', 'name' => 'Armins List'])
         ->assertSuccessful()

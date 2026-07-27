@@ -11,6 +11,9 @@ final readonly class RoomBlob
      * @param  array<string, int>  $exits  direction => neighbor room id (exits only)
      * @param  list<MobSighting>  $mobs
      * @param  array<string, mixed>|null  $doors
+     * @param  string|null  $questHelpDirection  quest-helper compass while "find my
+     *                                           target" is on: north/south/east/west, or null when there is no
+     *                                           pointer — in the target room (or helper off)
      */
     public function __construct(
         public int $curRoom,
@@ -19,6 +22,7 @@ final readonly class RoomBlob
         public array $mobs,
         public ?array $doors,
         public string $error,
+        public ?string $questHelpDirection = null,
     ) {}
 
     public function hasError(): bool

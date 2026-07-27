@@ -16,5 +16,7 @@ class DatabaseSeeder extends Seeder
     {
         $this->call(SkillSeeder::class);
         $this->call(JunkItemSeeder::class);
+        $this->call(QuestItemSeeder::class);
+        $this->call(AreaSeeder::class);
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Models\Quest;
 use App\Models\QuestList;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
@@ -10,9 +11,8 @@ use Illuminate\Console\Command;
 #[Signature('outwar:questlist
     {action=show : create | add | remove | delete | show}
     {name? : Quest list name (required for every action except a bare show)}
-    {--quest= : (add) Quest id}
-    {--npc= : (add) Exact quest-giver mob name}
-    {--label= : (add) Human-readable quest name}
+    {--quest= : (add) Game quest id or exact quest name from the catalog}
+    {--label= : (add) Optional label overriding the quest name}
     {--position= : (remove) Item position to remove}')]
 #[Description('Manage quest lists: create, add quests, remove, delete, or show')]
 class QuestListCommand extends Command
@@ -59,21 +59,36 @@ class QuestListCommand extends Command
             return self::FAILURE;
         }
 
-        if ($this->option('quest') === null || $this->option('npc') === null) {
-            $this->error('Add needs --quest={id} and --npc="Giver Name".');
+        if ($this->option('quest') === null) {
+            $this->error('Add needs --quest={game quest id or exact name}.');
 
             return self::FAILURE;
         }
 
-        $item = $list->addQuest(
-            questId: (int) $this->option('quest'),
-            npcName: (string) $this->option('npc'),
-            label: $this->option('label'),
-        );
+        $quest = $this->resolveQuest((string) $this->option('quest'));
 
-        $this->info("Added {$item->displayName()} at position {$item->position} of '{$list->name}'.");
+        if ($quest === null) {
+            return self::FAILURE;
+        }
+
+        $item = $list->addQuest(questId: $quest->id, label: $this->option('label'));
+
+        $this->info("Added {$item->displayName()} (giver: {$quest->giver}) at position {$item->position} of '{$list->name}'.");
 
         return self::SUCCESS;
+    }
+
+    private function resolveQuest(string $identifier): ?Quest
+    {
+        $quest = is_numeric($identifier)
+            ? Quest::where('game_quest_id', (int) $identifier)->first()
+            : Quest::where('name', $identifier)->first();
+
+        if ($quest === null) {
+            $this->error("Quest '{$identifier}' is not in the catalog — crawl it first with outwar:quests:map.");
+        }
+
+        return $quest;
     }
 
     private function remove(): int
@@ -136,8 +151,8 @@ class QuestListCommand extends Command
 
         $this->info("Quest list '{$list->name}':");
         $this->table(
-            ['#', 'Quest', 'Quest ID', 'Giver'],
-            $list->items->map(fn ($item) => [$item->position, $item->displayName(), $item->quest_id, $item->npc_name]),
+            ['#', 'Quest', 'Game Quest ID', 'Giver'],
+            $list->items->map(fn ($item) => [$item->position, $item->displayName(), $item->quest->game_quest_id, $item->quest->giver]),
         );
 
         return self::SUCCESS;
@@ -153,7 +168,7 @@ class QuestListCommand extends Command
             return null;
         }
 
-        $list = QuestList::with('items')->where('name', $name)->first();
+        $list = QuestList::with('items.quest')->where('name', $name)->first();
 
         if ($list === null) {
             $this->error("Quest list '{$name}' not found.");

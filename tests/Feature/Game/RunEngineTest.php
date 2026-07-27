@@ -222,8 +222,9 @@ it('executes a quest-list job end to end and completes the run', function () {
     Mob::factory()->create(['name' => 'Street Crawler'])->rooms()->attach(2, ['last_seen_at' => now()]);
     fakeQuestWorld();
 
+    $catalog = seedQuestCatalog();
     $list = QuestList::create(['name' => 'Armins List']);
-    $list->addQuest(742, 'Stella', 'Street Crawler');
+    $list->addQuest($catalog[742]->id);
 
     $character = Character::factory()->for(Rga::factory()->withSession())->create();
     $participant = RunParticipant::factory()

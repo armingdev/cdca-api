@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Models\Quest;
 use App\Models\QuestList;
 use App\Models\QuestListItem;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -21,8 +22,7 @@ class QuestListItemFactory extends Factory
         return [
             'quest_list_id' => QuestList::factory(),
             'position' => 1,
-            'quest_id' => fake()->unique()->numberBetween(1, 3000),
-            'npc_name' => fake()->firstName(),
+            'quest_id' => Quest::factory(),
             'label' => null,
         ];
     }

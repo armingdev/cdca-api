@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Mob;
+use App\Models\Quest;
 use App\Models\Room;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -159,6 +160,20 @@ function seedQuestWorld(): void
     Mob::factory()->create(['name' => 'Street Crawler'])->rooms()->attach(2, ['last_seen_at' => now()]);
 }
 
+/**
+ * Catalog rows matching the fake quest world: quests 742/743, both given by
+ * Stella. Returns them keyed by game quest id for addQuest() calls.
+ *
+ * @return array<int, Quest>
+ */
+function seedQuestCatalog(): array
+{
+    return [
+        742 => Quest::factory()->create(['game_quest_id' => 742, 'name' => 'Street Crawler', 'giver' => 'Stella']),
+        743 => Quest::factory()->create(['game_quest_id' => 743, 'name' => 'Cleansing the Church', 'giver' => 'Stella']),
+    ];
+}
+
 function questMobJson(string $name, int $mobId, int $spawnId, string $hash, int $level): array
 {
     return [
@@ -221,6 +236,134 @@ function fakeQuestWorld(int $rage = 50000): void
 
         if (str_contains($url, 'attack/900')) {
             return Http::response('var battle_result = "Hero has gained 500 experience!"; var defender_name = "Street Crawler";');
+        }
+
+        if (str_contains($url, 'ajax_changeroomb.php')) {
+            $query = [];
+            parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
+            $position = (int) $query['room'] ?: $position;
+
+            return Http::response($roomBlob($position));
+        }
+
+        return Http::response('<html>world</html>');
+    });
+}
+
+/**
+ * DB side of the fake collect-quest world: room 1 (Rune Master, quest-giver)
+ * –E– room 2 (Holy Elemental Keeper, the collect-objective source mob).
+ * Rooms may already exist from seedQuestWorld().
+ */
+function seedCollectQuestWorld(): void
+{
+    Room::firstOrCreate(['id' => 1], Room::factory()->raw(['east' => 2]));
+    Room::firstOrCreate(['id' => 2], Room::factory()->raw(['west' => 1]));
+    Mob::factory()->create(['name' => 'Rune Master'])->rooms()->attach(1, ['last_seen_at' => now()]);
+    Mob::factory()->create(['name' => 'Holy Elemental Keeper'])->rooms()->attach(2, ['last_seen_at' => now()]);
+}
+
+/**
+ * A mob_talk collect-step page mirroring the live markup: the objective reads
+ * "{Item}: n/m" (no "killed" suffix) and the finish link appears only once
+ * the item has been collected.
+ */
+function collectStepHtml(int $collected): string
+{
+    $state = $collected >= 1 ? 'complete' : 'incomplete';
+    $finish = $collected >= 1
+        ? '<a href="mob_talk.php?id=60001&stepid=4001&userspawn=&finish=1" class="btn">Complete Task</a>'
+        : '';
+
+    return <<<HTML
+        <div class="mob-dialog-container">
+          <h2 class="mob-name">Rune Master</h2>
+          <span class="badge">Primal Elemental Rune</span>
+          <p class="mob-description">Bring me a Holy Elemental Crystal.</p>
+          <div class="quest-objective {$state}">
+            <strong>Holy Elemental Crystal:</strong> {$collected}/1
+          </div>
+          {$finish}
+          <a href="mob.php?id=60001&h=npchash&userspawn=" class="btn">Go Back</a>
+        </div>
+        HTML;
+}
+
+/**
+ * Stateful fake of a collect quest (quest 1449 step 4001, "Holy Elemental
+ * Crystal: 0/1"): each Keeper kill drops the crystal; the step completes
+ * after one drop and the finish href serves the captured reward page.
+ * Includes the quest-helper: the tracker offers a "find my target" toggle for
+ * the crystal, and while it is on, room blobs carry the compass (room 1
+ * points east; room 2 is the designated target room).
+ */
+function fakeCollectQuestWorld(int $rage = 50000, bool $helper = true): void
+{
+    $position = 1;
+    $dropped = 0;
+    $helpOn = false;
+
+    $roomBlob = function (int $roomId) use (&$helpOn): string {
+        $mobs = match ($roomId) {
+            1 => [questMobJson('Rune Master', 60001, 910, 'npchash', level: 80)],
+            2 => [questMobJson('Holy Elemental Keeper', 60002, 920, 'y', level: 60)],
+            default => [],
+        };
+
+        return json_encode([
+            'error' => '', 'curRoom' => (string) $roomId, 'name' => "Room {$roomId}",
+            'north' => '0', 'east' => $roomId === 1 ? '2' : '0', 'south' => '0', 'west' => $roomId === 2 ? '1' : '0',
+            'roomDetailsNew' => $mobs, 'doorsData' => null,
+            'questHelpData' => $helpOn ? ($roomId === 1 ? 'dpadcenter_east.jpg' : null) : null,
+        ]);
+    };
+
+    Http::fake(function ($request) use (&$position, &$dropped, &$helpOn, $roomBlob, $rage, $helper) {
+        $url = $request->url();
+
+        if (str_contains($url, 'userstats.php')) {
+            return Http::response(json_encode(['exp' => '1,000', 'rage' => number_format($rage), 'level' => '80', 'width' => 0]));
+        }
+
+        if (str_contains($url, 'world_questHelper.php')) {
+            return Http::response(json_encode([
+                'qtable' => $helper
+                    ? '<a href="javascript:void(0);" onClick="getQuestHelpData2(\'1449\', \'0\', \'Holy Elemental Crystal\', \'4001\', \'555\');">Holy Elemental Crystal</a>: 0/1'
+                    : '',
+            ]));
+        }
+
+        if (str_contains($url, 'quest_help.php')) {
+            $query = [];
+            parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
+            $helpOn = ($query['state'] ?? '0') === '1';
+
+            return Http::response(json_encode(['questHelpOn' => $helpOn ? 1 : 0, 'stepId' => 4001, 'conditionId' => 555]));
+        }
+
+        if (str_contains($url, 'mob_talk.php')) {
+            if (str_contains($url, 'finish=1')) {
+                return Http::response(gameFixture('quest/mob_talk_step_finish.html'));
+            }
+
+            return Http::response(collectStepHtml(min($dropped, 1)));
+        }
+
+        if (str_contains($url, 'mob.php')) {
+            return Http::response('<div><a href="mob_talk.php?id=60001&stepid=4001&userspawn=&questid=1449">Primal Elemental Rune</a></div>');
+        }
+
+        if (str_contains($url, 'somethingelse.php')) {
+            $dropped++;
+
+            return Http::response('', 302, ['Location' => 'https://sigil.outwar.com/attack/901/']);
+        }
+
+        if (str_contains($url, 'attack/901')) {
+            return Http::response(
+                'var battle_result = "Hero has gained 500 experience!"; var defender_name = "Holy Elemental Keeper";'
+                .'<div id="found_items"><b>WIN: Found Holy Elemental Crystal</b></div>'
+            );
         }
 
         if (str_contains($url, 'ajax_changeroomb.php')) {

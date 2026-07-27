@@ -46,7 +46,7 @@ class QuestListRunner
     {
         $log ??= fn (string $message) => null;
 
-        $list = QuestList::with('items')->find($this->config->questListId);
+        $list = QuestList::with('items.quest')->find($this->config->questListId);
 
         if ($list === null) {
             throw new GameException("Quest list #{$this->config->questListId} not found.");
@@ -79,11 +79,20 @@ class QuestListRunner
      */
     private function runQuest(QuestListItem $item, Closure $log, ?Closure $shouldStop, ?Closure $onBattle): ?QuestListRunSummary
     {
-        $log("→ {$item->displayName()} (quest {$item->quest_id} via {$item->npc_name}).");
+        $quest = $item->quest;
+
+        if ($quest->giver === null) {
+            return $this->summary(
+                completed: false,
+                reason: "Stopped on {$item->displayName()}: quest {$quest->game_quest_id} has no known giver.",
+            );
+        }
+
+        $log("→ {$item->displayName()} (quest {$quest->game_quest_id} via {$quest->giver}).");
 
         $questConfig = new QuestRunConfig(
-            npcName: $item->npc_name,
-            questId: $item->quest_id,
+            npcName: $quest->giver,
+            questId: $quest->game_quest_id,
             stopRage: $this->config->stopRage,
             levelUp: $this->config->levelUp,
         );
