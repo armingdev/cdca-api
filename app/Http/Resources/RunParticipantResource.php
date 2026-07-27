@@ -26,6 +26,8 @@ class RunParticipantResource extends JsonResource
             'losses' => $this->losses,
             'errors' => $this->errors,
             'last_activity' => $this->last_activity,
+            'progress' => $this->progress,
+            'resume_at' => $this->resume_at,
             'started_at' => $this->started_at,
             'finished_at' => $this->finished_at,
         ];

@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Game\Enums\CharacterActivity;
 use App\Models\Character;
 use App\Models\Rga;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -29,7 +30,7 @@ class CharacterFactory extends Factory
             'crew' => fake()->optional()->company(),
             'current_room_id' => null,
             'last_stats_at' => null,
-            'status' => null,
+            'status' => CharacterActivity::Idle,
         ];
     }
 

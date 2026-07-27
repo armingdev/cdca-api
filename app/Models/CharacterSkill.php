@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -100,14 +101,28 @@ class CharacterSkill extends Model
      */
     public function isOnCooldown(): bool
     {
+        $endsAt = $this->cooldownEndsAt();
+
+        return $endsAt !== null && $endsAt->isFuture();
+    }
+
+    /**
+     * When the current cooldown ends: the server-read recharge window when
+     * known, otherwise last cast + the (level-scaled, else catalog) cooldown.
+     * Null when the skill was never cast and no recharge was read.
+     */
+    public function cooldownEndsAt(): ?CarbonInterface
+    {
         if ($this->recharge_until !== null) {
-            return $this->recharge_until->isFuture();
+            return $this->recharge_until;
         }
 
         $cooldown = $this->current_cooldown_minutes ?? $this->skill->cooldown_minutes;
 
-        return $this->last_cast_at !== null
-            && $cooldown !== null
-            && $this->last_cast_at->addMinutes($cooldown)->isFuture();
+        if ($this->last_cast_at === null || $cooldown === null) {
+            return null;
+        }
+
+        return $this->last_cast_at->addMinutes($cooldown);
     }
 }

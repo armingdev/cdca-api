@@ -99,8 +99,9 @@ Auth required. `200 OK` → `{ "user": { ... } }`.
   - `429` — rate limited (auth routes).
 - **Enums** (exact string values):
   - Run `mode`: `mob` · `quest` · `quest-list` · `pvp`
-  - Run/participant `status`: `pending` · `running` · `stopping` · `stopped` · `completed` · `failed`
+  - Run/participant `status`: `pending` · `running` · `stopping` · `pausing` · `paused` · `waiting` · `stopped` · `completed` · `failed`
   - RGA `status`: `active` · `invalid`
+  - Character `status` (activity): `idle` · `running` · `waiting` · `paused`
   - Skill `school`: `class` · `ferocity` · `preservation` · `affliction` · `misc`
   - Battle `kind`: `pve` · `pvp`; `outcome`: `win` · `loss` · `failed` · `unknown`
 
@@ -126,17 +127,27 @@ stored encrypted.
 ### `GET /rgas/{id}` · `DELETE /rgas/{id}`
 Show / delete one of your RGAs. `403` if not yours.
 
+### `PUT /rgas/{id}`
+Update credentials: `password` and/or `security_answer` (both optional,
+encrypted at rest). `username` is immutable — a different account is a new RGA.
+
 ### `POST /rgas/{id}/login`
 Logs the RGA in to Outwar and captures its session. Synchronous (makes a live
 game request). `200` → RGA resource with `has_session: true`. On failure →
-`422 { "message": "…" }`.
+`422 { "message": "…" }`. Queues a background stat refresh for every known
+character on the RGA.
 
 ### `POST /rgas/{id}/sync-characters`
 Discovers all characters on the RGA (both servers) and upserts them. Auto-logs
-in first if needed. `200` → `{ "data": [ Character, … ] }`.
+in first if needed. `200` → `{ "data": [ Character, … ] }`. Also queues a
+stat refresh per character.
+
+### `POST /rgas/{id}/refresh-stats`
+Queues a background rage/exp/level refresh for every character on the RGA.
+`202` → `{ "message": "Queued N stat refresh(es)." }`; `422` without a session.
 
 **Onboarding flow:** create RGA → `POST /login` → `POST /sync-characters` →
-characters appear under `GET /characters`.
+characters appear under `GET /characters` with live stats filling in.
 
 ---
 
@@ -149,13 +160,21 @@ All your characters (across RGAs), ordered by level desc. Filters:
 { "data": [ { "id": 5, "rga_id": 1, "suid": 2403, "server_id": 1,
   "server": "sigil", "name": "RealLinuXX", "level": 95, "rage": 244093,
   "exp": 169548518310, "crew": "Collective 2", "current_room_id": 258,
-  "status": "Attacking", "last_stats_at": "…" } ] }
+  "status": "running", "last_stats_at": "…" } ] }
 ```
-`rage`/`exp`/`level`/`current_room_id`/`status` update live while a run is
-active — poll this endpoint to drive the fleet grid.
+`rage`/`exp`/`level`/`current_room_id` update live while a run is active
+(after every attack), and `status` is the live activity (`idle` · `running` ·
+`waiting` · `paused`) mirrored from the character's run participant — poll
+this endpoint to drive the fleet grid. Idle characters are refreshed in the
+background when their stats are older than ~15 minutes, and immediately
+after an RGA connects.
 
 ### `GET /characters/{id}`
 One character. `403` if not yours.
+
+### `POST /characters/{id}/refresh-stats`
+Synchronous single-character refresh (one live `userstats.php` read).
+`200` → the updated character; `422` when the RGA has no session.
 
 ### Per-character skills
 
@@ -245,14 +264,14 @@ Common fields (all modes):
 | `stop_rage` | int | rage-pool floor; stop below it (default 2500) |
 | `level_up` | bool | level up (refills rage) instead of stopping when low |
 | `cast_on_start` | bool | cast the characters' selected skills before the run |
-| `require_circumspect` | bool | only run while Circumspect is active (else gated off) |
-| `restart_every_minutes` | int? | re-dispatch this run every N minutes after it finishes |
-| `start_at` | datetime? | delay the first start until this time (e.g. `"2026-07-16T22:57:00Z"`) |
+| `require_circumspect` | bool | run on the Circumspect cycle: cast it when possible, otherwise park `waiting` and auto-resume when its cooldown ends |
+| `restart_every_minutes` | int? | re-dispatch this run every N minutes after it **completes** |
+| `start_at` | datetime? | delay the first start until this time (run stays `pending` until then) |
 
 Mode-specific fields:
 | Mode | Fields |
 |---|---|
-| `mob` | `mobs`: string[] (exact mob names, required); `max_kills`: int (0 = unlimited) |
+| `mob` | `mobs`: string[] (exact mob names, required); `max_kills`: int (0 = unlimited, counted across passes); `run_count`: int (full passes per character, 0 = unbounded while cycling); `attack_interval_seconds`: int 60–86400 (wait between passes); `drop_junk`: bool |
 | `quest` | `npc`: string (giver name, required); `quest_id`: int (required) |
 | `quest-list` | `quest_list_id`: int (required, must be yours) |
 | `pvp` | `targets`: string[] (player names, required); `attack_rage`: int 2–50 (default 50); `attacks_per_target`: int (default 1); `message`: string? |
@@ -274,9 +293,14 @@ Example (mob mode, fleet of 2, cast skills + Circ gate):
     { "id": 30, "run_id": 12, "character_id": 5,
       "character": { "id": 5, "name": "RealLinuXX", "level": 95, … },
       "status": "running", "wins": 0, "losses": 0, "errors": 0,
-      "last_activity": null, "started_at": "…", "finished_at": null } ],
+      "last_activity": null, "progress": null, "resume_at": null,
+      "started_at": "…", "finished_at": null } ],
   "created_at": "…" } }
 ```
+`progress` fills in as the run cycles: mob → `kills_done`/`cycles_done`;
+quest-list → `position`/`quests_completed`/`quests_skipped`. `resume_at` is
+set while a participant is `waiting` (Circ cooldown, pass interval, session
+recovery) — that's when the scheduler re-dispatches it.
 
 ### `GET /runs`
 Your runs, newest first, each with `participants` (and their `character`). This
@@ -288,16 +312,36 @@ to update per-character `status`, `wins`/`losses`/`errors`, and `last_activity`
 (the movement/battle log line).
 
 ### `POST /runs/{id}/stop`
-Graceful stop: every worker exits at its next loop iteration and auto-restart is
-disarmed. `200` → the run (status → `stopping`, then `stopped` once workers exit).
+Graceful stop (terminal): live workers exit at their next loop iteration,
+parked (`waiting`/`paused`) and pending participants stop immediately, and
+auto-restart is disarmed. `200` → the run (status → `stopping`, then
+`stopped` once workers exit).
+
+### `POST /runs/{id}/pause` · `POST /runs/{id}/resume`
+Pause parks the run without losing progress: live workers finish their
+current action and park (`pausing` → `paused`); waiting/pending participants
+pause instantly. Allowed while the run is `pending`/`running`/`waiting`
+(else `422`). Resume (only from `paused`, else `422`) re-dispatches every
+paused participant — skill options (cast-on-start selection, Circumspect
+gate) are re-applied at pickup, so changing the skill selection while paused
+takes effect, and each character continues from its persisted `progress`.
+
+### `DELETE /runs/{id}`
+Delete a **finished** run and its participants. `422` while live or parked
+(stop it first).
 
 ### `GET /runs/{id}/battles?per_page=50`
 All battle events across the run's characters (paginated, newest first).
 
-**Participant status lifecycle:** `pending` → `running` → (`completed` |
-`stopped` | `failed`). The run's own status settles to `completed` when all
-participants finish, `stopped` if any was stopped, `failed` if any failed.
-`last_activity` is the human log line (e.g. `"Beat Kix Harvester (+379 exp)"`).
+**Participant status lifecycle:** `pending` → `running` → terminal
+(`completed` | `stopped` | `failed`) or parked (`waiting` with `resume_at`,
+auto-resumed by the scheduler; `paused` by the user, resumable). Rage-out is
+a normal outcome: `stopped` (or `waiting` under `require_circumspect`) —
+**never `failed`**, which is reserved for real errors. The run's own status
+aggregates once no worker is active: `waiting` > `paused` > `failed` >
+`stopped` > `completed`. One character can only be in one unfinished run at
+a time (`422` on `POST /runs` otherwise). `last_activity` is the human log
+line (e.g. `"Beat Kix Harvester (+379 exp)"`).
 
 ---
 
@@ -326,6 +370,9 @@ the client stays live by polling:
 - **Open run detail:** poll `GET /runs/{id}` every 2–3s for per-character
   tallies + `last_activity`.
 - Stop polling a run once its `status` is `completed`/`stopped`/`failed`.
+- A `waiting` run is parked until its participants' `resume_at` — poll it
+  lazily (e.g. once a minute) until then; a `paused` run only changes on
+  user action.
 
 A websocket push layer (Laravel Reverb) is a planned enhancement; when it lands
 it will broadcast run/participant updates on a private per-user channel and this
@@ -343,8 +390,9 @@ These backend features aren't built yet; don't design hard dependencies on them:
 - **Named PvP target lists** and crew-roster/hitlist import — PvP targets are
   passed inline per run for now.
 - **Raids / God raids.**
-- **Scheduling niceties** — Circ-aligned `:57` starts and 12-hour fleet stagger
-  (basic `start_at` + `restart_every_minutes` exist).
+- **Fleet start stagger** ("Spread Start Time 12hrs"). Circ-cycle scheduling
+  itself **is** built: `require_circumspect` runs park `waiting` and
+  auto-resume when Circumspect recharges (see §8).
 - **Websockets** (see §10).
 
 Everything else in this document is implemented and covered by tests.

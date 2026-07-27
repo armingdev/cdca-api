@@ -23,11 +23,12 @@ Route::prefix('v1')->group(function () {
         Route::get('user', [AuthController::class, 'user']);
 
         // RGAs (game accounts) + their session actions.
-        Route::apiResource('rgas', RgaController::class)->except(['update']);
+        Route::apiResource('rgas', RgaController::class);
         Route::post('rgas/{rga}/login', [RgaController::class, 'login']);
         Route::post('rgas/{rga}/session', [RgaController::class, 'attachSession']);
         Route::get('rgas/{rga}/session', [RgaController::class, 'showSession']);
         Route::post('rgas/{rga}/sync-characters', [RgaController::class, 'syncCharacters']);
+        Route::post('rgas/{rga}/refresh-stats', [RgaController::class, 'refreshStats']);
 
         // Characters + per-character skill selection / casting.
         Route::apiResource('characters', CharacterController::class)->only(['index', 'show']);
@@ -36,6 +37,7 @@ Route::prefix('v1')->group(function () {
         Route::post('characters/{character}/skills/sync', [CharacterSkillController::class, 'sync']);
         Route::post('characters/{character}/skills/{skill}/train', [CharacterSkillController::class, 'train']);
         Route::post('characters/{character}/cast', [CharacterSkillController::class, 'cast']);
+        Route::post('characters/{character}/refresh-stats', [CharacterController::class, 'refreshStats']);
         Route::get('characters/{character}/battles', [StatsController::class, 'battles']);
         Route::get('characters/{character}/stats', [StatsController::class, 'summary']);
 
@@ -57,8 +59,10 @@ Route::prefix('v1')->group(function () {
         Route::delete('quest-lists/{questList}/items/{position}', [QuestListItemController::class, 'destroy']);
 
         // Runs — the automation engine.
-        Route::apiResource('runs', RunController::class)->only(['index', 'store', 'show']);
+        Route::apiResource('runs', RunController::class)->only(['index', 'store', 'show', 'destroy']);
         Route::post('runs/{run}/stop', [RunController::class, 'stop']);
+        Route::post('runs/{run}/pause', [RunController::class, 'pause']);
+        Route::post('runs/{run}/resume', [RunController::class, 'resume']);
         Route::get('runs/{run}/battles', [RunController::class, 'battles']);
     });
 });

@@ -10,6 +10,7 @@ final readonly class QuestListRunSummary
         public int $questsSkipped,
         public int $kills,
         public string $stopReason,
-        public bool $externallyStopped = false,
+        public RunEndReason $endReason,
+        public int $nextPosition = 0,
     ) {}
 }

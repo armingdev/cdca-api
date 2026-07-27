@@ -3,8 +3,13 @@
 namespace App\Jobs;
 
 use App\Game\Auth\LoginService;
+use App\Game\Engine\ParticipantOutcome;
 use App\Game\Enums\BattleOutcome;
+use App\Game\Enums\CharacterActivity;
+use App\Game\Enums\RunSignal;
 use App\Game\Enums\RunStatus;
+use App\Game\Exceptions\SessionCollisionException;
+use App\Game\Skills\CircumspectGate;
 use App\Game\Skills\SkillCaster;
 use App\Game\Skills\SkillSyncService;
 use App\Models\BattleEvent;
@@ -15,27 +20,36 @@ use Closure;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Throwable;
 
 /**
  * Base for one-character run jobs. Owns the participant lifecycle (pre-pickup
- * stop, running → finished transitions, tally callbacks, failure handling)
- * and the long-lived queue placement. Subclasses only drive their engine.
- * Lives for the whole run (possibly hours) on the redis-runs connection whose
- * retry_after exceeds the supervisor timeout, so a live run is never
- * re-dispatched.
+ * stop/pause, running → parked/finished transitions, tally callbacks, failure
+ * handling) and the long-lived queue placement. Subclasses only drive their
+ * engine. Lives for the whole run (possibly hours) on the redis-runs
+ * connection whose retry_after exceeds the supervisor timeout, so a live run
+ * is never re-dispatched.
  */
 abstract class RunJob implements ShouldQueue
 {
     use Queueable, SerializesModels;
 
+    /** Engine iterations between authoritative DB status reads backing up the cache signal. */
+    private const int DB_SIGNAL_CHECK_EVERY = 25;
+
+    /** Session-collision re-logins tolerated per cycle before failing loudly. */
+    private const int MAX_RELOGIN_ATTEMPTS = 3;
+
     public int $timeout = 7200;
 
     public int $tries = 1;
 
-    public function __construct(public RunParticipant $participant)
-    {
+    public function __construct(
+        public RunParticipant $participant,
+        public string $dispatchToken,
+    ) {
         $this->onConnection('redis-runs');
         $this->onQueue('runs');
     }
@@ -44,18 +58,59 @@ abstract class RunJob implements ShouldQueue
     {
         $participant = $this->participant->fresh();
 
-        // A stop requested before the worker picked the job up.
+        // Superseded by a later dispatch (pause→resume, restart): this
+        // delivery is stale and must not touch the participant.
+        if ($participant->dispatch_token !== $this->dispatchToken) {
+            return;
+        }
+
+        // A stop or pause requested before the worker picked the job up.
         if ($participant->status !== RunStatus::Pending) {
             if ($participant->status === RunStatus::Stopping) {
-                $participant->update(['status' => RunStatus::Stopped, 'finished_at' => now()]);
+                $participant->transition(RunStatus::Stopped, 'Stopped before start.');
+                $participant->run->refreshStatus();
+            }
+
+            if ($participant->status === RunStatus::Pausing) {
+                $participant->transition(RunStatus::Paused, 'Paused before start.');
                 $participant->run->refreshStatus();
             }
 
             return;
         }
 
-        $participant->update(['status' => RunStatus::Running, 'started_at' => now()]);
         $character = $participant->character;
+
+        // One character, one worker — the enrollment guard makes a second
+        // driver near-impossible, so a held lock is a loud failure, not a
+        // silent retry. TTL outlives the job so a hard-killed worker frees it.
+        $lock = Cache::lock("character-run:{$character->id}", $this->timeout + 600);
+
+        if (! $lock->get()) {
+            $participant->transition(RunStatus::Failed, 'Character is already driven by another worker.');
+            $participant->run->refreshStatus();
+
+            return;
+        }
+
+        try {
+            $this->drive($participant, $character, $loginService);
+        } finally {
+            $lock->release();
+        }
+    }
+
+    private function drive(RunParticipant $participant, Character $character, LoginService $loginService): void
+    {
+        $participant->update(['status' => RunStatus::Running, 'started_at' => now()]);
+        $character->update(['status' => CharacterActivity::Running]);
+
+        $run = $participant->run;
+
+        if ($run->status === RunStatus::Pending) {
+            $run->update(['status' => RunStatus::Running]);
+        }
+
         $log = fn (string $message) => $participant->update(['last_activity' => Str::limit($message, 250)]);
 
         try {
@@ -64,20 +119,21 @@ abstract class RunJob implements ShouldQueue
             }
 
             if (! $this->applySkillOptions($character, $participant, $log)) {
-                $participant->update([
-                    'status' => RunStatus::Stopped,
-                    'last_activity' => 'Circumspect not active — run gated.',
-                    'finished_at' => now(),
-                ]);
+                $resumeAt = app(CircumspectGate::class)->resumeAtFor($character);
+                $participant->transition(
+                    RunStatus::Waiting,
+                    "Waiting for Circumspect — resumes {$resumeAt->format('Y-m-d H:i')}.",
+                    resumeAt: $resumeAt,
+                );
 
                 return;
             }
 
-            [$status, $reason] = $this->runEngine(
+            $outcome = $this->runEngine(
                 $character,
                 $participant,
                 log: $log,
-                shouldStop: fn (): bool => $participant->stopRequested(),
+                signal: $this->signalClosure($participant),
                 onBattle: function (BattleEvent $event) use ($participant): void {
                     match ($event->outcome) {
                         BattleOutcome::Win => $participant->increment('wins'),
@@ -87,22 +143,124 @@ abstract class RunJob implements ShouldQueue
                 },
             );
 
-            $participant->update([
-                'status' => $status,
-                'last_activity' => $reason,
-                'finished_at' => now(),
-            ]);
+            $participant->transition(
+                $outcome->status,
+                $outcome->reason,
+                $outcome->resumeAt,
+                // A clean engine return proves the session works again.
+                array_merge($outcome->progress ?? [], ['relogin_attempts' => 0]),
+            );
+        } catch (SessionCollisionException) {
+            $this->recoverSession($participant, $character, $loginService);
         } catch (Throwable $exception) {
-            $participant->update([
-                'status' => RunStatus::Failed,
-                'last_activity' => Str::limit($exception->getMessage(), 250),
-                'finished_at' => now(),
-            ]);
+            $participant->transition(RunStatus::Failed, $exception->getMessage());
 
             throw $exception;
         } finally {
             $participant->run->refreshStatus();
         }
+    }
+
+    /**
+     * Session-collision self-heal: one re-login attempt per RGA at a time
+     * (the lock stops a 75-character stampede — siblings just wait for the
+     * winner's session), then park briefly and let the resume scheduler
+     * re-drive the participant. Bounded by a per-cycle attempt budget so a
+     * genuinely broken account fails loudly instead of looping forever.
+     */
+    private function recoverSession(RunParticipant $participant, Character $character, LoginService $loginService): void
+    {
+        $attempts = (int) ($participant->progress['relogin_attempts'] ?? 0) + 1;
+
+        if ($attempts > self::MAX_RELOGIN_ATTEMPTS) {
+            $participant->transition(
+                RunStatus::Failed,
+                'Session lost repeatedly — giving up after '.self::MAX_RELOGIN_ATTEMPTS.' re-login attempts.',
+                progress: ['relogin_attempts' => $attempts],
+            );
+
+            return;
+        }
+
+        $rga = $character->rga;
+        $lock = Cache::lock("rga-relogin:{$rga->id}", 120);
+
+        if ($lock->get()) {
+            try {
+                $loginService->login($rga->fresh());
+            } catch (Throwable $exception) {
+                $participant->transition(
+                    RunStatus::Failed,
+                    Str::limit("Session lost and re-login failed: {$exception->getMessage()}", 250),
+                    progress: ['relogin_attempts' => $attempts],
+                );
+
+                return;
+            } finally {
+                $lock->release();
+            }
+        }
+
+        // Either this worker just restored the session or a sibling is doing
+        // it right now — resume shortly and re-check at pickup.
+        $participant->transition(
+            RunStatus::Waiting,
+            'Session dropped — recovered, resuming shortly.',
+            resumeAt: now()->addMinute(),
+            progress: ['relogin_attempts' => $attempts],
+        );
+    }
+
+    /**
+     * The Circumspect cycle outcome shared by all modes: park the participant
+     * until Circumspect's cooldown ends (fresh server reading when reachable),
+     * carrying the mode's progress into the next cycle. Rage regenerates
+     * during the cooldown, so waking at recharge time restarts a full window.
+     *
+     * @param  array<string, mixed>|null  $progress
+     */
+    protected function waitForCircumspect(Character $character, string $reason, ?array $progress = null): ParticipantOutcome
+    {
+        $resumeAt = app(CircumspectGate::class)->resumeAtFor($character, refresh: true);
+
+        return new ParticipantOutcome(
+            RunStatus::Waiting,
+            rtrim($reason, '.').". Waiting for Circumspect — resumes {$resumeAt->format('Y-m-d H:i')}.",
+            $resumeAt,
+            $progress,
+        );
+    }
+
+    /**
+     * The engines' per-iteration control check: the cache signal is the fast
+     * path; every Nth call falls back to an authoritative DB read so a lost
+     * cache entry can never strand a stop or pause.
+     *
+     * @return Closure(): RunSignal
+     */
+    private function signalClosure(RunParticipant $participant): Closure
+    {
+        $calls = 0;
+
+        return function () use ($participant, &$calls): RunSignal {
+            $calls++;
+
+            $signal = $participant->run->currentSignal();
+
+            if ($signal !== RunSignal::None) {
+                return $signal;
+            }
+
+            if ($calls % self::DB_SIGNAL_CHECK_EVERY === 0) {
+                return match ($participant->fresh()->status) {
+                    RunStatus::Stopping => RunSignal::Stop,
+                    RunStatus::Pausing => RunSignal::Pause,
+                    default => RunSignal::None,
+                };
+            }
+
+            return RunSignal::None;
+        };
     }
 
     /**
@@ -171,18 +329,17 @@ abstract class RunJob implements ShouldQueue
     }
 
     /**
-     * Drive the mode's engine to completion.
+     * Drive the mode's engine and report the participant's outcome.
      *
      * @param  Closure(string): void  $log
-     * @param  Closure(): bool  $shouldStop
+     * @param  Closure(): RunSignal  $signal
      * @param  Closure(BattleEvent): void  $onBattle
-     * @return array{0: RunStatus, 1: string} final status + reason line
      */
     abstract protected function runEngine(
         Character $character,
         RunParticipant $participant,
         Closure $log,
-        Closure $shouldStop,
+        Closure $signal,
         Closure $onBattle,
-    ): array;
+    ): ParticipantOutcome;
 }

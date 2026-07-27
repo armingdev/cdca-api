@@ -7,6 +7,7 @@ use App\Game\Combat\StatsService;
 use App\Game\Data\MobSighting;
 use App\Game\Data\RoomBlob;
 use App\Game\Enums\BattleOutcome;
+use App\Game\Enums\RunSignal;
 use App\Game\Exceptions\GameException;
 use App\Game\Items\JunkDropper;
 use App\Game\World\Navigator;
@@ -20,8 +21,8 @@ use Closure;
  * The mob-mode loop for one character: pathfind to the target mobs' rooms,
  * then load room → fresh encid → attack → record → refresh stats, until a
  * stop condition fires. Used by the outwar:attack command (foreground) and
- * RunMobJob (queued) — callbacks carry logging, external stop signals, and
- * per-battle hooks.
+ * RunMobJob (queued) — callbacks carry logging, external control signals,
+ * and per-battle hooks.
  */
 class MobRunner
 {
@@ -30,6 +31,9 @@ class MobRunner
     private int $losses = 0;
 
     private int $errors = 0;
+
+    /** Kills carried over from earlier cycles of the same run, counted against max_kills. */
+    private int $winsBaseline = 0;
 
     public function __construct(
         private readonly Character $character,
@@ -54,17 +58,23 @@ class MobRunner
 
     /**
      * @param  Closure(string): void|null  $log
-     * @param  Closure(): bool|null  $shouldStop  external stop signal, polled every iteration
+     * @param  Closure(): RunSignal|null  $signal  external control signal, polled every iteration
      * @param  Closure(BattleEvent): void|null  $onBattle
+     * @param  int  $killsAlreadyDone  kills from earlier cycles, so max_kills spans pauses/waits
      *
      * @throws GameException when the targets have no mapped rooms
      */
-    public function run(?Closure $log = null, ?Closure $shouldStop = null, ?Closure $onBattle = null): MobRunSummary
-    {
+    public function run(
+        ?Closure $log = null,
+        ?Closure $signal = null,
+        ?Closure $onBattle = null,
+        int $killsAlreadyDone = 0,
+    ): MobRunSummary {
         $log ??= fn (string $message) => null;
+        $this->winsBaseline = max(0, $killsAlreadyDone);
 
         try {
-            return $this->loop($log, $shouldStop, $onBattle);
+            return $this->loop($log, $signal, $onBattle);
         } finally {
             $this->dropJunk($log);
         }
@@ -72,10 +82,10 @@ class MobRunner
 
     /**
      * @param  Closure(string): void  $log
-     * @param  Closure(): bool|null  $shouldStop
+     * @param  Closure(): RunSignal|null  $signal
      * @param  Closure(BattleEvent): void|null  $onBattle
      */
-    private function loop(Closure $log, ?Closure $shouldStop, ?Closure $onBattle): MobRunSummary
+    private function loop(Closure $log, ?Closure $signal, ?Closure $onBattle): MobRunSummary
     {
         $targetRooms = Mob::whereIn('name', $this->config->mobNames)
             ->with('rooms:id')
@@ -95,22 +105,28 @@ class MobRunner
         $exhausted = [];
 
         while (true) {
-            if ($shouldStop !== null && $shouldStop()) {
-                return $this->summary('Stop requested.', externallyStopped: true);
+            $control = $signal !== null ? $signal() : RunSignal::None;
+
+            if ($control === RunSignal::Stop) {
+                return $this->summary('Stop requested.', RunEndReason::ExternalStop);
+            }
+
+            if ($control === RunSignal::Pause) {
+                return $this->summary('Pause requested.', RunEndReason::ExternalPause);
             }
 
             if ($current->rage < $this->config->stopRage) {
                 $recovered = $this->recoverRage($log);
 
                 if ($recovered === null || $recovered < $this->config->stopRage) {
-                    return $this->summary("Rage below the {$this->config->stopRage} floor.");
+                    return $this->summary("Rage below the {$this->config->stopRage} floor.", RunEndReason::RageExhausted);
                 }
 
                 $current = $this->stats->refresh();
             }
 
-            if ($this->config->maxKills > 0 && $this->wins >= $this->config->maxKills) {
-                return $this->summary("Reached {$this->config->maxKills} kills.");
+            if ($this->config->maxKills > 0 && $this->winsBaseline + $this->wins >= $this->config->maxKills) {
+                return $this->summary("Reached {$this->config->maxKills} kills.", RunEndReason::TargetReached);
             }
 
             $sighting = $this->liveTarget($blob);
@@ -134,7 +150,7 @@ class MobRunner
             );
 
             if ($path === null) {
-                return $this->summary('No live targets remain in any known room.');
+                return $this->summary('No live targets remain in any known room.', RunEndReason::Completed);
             }
 
             try {
@@ -215,8 +231,8 @@ class MobRunner
         });
     }
 
-    private function summary(string $reason, bool $externallyStopped = false): MobRunSummary
+    private function summary(string $reason, RunEndReason $endReason): MobRunSummary
     {
-        return new MobRunSummary($this->wins, $this->losses, $this->errors, $reason, $externallyStopped);
+        return new MobRunSummary($this->wins, $this->losses, $this->errors, $reason, $endReason);
     }
 }

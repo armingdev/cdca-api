@@ -2,7 +2,9 @@
 
 namespace App\Jobs;
 
+use App\Game\Engine\ParticipantOutcome;
 use App\Game\Engine\QuestRunConfig;
+use App\Game\Engine\RunEndReason;
 use App\Game\Enums\RunStatus;
 use App\Game\Quest\QuestRunner;
 use App\Models\Character;
@@ -18,20 +20,25 @@ class RunQuestJob extends RunJob
         Character $character,
         RunParticipant $participant,
         Closure $log,
-        Closure $shouldStop,
+        Closure $signal,
         Closure $onBattle,
-    ): array {
+    ): ParticipantOutcome {
         $config = QuestRunConfig::fromArray($participant->run->config);
 
         $summary = QuestRunner::forCharacter($character, $config)
-            ->run(log: $log, shouldStop: $shouldStop, onBattle: $onBattle);
+            ->run(log: $log, signal: $signal, onBattle: $onBattle);
 
-        $status = match (true) {
-            $summary->externallyStopped => RunStatus::Stopped,
-            $summary->completed => RunStatus::Completed,
-            default => RunStatus::Failed,
+        if ($summary->endReason === RunEndReason::RageExhausted && $participant->run->require_circumspect) {
+            return $this->waitForCircumspect($character, $summary->stopReason);
+        }
+
+        $status = match ($summary->endReason) {
+            RunEndReason::ExternalStop => RunStatus::Stopped,
+            RunEndReason::ExternalPause => RunStatus::Paused,
+            RunEndReason::Completed => RunStatus::Completed,
+            default => RunStatus::Stopped,
         };
 
-        return [$status, $summary->stopReason];
+        return new ParticipantOutcome($status, $summary->stopReason);
     }
 }

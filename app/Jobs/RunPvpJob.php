@@ -3,7 +3,9 @@
 namespace App\Jobs;
 
 use App\Game\Combat\PvpRunner;
+use App\Game\Engine\ParticipantOutcome;
 use App\Game\Engine\PvpRunConfig;
+use App\Game\Engine\RunEndReason;
 use App\Game\Enums\RunStatus;
 use App\Models\Character;
 use App\Models\RunParticipant;
@@ -18,20 +20,21 @@ class RunPvpJob extends RunJob
         Character $character,
         RunParticipant $participant,
         Closure $log,
-        Closure $shouldStop,
+        Closure $signal,
         Closure $onBattle,
-    ): array {
+    ): ParticipantOutcome {
         $config = PvpRunConfig::fromArray($participant->run->config);
 
         $summary = PvpRunner::forCharacter($character, $config)
-            ->run(log: $log, shouldStop: $shouldStop, onBattle: $onBattle);
+            ->run(log: $log, signal: $signal, onBattle: $onBattle);
 
-        $status = match (true) {
-            $summary->externallyStopped => RunStatus::Stopped,
-            $summary->completed => RunStatus::Completed,
-            default => RunStatus::Failed,
+        $status = match ($summary->endReason) {
+            RunEndReason::ExternalStop => RunStatus::Stopped,
+            RunEndReason::ExternalPause => RunStatus::Paused,
+            RunEndReason::Completed => RunStatus::Completed,
+            default => RunStatus::Stopped,
         };
 
-        return [$status, $summary->stopReason];
+        return new ParticipantOutcome($status, $summary->stopReason);
     }
 }

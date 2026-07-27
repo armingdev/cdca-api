@@ -4,7 +4,9 @@ namespace App\Game\Combat;
 
 use App\Game\Engine\PvpRunConfig;
 use App\Game\Engine\PvpRunSummary;
+use App\Game\Engine\RunEndReason;
 use App\Game\Enums\BattleOutcome;
+use App\Game\Enums\RunSignal;
 use App\Models\BattleEvent;
 use App\Models\Character;
 use Closure;
@@ -38,27 +40,37 @@ class PvpRunner
 
     /**
      * @param  Closure(string): void|null  $log
-     * @param  Closure(): bool|null  $shouldStop
+     * @param  Closure(): RunSignal|null  $signal
      * @param  Closure(BattleEvent): void|null  $onBattle
      */
-    public function run(?Closure $log = null, ?Closure $shouldStop = null, ?Closure $onBattle = null): PvpRunSummary
+    public function run(?Closure $log = null, ?Closure $signal = null, ?Closure $onBattle = null): PvpRunSummary
     {
         $log ??= fn (string $message) => null;
 
         if ($this->config->targets === []) {
-            return $this->summary(completed: false, reason: 'No PvP targets configured.');
+            return $this->summary(completed: false, reason: 'No PvP targets configured.', endReason: RunEndReason::Stuck);
         }
 
         $current = $this->stats->refresh();
 
         foreach ($this->config->targets as $name) {
             for ($i = 0; $i < $this->config->attacksPerTarget; $i++) {
-                if ($shouldStop !== null && $shouldStop()) {
-                    return $this->summary(completed: false, reason: 'Stop requested.', externallyStopped: true);
+                $control = $signal !== null ? $signal() : RunSignal::None;
+
+                if ($control === RunSignal::Stop) {
+                    return $this->summary(completed: false, reason: 'Stop requested.', endReason: RunEndReason::ExternalStop);
+                }
+
+                if ($control === RunSignal::Pause) {
+                    return $this->summary(completed: false, reason: 'Pause requested.', endReason: RunEndReason::ExternalPause);
                 }
 
                 if ($current->rage < $this->config->stopRage) {
-                    return $this->summary(completed: false, reason: "Rage below the {$this->config->stopRage} floor.");
+                    return $this->summary(
+                        completed: false,
+                        reason: "Rage below the {$this->config->stopRage} floor.",
+                        endReason: RunEndReason::RageExhausted,
+                    );
                 }
 
                 $target = $this->attacker->findTarget($name);
@@ -78,7 +90,7 @@ class PvpRunner
             }
         }
 
-        return $this->summary(completed: true, reason: 'PvP run complete.');
+        return $this->summary(completed: true, reason: 'PvP run complete.', endReason: RunEndReason::Completed);
     }
 
     private function line(string $opponent, BattleOutcome $outcome): string
@@ -90,13 +102,13 @@ class PvpRunner
         };
     }
 
-    private function summary(bool $completed, string $reason, bool $externallyStopped = false): PvpRunSummary
+    private function summary(bool $completed, string $reason, RunEndReason $endReason): PvpRunSummary
     {
         return new PvpRunSummary(
             completed: $completed,
             attacks: $this->attacks,
             stopReason: $reason,
-            externallyStopped: $externallyStopped,
+            endReason: $endReason,
         );
     }
 }

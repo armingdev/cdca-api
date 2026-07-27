@@ -10,6 +10,6 @@ final readonly class QuestRunSummary
         public int $expGained,
         public int $kills,
         public string $stopReason,
-        public bool $externallyStopped = false,
+        public RunEndReason $endReason,
     ) {}
 }

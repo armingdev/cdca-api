@@ -6,9 +6,11 @@ use App\Game\Engine\MobRunConfig;
 use App\Game\Engine\PvpRunConfig;
 use App\Game\Engine\QuestListRunConfig;
 use App\Game\Engine\QuestRunConfig;
+use App\Game\Engine\RunDispatcher;
 use App\Game\Engine\RunLauncher;
 use App\Game\Enums\RunMode;
 use App\Game\Enums\RunStatus;
+use App\Game\Exceptions\CharactersBusyException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreRunRequest;
 use App\Http\Resources\BattleEventResource;
@@ -49,16 +51,20 @@ class RunController extends Controller
 
         $config = $this->buildConfig($mode, $request, $user->id);
 
-        $run = $launcher->launch(
-            mode: $mode,
-            characters: $characters,
-            config: $config,
-            castOnStart: $request->boolean('cast_on_start'),
-            requireCircumspect: $request->boolean('require_circumspect'),
-            restartEveryMinutes: $request->filled('restart_every_minutes') ? $request->integer('restart_every_minutes') : null,
-            startAt: $request->filled('start_at') ? Carbon::parse($request->validated('start_at')) : null,
-            user: $user,
-        );
+        try {
+            $run = $launcher->launch(
+                mode: $mode,
+                characters: $characters,
+                config: $config,
+                castOnStart: $request->boolean('cast_on_start'),
+                requireCircumspect: $request->boolean('require_circumspect'),
+                restartEveryMinutes: $request->filled('restart_every_minutes') ? $request->integer('restart_every_minutes') : null,
+                startAt: $request->filled('start_at') ? Carbon::parse($request->validated('start_at')) : null,
+                user: $user,
+            );
+        } catch (CharactersBusyException $exception) {
+            throw ValidationException::withMessages(['characters' => [$exception->getMessage()]]);
+        }
 
         return RunResource::make($run->load('participants.character'))->response()->setStatusCode(201);
     }
@@ -71,19 +77,79 @@ class RunController extends Controller
     }
 
     /**
-     * Request a graceful stop: every worker exits at its next loop iteration.
+     * Request a graceful stop: every worker exits at its next loop iteration;
+     * parked participants are finalized immediately. Terminal — a stopped run
+     * cannot be resumed.
      */
     public function stop(Run $run): RunResource
     {
         Gate::authorize('update', $run);
 
-        $run->update(['status' => RunStatus::Stopping, 'restart_every_minutes' => null]);
-        $run->participants()
-            ->whereIn('status', [RunStatus::Pending, RunStatus::Running])
-            ->update(['status' => RunStatus::Stopping]);
-        $run->refreshStatus();
+        $run->requestStop();
 
         return RunResource::make($run->fresh()->load('participants.character'));
+    }
+
+    /**
+     * Request a graceful pause: workers park at their next loop iteration
+     * with progress persisted; resume continues where each character left off.
+     */
+    public function pause(Run $run): RunResource
+    {
+        Gate::authorize('update', $run);
+
+        if (! in_array($run->status, [RunStatus::Pending, RunStatus::Running, RunStatus::Waiting], true)) {
+            throw ValidationException::withMessages(['run' => ['Only a pending, running, or waiting run can be paused.']]);
+        }
+
+        $run->requestPause();
+
+        return RunResource::make($run->fresh()->load('participants.character'));
+    }
+
+    /**
+     * Resume a paused run: paused participants are re-dispatched and continue
+     * from their persisted progress; skill options (cast-on-start selection,
+     * Circumspect gate) are re-applied at pickup, so selection changes made
+     * while paused take effect.
+     */
+    public function resume(Run $run, RunDispatcher $dispatcher): RunResource
+    {
+        Gate::authorize('update', $run);
+
+        if ($run->status !== RunStatus::Paused) {
+            throw ValidationException::withMessages(['run' => ['Only a paused run can be resumed.']]);
+        }
+
+        $run->clearSignal();
+
+        $participants = $run->participants()->where('status', RunStatus::Paused)->get();
+
+        foreach ($participants as $participant) {
+            $participant->transition(RunStatus::Pending, 'Resuming…');
+            $dispatcher->dispatch($participant);
+        }
+
+        $run->update(['status' => RunStatus::Running]);
+
+        return RunResource::make($run->fresh()->load('participants.character'));
+    }
+
+    /**
+     * Delete a finished run (and its participants via cascade). Live or
+     * parked runs must be stopped first.
+     */
+    public function destroy(Run $run): JsonResponse
+    {
+        Gate::authorize('delete', $run);
+
+        if (! $run->status->isFinished()) {
+            throw ValidationException::withMessages(['run' => ['Stop the run before deleting it.']]);
+        }
+
+        $run->delete();
+
+        return response()->json(['message' => 'Run deleted.']);
     }
 
     /**
@@ -119,6 +185,10 @@ class RunController extends Controller
                 maxKills: $request->integer('max_kills'),
                 levelUp: $levelUp,
                 dropJunk: $request->boolean('drop_junk'),
+                runCount: $request->integer('run_count'),
+                attackIntervalSeconds: $request->filled('attack_interval_seconds')
+                    ? $request->integer('attack_interval_seconds')
+                    : null,
             ))->toArray(),
 
             RunMode::Quest => (new QuestRunConfig(

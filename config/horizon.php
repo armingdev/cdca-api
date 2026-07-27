@@ -98,6 +98,9 @@ return [
 
     'waits' => [
         'redis:default' => 60,
+        // Run jobs legitimately sit for hours behind 2h workers — don't page
+        // about a "long wait" that is just a full runs queue.
+        'redis-runs:runs' => 7200,
     ],
 
     /*

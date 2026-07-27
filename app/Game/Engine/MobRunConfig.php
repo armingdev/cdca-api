@@ -4,6 +4,12 @@ namespace App\Game\Engine;
 
 /**
  * Per-run mob-mode options — stored as the run's jsonb config.
+ *
+ * A "pass" (run) is one full sweep: attack the selected mobs until none are
+ * left alive or the rage floor is hit. run_count bounds how many passes each
+ * character performs (0 = unbounded); attack_interval_seconds is the wait
+ * between passes (mob respawn time). Neither set (and no Circumspect gate)
+ * means the classic single-pass run.
  */
 final readonly class MobRunConfig
 {
@@ -16,6 +22,8 @@ final readonly class MobRunConfig
         public int $maxKills = 0,
         public bool $levelUp = false,
         public bool $dropJunk = false,
+        public int $runCount = 0,
+        public ?int $attackIntervalSeconds = null,
     ) {}
 
     /**
@@ -29,6 +37,10 @@ final readonly class MobRunConfig
             maxKills: (int) ($config['max_kills'] ?? 0),
             levelUp: (bool) ($config['level_up'] ?? false),
             dropJunk: (bool) ($config['drop_junk'] ?? false),
+            runCount: (int) ($config['run_count'] ?? 0),
+            attackIntervalSeconds: isset($config['attack_interval_seconds'])
+                ? (int) $config['attack_interval_seconds']
+                : null,
         );
     }
 
@@ -43,6 +55,8 @@ final readonly class MobRunConfig
             'max_kills' => $this->maxKills,
             'level_up' => $this->levelUp,
             'drop_junk' => $this->dropJunk,
+            'run_count' => $this->runCount,
+            'attack_interval_seconds' => $this->attackIntervalSeconds,
         ];
     }
 }
