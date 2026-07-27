@@ -7,9 +7,12 @@ use App\Game\Data\QuestObjective;
 use App\Game\Data\QuestStepPage;
 use App\Game\Engine\MobRunConfig;
 use App\Game\Engine\MobRunner;
+use App\Game\Engine\MobRunSummary;
 use App\Game\Engine\QuestRunConfig;
 use App\Game\Engine\QuestRunSummary;
+use App\Game\Engine\RunEndReason;
 use App\Game\Enums\QuestObjectiveType;
+use App\Game\Enums\RunSignal;
 use App\Game\Exceptions\GameException;
 use App\Game\Exceptions\QuestNotAvailableException;
 use App\Game\World\Navigator;
@@ -59,10 +62,10 @@ class QuestRunner
 
     /**
      * @param  Closure(string): void|null  $log
-     * @param  Closure(): bool|null  $shouldStop
+     * @param  Closure(): RunSignal|null  $signal
      * @param  Closure(BattleEvent): void|null  $onBattle  forwarded to objective farming
      */
-    public function run(?Closure $log = null, ?Closure $shouldStop = null, ?Closure $onBattle = null): QuestRunSummary
+    public function run(?Closure $log = null, ?Closure $signal = null, ?Closure $onBattle = null): QuestRunSummary
     {
         $log ??= fn (string $message) => null;
 
@@ -81,8 +84,14 @@ class QuestRunner
         $sendQuestId = true;
 
         while (true) {
-            if ($shouldStop !== null && $shouldStop()) {
-                return $this->summary(completed: false, reason: 'Stop requested.', externallyStopped: true);
+            $control = $signal !== null ? $signal() : RunSignal::None;
+
+            if ($control === RunSignal::Stop) {
+                return $this->summary(completed: false, reason: 'Stop requested.', endReason: RunEndReason::ExternalStop);
+            }
+
+            if ($control === RunSignal::Pause) {
+                return $this->summary(completed: false, reason: 'Pause requested.', endReason: RunEndReason::ExternalPause);
             }
 
             $page = $this->questService->viewStep($npcId, $stepId, $sendQuestId ? $this->config->questId : null);
@@ -97,7 +106,7 @@ class QuestRunner
                 $nextStep = $this->stepIdFromLink($finished->continueLink);
 
                 if ($nextStep === null) {
-                    return $this->summary(completed: true, reason: 'Quest complete.');
+                    return $this->summary(completed: true, reason: 'Quest complete.', endReason: RunEndReason::Completed);
                 }
 
                 $stepId = $nextStep;
@@ -115,14 +124,31 @@ class QuestRunner
                     $objective->type->value,
                 ));
 
-                $wins = $this->fulfill($objective, $log, $shouldStop, $onBattle);
+                $farm = $this->fulfill($objective, $log, $signal, $onBattle);
+                $wins = $farm?->wins ?? 0;
                 $this->kills += $wins;
+
+                // Surface an external signal from the nested farm without
+                // walking back to the giver first — the resume re-navigates.
+                if ($farm !== null && $farm->endReason === RunEndReason::ExternalStop) {
+                    return $this->summary(completed: false, reason: 'Stop requested.', endReason: RunEndReason::ExternalStop);
+                }
+
+                if ($farm !== null && $farm->endReason === RunEndReason::ExternalPause) {
+                    return $this->summary(completed: false, reason: 'Pause requested.', endReason: RunEndReason::ExternalPause);
+                }
+
+                if ($farm !== null && $farm->endReason === RunEndReason::RageExhausted) {
+                    return $this->summary(completed: false, reason: $farm->stopReason, endReason: RunEndReason::RageExhausted);
+                }
+
                 $this->navigateToNpc();
 
                 if ($wins === 0) {
                     return $this->summary(
                         completed: false,
                         reason: "Could not make progress on objective '{$objective->target}'.",
+                        endReason: RunEndReason::Stuck,
                     );
                 }
 
@@ -132,7 +158,11 @@ class QuestRunner
             $nextStep = $this->stepIdFromLink($page->continueLink);
 
             if ($nextStep === null) {
-                return $this->summary(completed: false, reason: "Step {$stepId} has no actionable link.");
+                return $this->summary(
+                    completed: false,
+                    reason: "Step {$stepId} has no actionable link.",
+                    endReason: RunEndReason::Stuck,
+                );
             }
 
             $stepId = $nextStep;
@@ -140,14 +170,15 @@ class QuestRunner
     }
 
     /**
-     * Farm the objective's target. Returns the number of wins so a zero result
-     * (no targets / rage floor) can break a stuck loop.
+     * Farm the objective's target. Returns the nested farm summary (its end
+     * reason distinguishes rage-out from "no way to progress"), or null when
+     * no farmable mob is known or the farm could not start.
      *
      * @param  Closure(string): void  $log
-     * @param  Closure(): bool|null  $shouldStop
+     * @param  Closure(): RunSignal|null  $signal
      * @param  Closure(BattleEvent): void|null  $onBattle
      */
-    private function fulfill(QuestObjective $objective, Closure $log, ?Closure $shouldStop, ?Closure $onBattle): int
+    private function fulfill(QuestObjective $objective, Closure $log, ?Closure $signal, ?Closure $onBattle): ?MobRunSummary
     {
         $mobNames = match ($objective->type) {
             QuestObjectiveType::Kill => [$objective->target],
@@ -162,7 +193,7 @@ class QuestRunner
         if ($mobNames === []) {
             $log("No known way to fulfill '{$objective->target}' ({$objective->type->value}).");
 
-            return 0;
+            return null;
         }
 
         $config = new MobRunConfig(
@@ -174,12 +205,11 @@ class QuestRunner
 
         try {
             return MobRunner::forCharacter($this->character, $config)
-                ->run(log: $log, shouldStop: $shouldStop, onBattle: $onBattle)
-                ->wins;
+                ->run(log: $log, signal: $signal, onBattle: $onBattle);
         } catch (GameException $exception) {
             $log($exception->getMessage());
 
-            return 0;
+            return null;
         }
     }
 
@@ -331,7 +361,7 @@ class QuestRunner
         return isset($query['stepid']) ? (int) $query['stepid'] : null;
     }
 
-    private function summary(bool $completed, string $reason, bool $externallyStopped = false): QuestRunSummary
+    private function summary(bool $completed, string $reason, RunEndReason $endReason): QuestRunSummary
     {
         return new QuestRunSummary(
             completed: $completed,
@@ -339,7 +369,7 @@ class QuestRunner
             expGained: $this->expGained,
             kills: $this->kills,
             stopReason: $reason,
-            externallyStopped: $externallyStopped,
+            endReason: $endReason,
         );
     }
 }

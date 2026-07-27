@@ -56,7 +56,7 @@ it('executes a participant run to completion and settles the run status', functi
         ->for($character)
         ->create();
 
-    new RunMobJob($participant)->handle(app(LoginService::class));
+    makeRunJob($participant)->handle(app(LoginService::class));
 
     $participant->refresh();
 
@@ -76,7 +76,7 @@ it('honors a stop requested before the worker picked the job up', function () {
         ->for(Character::factory()->for(Rga::factory()->withSession()))
         ->create(['status' => RunStatus::Stopping]);
 
-    new RunMobJob($participant)->handle(app(LoginService::class));
+    makeRunJob($participant)->handle(app(LoginService::class));
 
     expect($participant->fresh()->status)->toBe(RunStatus::Stopped)
         ->and($participant->fresh()->wins)->toBe(0)
@@ -92,7 +92,7 @@ it('marks the participant failed when the run throws', function () {
         ->for(Character::factory()->for(Rga::factory()->withSession()))
         ->create();
 
-    expect(fn () => new RunMobJob($participant)->handle(app(LoginService::class)))
+    expect(fn () => makeRunJob($participant)->handle(app(LoginService::class)))
         ->toThrow(GameException::class);
 
     expect($participant->fresh()->status)->toBe(RunStatus::Failed)
@@ -189,7 +189,7 @@ it('executes a quest run job end to end and completes the run', function () {
         ->for($character)
         ->create();
 
-    new RunQuestJob($participant)->handle(app(LoginService::class));
+    makeRunJob($participant)->handle(app(LoginService::class));
 
     expect($participant->fresh()->status)->toBe(RunStatus::Completed)
         ->and($participant->fresh()->wins)->toBe(5)
@@ -236,7 +236,7 @@ it('executes a quest-list job end to end and completes the run', function () {
         ->for($character)
         ->create();
 
-    new RunQuestListJob($participant)->handle(app(LoginService::class));
+    makeRunJob($participant)->handle(app(LoginService::class));
 
     expect($participant->fresh()->status)->toBe(RunStatus::Completed)
         ->and($participant->fresh()->wins)->toBe(5)
@@ -259,7 +259,7 @@ it('casts on-start skills before the run when cast_on_start is set', function ()
         ->for($character)
         ->create();
 
-    new RunMobJob($participant)->handle(app(LoginService::class));
+    makeRunJob($participant)->handle(app(LoginService::class));
 
     expect($participant->fresh()->status)->toBe(RunStatus::Completed)
         ->and(CharacterSkill::where('character_id', $character->id)->where('skill_id', 4)->value('last_cast_at'))->not->toBeNull();
@@ -282,7 +282,7 @@ it('gates the run off when Circumspect is required but cannot be made active', f
         ->for($character)
         ->create();
 
-    new RunMobJob($participant)->handle(app(LoginService::class));
+    makeRunJob($participant)->handle(app(LoginService::class));
 
     expect($participant->fresh()->status)->toBe(RunStatus::Stopped)
         ->and($participant->fresh()->last_activity)->toContain('Circumspect not active')
@@ -323,7 +323,7 @@ it('executes a pvp job end to end and completes the run', function () {
         ->for($character)
         ->create();
 
-    new RunPvpJob($participant)->handle(app(LoginService::class));
+    makeRunJob($participant)->handle(app(LoginService::class));
 
     expect($participant->fresh()->status)->toBe(RunStatus::Completed)
         ->and($participant->fresh()->wins)->toBe(1)

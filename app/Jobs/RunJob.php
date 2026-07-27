@@ -3,7 +3,9 @@
 namespace App\Jobs;
 
 use App\Game\Auth\LoginService;
+use App\Game\Engine\ParticipantOutcome;
 use App\Game\Enums\BattleOutcome;
+use App\Game\Enums\RunSignal;
 use App\Game\Enums\RunStatus;
 use App\Game\Skills\SkillCaster;
 use App\Game\Skills\SkillSyncService;
@@ -20,22 +22,27 @@ use Throwable;
 
 /**
  * Base for one-character run jobs. Owns the participant lifecycle (pre-pickup
- * stop, running → finished transitions, tally callbacks, failure handling)
- * and the long-lived queue placement. Subclasses only drive their engine.
- * Lives for the whole run (possibly hours) on the redis-runs connection whose
- * retry_after exceeds the supervisor timeout, so a live run is never
- * re-dispatched.
+ * stop/pause, running → parked/finished transitions, tally callbacks, failure
+ * handling) and the long-lived queue placement. Subclasses only drive their
+ * engine. Lives for the whole run (possibly hours) on the redis-runs
+ * connection whose retry_after exceeds the supervisor timeout, so a live run
+ * is never re-dispatched.
  */
 abstract class RunJob implements ShouldQueue
 {
     use Queueable, SerializesModels;
 
+    /** Engine iterations between authoritative DB status reads backing up the cache signal. */
+    private const int DB_SIGNAL_CHECK_EVERY = 25;
+
     public int $timeout = 7200;
 
     public int $tries = 1;
 
-    public function __construct(public RunParticipant $participant)
-    {
+    public function __construct(
+        public RunParticipant $participant,
+        public string $dispatchToken,
+    ) {
         $this->onConnection('redis-runs');
         $this->onQueue('runs');
     }
@@ -44,10 +51,21 @@ abstract class RunJob implements ShouldQueue
     {
         $participant = $this->participant->fresh();
 
-        // A stop requested before the worker picked the job up.
+        // Superseded by a later dispatch (pause→resume, restart): this
+        // delivery is stale and must not touch the participant.
+        if ($participant->dispatch_token !== $this->dispatchToken) {
+            return;
+        }
+
+        // A stop or pause requested before the worker picked the job up.
         if ($participant->status !== RunStatus::Pending) {
             if ($participant->status === RunStatus::Stopping) {
-                $participant->update(['status' => RunStatus::Stopped, 'finished_at' => now()]);
+                $participant->transition(RunStatus::Stopped, 'Stopped before start.');
+                $participant->run->refreshStatus();
+            }
+
+            if ($participant->status === RunStatus::Pausing) {
+                $participant->transition(RunStatus::Paused, 'Paused before start.');
                 $participant->run->refreshStatus();
             }
 
@@ -64,20 +82,16 @@ abstract class RunJob implements ShouldQueue
             }
 
             if (! $this->applySkillOptions($character, $participant, $log)) {
-                $participant->update([
-                    'status' => RunStatus::Stopped,
-                    'last_activity' => 'Circumspect not active — run gated.',
-                    'finished_at' => now(),
-                ]);
+                $participant->transition(RunStatus::Stopped, 'Circumspect not active — run gated.');
 
                 return;
             }
 
-            [$status, $reason] = $this->runEngine(
+            $outcome = $this->runEngine(
                 $character,
                 $participant,
                 log: $log,
-                shouldStop: fn (): bool => $participant->stopRequested(),
+                signal: $this->signalClosure($participant),
                 onBattle: function (BattleEvent $event) use ($participant): void {
                     match ($event->outcome) {
                         BattleOutcome::Win => $participant->increment('wins'),
@@ -87,22 +101,51 @@ abstract class RunJob implements ShouldQueue
                 },
             );
 
-            $participant->update([
-                'status' => $status,
-                'last_activity' => $reason,
-                'finished_at' => now(),
-            ]);
+            $participant->transition(
+                $outcome->status,
+                $outcome->reason,
+                $outcome->resumeAt,
+                $outcome->progress,
+            );
         } catch (Throwable $exception) {
-            $participant->update([
-                'status' => RunStatus::Failed,
-                'last_activity' => Str::limit($exception->getMessage(), 250),
-                'finished_at' => now(),
-            ]);
+            $participant->transition(RunStatus::Failed, $exception->getMessage());
 
             throw $exception;
         } finally {
             $participant->run->refreshStatus();
         }
+    }
+
+    /**
+     * The engines' per-iteration control check: the cache signal is the fast
+     * path; every Nth call falls back to an authoritative DB read so a lost
+     * cache entry can never strand a stop or pause.
+     *
+     * @return Closure(): RunSignal
+     */
+    private function signalClosure(RunParticipant $participant): Closure
+    {
+        $calls = 0;
+
+        return function () use ($participant, &$calls): RunSignal {
+            $calls++;
+
+            $signal = $participant->run->currentSignal();
+
+            if ($signal !== RunSignal::None) {
+                return $signal;
+            }
+
+            if ($calls % self::DB_SIGNAL_CHECK_EVERY === 0) {
+                return match ($participant->fresh()->status) {
+                    RunStatus::Stopping => RunSignal::Stop,
+                    RunStatus::Pausing => RunSignal::Pause,
+                    default => RunSignal::None,
+                };
+            }
+
+            return RunSignal::None;
+        };
     }
 
     /**
@@ -171,18 +214,17 @@ abstract class RunJob implements ShouldQueue
     }
 
     /**
-     * Drive the mode's engine to completion.
+     * Drive the mode's engine and report the participant's outcome.
      *
      * @param  Closure(string): void  $log
-     * @param  Closure(): bool  $shouldStop
+     * @param  Closure(): RunSignal  $signal
      * @param  Closure(BattleEvent): void  $onBattle
-     * @return array{0: RunStatus, 1: string} final status + reason line
      */
     abstract protected function runEngine(
         Character $character,
         RunParticipant $participant,
         Closure $log,
-        Closure $shouldStop,
+        Closure $signal,
         Closure $onBattle,
-    ): array;
+    ): ParticipantOutcome;
 }

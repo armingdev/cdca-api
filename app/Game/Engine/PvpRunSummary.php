@@ -8,6 +8,6 @@ final readonly class PvpRunSummary
         public bool $completed,
         public int $attacks,
         public string $stopReason,
-        public bool $externallyStopped = false,
+        public RunEndReason $endReason,
     ) {}
 }

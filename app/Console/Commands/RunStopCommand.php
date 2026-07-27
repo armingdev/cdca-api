@@ -22,13 +22,9 @@ class RunStopCommand extends Command
             return self::FAILURE;
         }
 
-        $run->update(['status' => RunStatus::Stopping, 'restart_every_minutes' => null]);
+        $run->requestStop();
 
-        $flagged = $run->participants()
-            ->whereIn('status', [RunStatus::Pending, RunStatus::Running])
-            ->update(['status' => RunStatus::Stopping]);
-
-        $run->refreshStatus();
+        $flagged = $run->participants()->where('status', RunStatus::Stopping)->count();
 
         $this->info("Stop requested for run #{$run->id} ({$flagged} active participant(s) flagged).");
 

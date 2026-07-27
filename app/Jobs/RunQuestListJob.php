@@ -2,7 +2,9 @@
 
 namespace App\Jobs;
 
+use App\Game\Engine\ParticipantOutcome;
 use App\Game\Engine\QuestListRunConfig;
+use App\Game\Engine\RunEndReason;
 use App\Game\Enums\RunStatus;
 use App\Game\Quest\QuestListRunner;
 use App\Models\Character;
@@ -18,20 +20,35 @@ class RunQuestListJob extends RunJob
         Character $character,
         RunParticipant $participant,
         Closure $log,
-        Closure $shouldStop,
+        Closure $signal,
         Closure $onBattle,
-    ): array {
+    ): ParticipantOutcome {
         $config = QuestListRunConfig::fromArray($participant->run->config);
+        $startPosition = (int) ($participant->progress['position'] ?? 0);
 
-        $summary = QuestListRunner::forCharacter($character, $config)
-            ->run(log: $log, shouldStop: $shouldStop, onBattle: $onBattle);
+        $summary = QuestListRunner::forCharacter($character, $config)->run(
+            log: $log,
+            signal: $signal,
+            onBattle: $onBattle,
+            startPosition: $startPosition,
+            onQuestSettled: function (int $nextPosition, int $completed, int $skipped) use ($participant): void {
+                $participant->update(['progress' => array_merge($participant->progress ?? [], [
+                    'position' => $nextPosition,
+                    'quests_completed' => $completed,
+                    'quests_skipped' => $skipped,
+                ])]);
+            },
+        );
 
-        $status = match (true) {
-            $summary->externallyStopped => RunStatus::Stopped,
-            $summary->completed => RunStatus::Completed,
-            default => RunStatus::Failed,
+        $status = match ($summary->endReason) {
+            RunEndReason::ExternalStop => RunStatus::Stopped,
+            RunEndReason::ExternalPause => RunStatus::Paused,
+            RunEndReason::Completed => RunStatus::Completed,
+            default => RunStatus::Stopped,
         };
 
-        return [$status, $summary->stopReason];
+        return new ParticipantOutcome($status, $summary->stopReason, progress: [
+            'position' => $summary->nextPosition,
+        ]);
     }
 }

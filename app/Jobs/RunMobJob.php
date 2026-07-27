@@ -4,6 +4,8 @@ namespace App\Jobs;
 
 use App\Game\Engine\MobRunConfig;
 use App\Game\Engine\MobRunner;
+use App\Game\Engine\ParticipantOutcome;
+use App\Game\Engine\RunEndReason;
 use App\Game\Enums\RunStatus;
 use App\Models\Character;
 use App\Models\RunParticipant;
@@ -18,17 +20,23 @@ class RunMobJob extends RunJob
         Character $character,
         RunParticipant $participant,
         Closure $log,
-        Closure $shouldStop,
+        Closure $signal,
         Closure $onBattle,
-    ): array {
+    ): ParticipantOutcome {
         $config = MobRunConfig::fromArray($participant->run->config);
+        $killsDone = (int) ($participant->progress['kills_done'] ?? 0);
 
         $summary = MobRunner::forCharacter($character, $config)
-            ->run(log: $log, shouldStop: $shouldStop, onBattle: $onBattle);
+            ->run(log: $log, signal: $signal, onBattle: $onBattle, killsAlreadyDone: $killsDone);
 
-        return [
-            $summary->externallyStopped ? RunStatus::Stopped : RunStatus::Completed,
-            $summary->stopReason,
-        ];
+        $progress = ['kills_done' => $killsDone + $summary->wins];
+
+        $status = match ($summary->endReason) {
+            RunEndReason::ExternalStop => RunStatus::Stopped,
+            RunEndReason::ExternalPause => RunStatus::Paused,
+            default => RunStatus::Completed,
+        };
+
+        return new ParticipantOutcome($status, $summary->stopReason, progress: $progress);
     }
 }

@@ -5,6 +5,8 @@ namespace App\Game\Quest;
 use App\Game\Engine\QuestListRunConfig;
 use App\Game\Engine\QuestListRunSummary;
 use App\Game\Engine\QuestRunConfig;
+use App\Game\Engine\RunEndReason;
+use App\Game\Enums\RunSignal;
 use App\Game\Exceptions\GameException;
 use App\Game\Exceptions\QuestNotAvailableException;
 use App\Models\BattleEvent;
@@ -18,6 +20,9 @@ use Closure;
  * a quest that is no longer available at its giver (already completed) is
  * skipped; a quest that gets stuck (rage floor, unfulfillable objective)
  * stops the whole list. When every item is processed, the list is complete.
+ * A start position lets a paused or rage-parked participant resume mid-list;
+ * the settle callback reports each processed item so the caller can persist
+ * that position.
  */
 class QuestListRunner
 {
@@ -26,6 +31,9 @@ class QuestListRunner
     private int $skipped = 0;
 
     private int $kills = 0;
+
+    /** The list position the next cycle should start from. */
+    private int $nextPosition = 0;
 
     public function __construct(
         private readonly Character $character,
@@ -39,11 +47,18 @@ class QuestListRunner
 
     /**
      * @param  Closure(string): void|null  $log
-     * @param  Closure(): bool|null  $shouldStop
+     * @param  Closure(): RunSignal|null  $signal
      * @param  Closure(BattleEvent): void|null  $onBattle
+     * @param  int  $startPosition  skip list items below this position (resume support)
+     * @param  Closure(int, int, int): void|null  $onQuestSettled  (nextPosition, completed, skipped) after each settled item
      */
-    public function run(?Closure $log = null, ?Closure $shouldStop = null, ?Closure $onBattle = null): QuestListRunSummary
-    {
+    public function run(
+        ?Closure $log = null,
+        ?Closure $signal = null,
+        ?Closure $onBattle = null,
+        int $startPosition = 0,
+        ?Closure $onQuestSettled = null,
+    ): QuestListRunSummary {
         $log ??= fn (string $message) => null;
 
         $list = QuestList::with('items.quest')->find($this->config->questListId);
@@ -52,21 +67,40 @@ class QuestListRunner
             throw new GameException("Quest list #{$this->config->questListId} not found.");
         }
 
-        $log("Running quest list '{$list->name}' ({$list->items->count()} quest(s)).");
+        $items = $list->items->where('position', '>=', $startPosition)->values();
+        $this->nextPosition = $startPosition;
 
-        foreach ($list->items as $item) {
-            if ($shouldStop !== null && $shouldStop()) {
-                return $this->summary(completed: false, reason: 'Stop requested.', externallyStopped: true);
+        $log(sprintf(
+            "Running quest list '%s' (%d quest(s)%s).",
+            $list->name,
+            $items->count(),
+            $startPosition > 0 ? ", resuming from position {$startPosition}" : '',
+        ));
+
+        foreach ($items as $item) {
+            $this->nextPosition = $item->position;
+
+            $control = $signal !== null ? $signal() : RunSignal::None;
+
+            if ($control === RunSignal::Stop) {
+                return $this->summary(completed: false, reason: 'Stop requested.', endReason: RunEndReason::ExternalStop);
             }
 
-            $outcome = $this->runQuest($item, $log, $shouldStop, $onBattle);
+            if ($control === RunSignal::Pause) {
+                return $this->summary(completed: false, reason: 'Pause requested.', endReason: RunEndReason::ExternalPause);
+            }
+
+            $outcome = $this->runQuest($item, $log, $signal, $onBattle);
 
             if ($outcome !== null) {
                 return $outcome;
             }
+
+            $this->nextPosition = $item->position + 1;
+            $onQuestSettled?->__invoke($this->nextPosition, $this->completed, $this->skipped);
         }
 
-        return $this->summary(completed: true, reason: 'Quest list complete.');
+        return $this->summary(completed: true, reason: 'Quest list complete.', endReason: RunEndReason::Completed);
     }
 
     /**
@@ -74,10 +108,10 @@ class QuestListRunner
      * or null to continue to the next quest.
      *
      * @param  Closure(string): void  $log
-     * @param  Closure(): bool|null  $shouldStop
+     * @param  Closure(): RunSignal|null  $signal
      * @param  Closure(BattleEvent): void|null  $onBattle
      */
-    private function runQuest(QuestListItem $item, Closure $log, ?Closure $shouldStop, ?Closure $onBattle): ?QuestListRunSummary
+    private function runQuest(QuestListItem $item, Closure $log, ?Closure $signal, ?Closure $onBattle): ?QuestListRunSummary
     {
         $quest = $item->quest;
 
@@ -85,6 +119,7 @@ class QuestListRunner
             return $this->summary(
                 completed: false,
                 reason: "Stopped on {$item->displayName()}: quest {$quest->game_quest_id} has no known giver.",
+                endReason: RunEndReason::Stuck,
             );
         }
 
@@ -99,7 +134,7 @@ class QuestListRunner
 
         try {
             $summary = QuestRunner::forCharacter($this->character, $questConfig)
-                ->run(log: $log, shouldStop: $shouldStop, onBattle: $onBattle);
+                ->run(log: $log, signal: $signal, onBattle: $onBattle);
         } catch (QuestNotAvailableException) {
             $this->skipped++;
             $log("Already completed — skipping {$item->displayName()}.");
@@ -109,14 +144,19 @@ class QuestListRunner
 
         $this->kills += $summary->kills;
 
-        if ($summary->externallyStopped) {
-            return $this->summary(completed: false, reason: 'Stop requested.', externallyStopped: true);
+        if ($summary->endReason === RunEndReason::ExternalStop) {
+            return $this->summary(completed: false, reason: 'Stop requested.', endReason: RunEndReason::ExternalStop);
+        }
+
+        if ($summary->endReason === RunEndReason::ExternalPause) {
+            return $this->summary(completed: false, reason: 'Pause requested.', endReason: RunEndReason::ExternalPause);
         }
 
         if (! $summary->completed) {
             return $this->summary(
                 completed: false,
                 reason: "Stopped on {$item->displayName()}: {$summary->stopReason}",
+                endReason: $summary->endReason,
             );
         }
 
@@ -125,7 +165,7 @@ class QuestListRunner
         return null;
     }
 
-    private function summary(bool $completed, string $reason, bool $externallyStopped = false): QuestListRunSummary
+    private function summary(bool $completed, string $reason, RunEndReason $endReason): QuestListRunSummary
     {
         return new QuestListRunSummary(
             completed: $completed,
@@ -133,7 +173,8 @@ class QuestListRunner
             questsSkipped: $this->skipped,
             kills: $this->kills,
             stopReason: $reason,
-            externallyStopped: $externallyStopped,
+            endReason: $endReason,
+            nextPosition: $this->nextPosition,
         );
     }
 }

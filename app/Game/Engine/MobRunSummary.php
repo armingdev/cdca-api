@@ -9,6 +9,6 @@ final readonly class MobRunSummary
         public int $losses,
         public int $errors,
         public string $stopReason,
-        public bool $externallyStopped = false,
+        public RunEndReason $endReason,
     ) {}
 }

@@ -90,6 +90,51 @@ it('shows a run and stops it gracefully', function () {
     expect($participant->fresh()->status)->toBe(RunStatus::Stopping);
 });
 
+it('pauses a running run and resumes it with a fresh dispatch', function () {
+    Queue::fake();
+
+    $run = Run::factory()->for($this->user)->state(['status' => RunStatus::Running])->create();
+    $waiting = RunParticipant::factory()->for($run)->for(Character::factory()->for($this->rga))
+        ->create(['status' => RunStatus::Waiting, 'resume_at' => now()->addHour()]);
+
+    $this->postJson("/api/v1/runs/{$run->id}/pause")
+        ->assertOk()
+        ->assertJsonPath('data.status', 'paused');
+
+    expect($waiting->fresh()->status)->toBe(RunStatus::Paused)
+        ->and($waiting->fresh()->resume_at)->toBeNull();
+
+    $this->postJson("/api/v1/runs/{$run->id}/resume")
+        ->assertOk()
+        ->assertJsonPath('data.status', 'running');
+
+    expect($waiting->fresh()->status)->toBe(RunStatus::Pending)
+        ->and($waiting->fresh()->dispatch_token)->not->toBeNull();
+
+    Queue::assertPushed(RunMobJob::class, 1);
+});
+
+it('rejects pausing a finished run and resuming a non-paused run', function () {
+    $finished = Run::factory()->for($this->user)->state(['status' => RunStatus::Completed])->create();
+    $running = Run::factory()->for($this->user)->state(['status' => RunStatus::Running])->create();
+
+    $this->postJson("/api/v1/runs/{$finished->id}/pause")->assertStatus(422);
+    $this->postJson("/api/v1/runs/{$running->id}/resume")->assertStatus(422);
+});
+
+it('stops parked participants immediately when a paused run is stopped', function () {
+    $run = Run::factory()->for($this->user)->state(['status' => RunStatus::Paused])->create();
+    $paused = RunParticipant::factory()->for($run)->for(Character::factory()->for($this->rga))
+        ->create(['status' => RunStatus::Paused]);
+
+    $this->postJson("/api/v1/runs/{$run->id}/stop")
+        ->assertOk()
+        ->assertJsonPath('data.status', 'stopped');
+
+    expect($paused->fresh()->status)->toBe(RunStatus::Stopped)
+        ->and($paused->fresh()->finished_at)->not->toBeNull();
+});
+
 it('lists only the user\'s runs and forbids others', function () {
     Run::factory()->for($this->user)->create();
     $other = Run::factory()->for(User::factory())->create();

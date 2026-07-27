@@ -59,6 +59,8 @@ Route::prefix('v1')->group(function () {
         // Runs — the automation engine.
         Route::apiResource('runs', RunController::class)->only(['index', 'store', 'show']);
         Route::post('runs/{run}/stop', [RunController::class, 'stop']);
+        Route::post('runs/{run}/pause', [RunController::class, 'pause']);
+        Route::post('runs/{run}/resume', [RunController::class, 'resume']);
         Route::get('runs/{run}/battles', [RunController::class, 'battles']);
     });
 });

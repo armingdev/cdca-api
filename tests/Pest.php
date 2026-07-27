@@ -1,10 +1,18 @@
 <?php
 
+use App\Game\Enums\RunMode;
+use App\Jobs\RunJob;
+use App\Jobs\RunMobJob;
+use App\Jobs\RunPvpJob;
+use App\Jobs\RunQuestJob;
+use App\Jobs\RunQuestListJob;
 use App\Models\Mob;
 use App\Models\Quest;
 use App\Models\Room;
+use App\Models\RunParticipant;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 /*
@@ -55,6 +63,23 @@ expect()->extend('toBeOne', function () {
 function gameFixture(string $name): string
 {
     return file_get_contents(__DIR__.'/Fixtures/game/'.$name);
+}
+
+/**
+ * Build the mode-appropriate run job for a participant with a freshly minted
+ * dispatch token (mirrors RunDispatcher), for tests that run jobs inline.
+ */
+function makeRunJob(RunParticipant $participant): RunJob
+{
+    $token = (string) Str::uuid();
+    $participant->update(['dispatch_token' => $token]);
+
+    return match ($participant->run->mode) {
+        RunMode::Mob => new RunMobJob($participant, $token),
+        RunMode::Quest => new RunQuestJob($participant, $token),
+        RunMode::QuestList => new RunQuestListJob($participant, $token),
+        RunMode::Pvp => new RunPvpJob($participant, $token),
+    };
 }
 
 /**
