@@ -31,6 +31,10 @@ return new class extends Migration
      */
     public function down(): void
     {
+        // Catalog references don't translate back to raw game quest ids —
+        // same one-way rule as up().
+        DB::table('quest_list_items')->delete();
+
         Schema::table('quest_list_items', function (Blueprint $table) {
             $table->dropConstrainedForeignId('quest_id');
         });

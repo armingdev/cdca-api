@@ -2,7 +2,10 @@
 
 namespace App\Models;
 
+use Database\Factories\AreaFactory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
@@ -11,11 +14,15 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class Area extends Model
 {
+    /** @use HasFactory<AreaFactory> */
+    use HasFactory;
+
     public $incrementing = false;
 
     protected $fillable = [
         'id',
         'name',
+        'zone_id',
     ];
 
     /**
@@ -24,5 +31,13 @@ class Area extends Model
     public function rooms(): HasMany
     {
         return $this->hasMany(Room::class);
+    }
+
+    /**
+     * @return BelongsTo<Zone, $this>
+     */
+    public function zone(): BelongsTo
+    {
+        return $this->belongsTo(Zone::class);
     }
 }

@@ -28,6 +28,7 @@ class Quest extends Model
         'steps_count',
         'total_exp',
         'item_rewards',
+        'repeatable',
         'last_mapped_at',
     ];
 
@@ -35,6 +36,7 @@ class Quest extends Model
     {
         return [
             'item_rewards' => 'array',
+            'repeatable' => 'boolean',
             'last_mapped_at' => 'datetime',
         ];
     }

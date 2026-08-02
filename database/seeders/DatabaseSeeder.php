@@ -17,6 +17,11 @@ class DatabaseSeeder extends Seeder
         $this->call(SkillSeeder::class);
         $this->call(JunkItemSeeder::class);
         $this->call(QuestItemSeeder::class);
+        $this->call(RoomSeeder::class);
         $this->call(AreaSeeder::class);
+        $this->call(ZoneSeeder::class);
+        $this->call(MobSeeder::class);
+        $this->call(QuestSeeder::class);
+        $this->call(BossSeeder::class);
     }
 }
