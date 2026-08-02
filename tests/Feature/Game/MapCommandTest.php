@@ -87,6 +87,36 @@ it('maps the whole reachable component, backtracking past dead ends and skipping
         ->and($character->fresh()->current_room_id)->toBe(5);
 });
 
+it('walks seeded rooms that were never verified live', function () {
+    $character = Character::factory()->for(Rga::factory()->withSession())->create();
+
+    // The whole world is already known from the seed — but none of it has
+    // been confirmed live. The spider must still walk everything.
+    foreach (fakeWorld() as $id => $exits) {
+        Room::factory()->create([
+            'id' => $id,
+            'north' => $exits['north'] ?? null,
+            'east' => $exits['east'] ?? null,
+            'south' => $exits['south'] ?? null,
+            'west' => $exits['west'] ?? null,
+            'source' => 'seed',
+            'first_seen_at' => null,
+            'last_verified_at' => null,
+        ]);
+    }
+
+    fakeWorldResponses();
+
+    $this->artisan('outwar:map', ['character' => $character->id])
+        ->assertSuccessful()
+        ->expectsOutputToContain('4 awaiting verification')
+        ->expectsOutputToContain('fully mapped');
+
+    expect(Room::whereNull('last_verified_at')->where('is_gated', false)->count())->toBe(0)
+        ->and(Room::find(3)->source)->toBe('spider')
+        ->and(Room::find(9)->is_gated)->toBeTrue();
+});
+
 it('resumes from persisted state without rewalking verified rooms', function () {
     $character = Character::factory()->for(Rga::factory()->withSession())->create();
 

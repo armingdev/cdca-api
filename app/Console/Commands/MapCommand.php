@@ -17,10 +17,20 @@ use Illuminate\Console\Command;
 #[Signature('outwar:map {character : Character id or name}
     {--max-rooms=0 : Stop after verifying this many rooms (0 = unlimited)}
     {--reset : Teleport to the start room before mapping}')]
-#[Description('Spider the world graph: walk every reachable room and record exits + mobs')]
+#[Description('Spider the world graph: walk every unknown or unverified room and record exits + mobs')]
 class MapCommand extends Command
 {
     private const int MAX_CONSECUTIVE_DESYNCS = 3;
+
+    /**
+     * Rooms still needing a live visit, as a set of ids. Seeded rooms start
+     * with a null last_verified_at, so a freshly seeded world is walked in
+     * full — the seed's exits only make the routing smarter, they don't count
+     * as verification.
+     *
+     * @var array<int, mixed>
+     */
+    private array $unverified = [];
 
     public function handle(RoomObservationRecorder $recorder, LoginService $loginService): int
     {
@@ -41,32 +51,47 @@ class MapCommand extends Command
         $graph = RoomGraph::fromDatabase();
         $maxRooms = (int) $this->option('max-rooms');
 
-        $this->info("Mapping as {$character->name} — {$graph->count()} rooms already known.");
+        $this->unverified = Room::whereNull('last_verified_at')
+            ->where('is_gated', false)
+            ->pluck('id')
+            ->flip()
+            ->all();
+
+        $this->info(sprintf(
+            'Mapping as %s — %d rooms known, %d awaiting verification.',
+            $character->name,
+            $graph->count(),
+            count($this->unverified),
+        ));
 
         $blob = $this->option('reset') ? $navigator->resetToStart() : $navigator->loadCurrentRoom();
         $graph->addRoom($blob->curRoom, $blob->exits);
         $current = $blob->curRoom;
 
         $verified = 1;
+        $reportedAt = 0;
         $gated = 0;
         $desyncs = 0;
         $startedAt = microtime(true);
+        unset($this->unverified[$current]);
+
+        $isTarget = fn (int $roomId): bool => ! $graph->has($roomId) || isset($this->unverified[$roomId]);
 
         while ($maxRooms === 0 || $verified < $maxRooms) {
-            $next = $this->firstUnexplored($graph, $current);
+            $next = $this->firstTargetExit($graph, $current);
 
             try {
                 if ($next !== null) {
                     $blob = $navigator->stepTo($next, $current);
+                    $walked = [$blob->curRoom];
                 } else {
-                    $path = $graph->pathToNearest(
-                        $current,
-                        fn (int $roomId): bool => ! $graph->has($roomId)
-                            || $this->firstUnexplored($graph, $roomId) !== null,
-                    );
+                    $path = $graph->pathToNearest($current, $isTarget);
 
                     if ($path === null) {
-                        $this->info('No unexplored exits remain — reachable component fully mapped.');
+                        $this->info(sprintf(
+                            'No reachable targets remain — component fully mapped (%d unreachable rooms still unverified).',
+                            count($this->unverified),
+                        ));
                         break;
                     }
 
@@ -75,10 +100,13 @@ class MapCommand extends Command
                     if ($blob === null) {
                         break;
                     }
+
+                    $walked = array_slice($path, 1);
                 }
             } catch (GatedRoomException $exception) {
                 $recorder->recordGated($exception->roomId, $exception->reason, $character);
                 $graph->addRoom($exception->roomId, []);
+                unset($this->unverified[$exception->roomId]);
                 $gated++;
                 $this->warn("Room {$exception->roomId} is gated: {$exception->reason}");
 
@@ -107,14 +135,21 @@ class MapCommand extends Command
 
             $desyncs = 0;
 
-            if (! $graph->has($blob->curRoom)) {
-                $verified++;
+            // Every room stepped through was recorded and verified — a walk
+            // through unverified territory clears the whole path.
+            foreach ($walked as $roomId) {
+                if (isset($this->unverified[$roomId]) || ! $graph->has($roomId)) {
+                    $verified++;
+                }
+
+                unset($this->unverified[$roomId]);
             }
 
             $graph->addRoom($blob->curRoom, $blob->exits);
             $current = $blob->curRoom;
 
-            if ($verified % 25 === 0) {
+            if ($verified - $reportedAt >= 25) {
+                $reportedAt = $verified;
                 $this->reportProgress($verified, $gated, $startedAt);
             }
         }
@@ -122,10 +157,11 @@ class MapCommand extends Command
         $elapsed = max(microtime(true) - $startedAt, 1);
 
         $this->info(sprintf(
-            'Done. %d rooms visited this run (%d gated), %d rooms in the database, %.1f rooms/min.',
+            'Done. %d rooms verified this run (%d gated), %d rooms in the database, %d still unverified, %.1f rooms/min.',
             $verified,
             $gated,
             Room::count(),
+            count($this->unverified),
             $verified / ($elapsed / 60),
         ));
 
@@ -133,12 +169,13 @@ class MapCommand extends Command
     }
 
     /**
-     * The first exit of a room leading somewhere we have never loaded.
+     * The first exit of a room leading somewhere we have never loaded live —
+     * unknown to the graph or seeded but unverified.
      */
-    private function firstUnexplored(RoomGraph $graph, int $roomId): ?int
+    private function firstTargetExit(RoomGraph $graph, int $roomId): ?int
     {
         foreach ($graph->neighbors($roomId) as $neighbor) {
-            if (! $graph->has($neighbor)) {
+            if (! $graph->has($neighbor) || isset($this->unverified[$neighbor])) {
                 return $neighbor;
             }
         }
@@ -151,10 +188,11 @@ class MapCommand extends Command
         $elapsed = max(microtime(true) - $startedAt, 1);
 
         $this->line(sprintf(
-            '%d rooms visited (%d gated) — %.1f rooms/min',
+            '%d rooms verified (%d gated) — %.1f rooms/min, %d remaining',
             $verified,
             $gated,
             $verified / ($elapsed / 60),
+            count($this->unverified),
         ));
     }
 
