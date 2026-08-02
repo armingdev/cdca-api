@@ -1,0 +1,44 @@
+[
+	{
+		"id": 127,
+		"name": "Cosmos, Great All Being",
+		"nick": "Cosmos",
+		"rageToJoin": 1500
+	},
+	{
+		"id": 128,
+		"name": "Death, Reaper of Souls",
+		"nick": "Death",
+		"rageToJoin": 2000
+	},
+	{
+		"id": 129,
+		"name": "Maekrix, Dreaded Striker",
+		"nick": "Maekrix",
+		"rageToJoin": 3000
+	},
+	{
+		"id": 134,
+		"name": "Nulak, Demon of Zhul",
+		"nick": "Nulak",
+		"rageToJoin": 500
+	},
+	{
+		"id": 135,
+		"name": "Blackhand Reborn",
+		"nick": "Blackhand",
+		"rageToJoin": 4000
+	},
+	{
+		"id": 136,
+		"name": "Arkron, God of Trials",
+		"nick": "Arkron",
+		"rageToJoin": 500
+	},
+	{
+		"id": 137,
+		"name": "Zyrak, Vision of Madness",
+		"nick": "Zyrak",
+		"rageToJoin": 4500
+	}
+]

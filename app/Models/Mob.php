@@ -21,6 +21,12 @@ class Mob extends Model
         'can_form',
         'image',
         'last_seen_at',
+        'attackable',
+        'talkable',
+        'spawnable',
+        'trainer',
+        'long_respawn',
+        'spawn_count',
     ];
 
     /**
@@ -35,6 +41,12 @@ class Mob extends Model
             'type' => 'integer',
             'can_form' => 'boolean',
             'last_seen_at' => 'datetime',
+            'attackable' => 'boolean',
+            'talkable' => 'boolean',
+            'spawnable' => 'boolean',
+            'trainer' => 'boolean',
+            'long_respawn' => 'boolean',
+            'spawn_count' => 'integer',
         ];
     }
 

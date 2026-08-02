@@ -9,8 +9,10 @@ use Illuminate\Database\Seeder;
 /**
  * Imports the named world regions (database/data/areas.json, from the xowh
  * seed's Areas catalog) and stamps area_id onto the rooms we have mapped.
- * Re-runnable: rooms spidered after seeding pick their area up on the next
- * run.
+ * Runs after RoomSeeder so the full seeded graph gets stamped on first
+ * deploy; re-runnable — rooms spidered after seeding pick their area up on
+ * the next run. The seed's Rooms[] membership lists are authoritative
+ * (Rooms.AreaId in the seed is incoherent and deliberately ignored).
  */
 class AreaSeeder extends Seeder
 {

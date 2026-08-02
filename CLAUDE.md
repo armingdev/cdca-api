@@ -36,10 +36,21 @@ is documented in the parent directory. **Read these before writing game code:**
 
 `/Users/armingerina/Code/cdca/data/xowh-seed/` (JSON, current, cross-checked
 478/480 exits vs live): **Rooms** (41,055 `{Id,AreaId,Name,N/W/E/S}`),
-**Mobs** (4,268 `{Name,Id,Level,Rooms[],flags}`), **Areas** (462), **Quests**
-(2,399), **QuestItems** (3,146 `{Name,Mobs[]}` = collect-item→source-mob), plus
-enhancements/sets/cauldron/junk. See its `README.md`. Import, then let the live
-spider verify-and-extend. (`data/legacy/` = older 2011 data, reference only.)
+**Mobs** (4,268 `{Name,Id,Level,Rooms[],flags}`), **Areas** (462), **Zones**
+(31, groups areas by name), **Quests** (2,399), **QuestItems** (3,146
+`{Name,Mobs[]}` = collect-item→source-mob), **Bosses** (7), plus
+enhancements/sets/cauldron/junk. See its `README.md`. (`data/legacy/` = older
+2011 data, reference only. The iowh bot dump is byte-identical — same
+upstream.)
+
+**Already imported**: `php artisan db:seed` seeds the full core world —
+skills, junk items, quest items, rooms (41k, deduped, `source='seed'`), areas,
+zones, mobs + mob_room placements + behavioural flags, quest metadata
+(`game_quest_id`, dup ids first-wins), bosses. Seeders are idempotent and
+never clobber live-crawl data (spider-visited rooms, `last_mapped_at` quests,
+recorder-owned mob columns). The spider/quest crawl only verifies and extends.
+Seed sources live in `database/data/*.json` (zones.json is cleaned of the
+upstream's trailing commas).
 
 ## Verified endpoints cheat-sheet (all HTTPS, host = the server subdomain)
 
@@ -57,7 +68,8 @@ spider verify-and-extend. (`data/legacy/` = older 2011 data, reference only.)
 
 1. Migrations/models: `Rga` (holds session cookies) → `Character`; world
    `Area`/`Room` (adjacency); `Mob` (+ mob_room); `Quest`/`QuestItem`; `Skill`.
-2. Seeder importing `data/xowh-seed/`.
+2. Seeder importing `data/xowh-seed/`. ✅ done — full core world seeds
+   statically (see "Seed data" above).
 3. Game HTTP client: per-character cookie jar (RGA cookies + `ow_*`), throttled,
    session-collision (`Rampid Gaming Login`) detection.
 4. World service: BFS pathfinding + spider (see world-pathfinding.md).
