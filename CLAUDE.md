@@ -54,7 +54,7 @@ upstream's trailing commas).
 
 ## Verified endpoints cheat-sheet (all HTTPS, host = the server subdomain)
 
-- **Login**: `POST www.outwar.com/index.php` `serverid&login_username&login_password&submitit` → 302 `/world?suid=&serverid=`. Cookies: `rg_sess_id`,`token`,`cuserid2` (RGA) + `ow_userid`,`ow_serverid` (active char). One RGA login works across both servers.
+- **Login**: `POST outwar.com/index.php` (apex — `www.` 301s since 2026-08-09 and a POST can't follow it) `serverid&login_username&login_password&submitit` → 302 `/world?suid=&serverid=`; bad creds → 302 `/login?LE=1`. Cookies: `rg_sess_id`,`token`,`cuserid2` (RGA) + `ow_userid`,`ow_serverid` (active char). One RGA login works across both servers.
 - **Switch char**: `GET /world?suid={char}&serverid={srv}` (sets `ow_*` cookies). Concurrency = one cookie jar per character sharing RGA cookies.
 - **Move / room**: `GET ajax_changeroomb.php?room={target}&lastroom={cur}` → JSON `{name,curRoom,north/south/east/west, roomDetailsNew[], ...}`. Move by absolute room id (neighbor only).
 - **Attack mob (PvE)**: `GET somethingelse.php?attackid={encid}&r=world` → 302 `/attack/{battleId}/`. `encid` from room JSON, **single-use per room load** → loop: load room→read encid→attack→reload.

@@ -26,7 +26,7 @@ beforeEach(function () {
 function fakeBootedWorld(): void
 {
     Http::fake(function ($request) {
-        if (str_contains($request->url(), 'www.outwar.com/index.php')) {
+        if (str_contains($request->url(), 'outwar.com/index.php')) {
             return Http::response('', 302, [
                 'Set-Cookie' => ['rg_sess_id=fresh; domain=.outwar.com', 'token=t; domain=.outwar.com', 'cuserid2=1; domain=.outwar.com'],
             ]);
@@ -144,7 +144,7 @@ it('does not stampede the login when a sibling already holds the re-login lock',
     makeRunJob($participant)->handle(app(LoginService::class));
 
     expect($participant->fresh()->status)->toBe(RunStatus::Waiting);
-    Http::assertNotSent(fn ($request) => str_contains($request->url(), 'www.outwar.com/index.php'));
+    Http::assertNotSent(fn ($request) => str_contains($request->url(), 'outwar.com/index.php'));
 
     $sibling->release();
 });

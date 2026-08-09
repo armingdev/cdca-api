@@ -177,6 +177,7 @@ class RunController extends Controller
     {
         $stopRage = $request->integer('stop_rage', 2500);
         $levelUp = $request->boolean('level_up');
+        $smart = $request->boolean('smart');
 
         return match ($mode) {
             RunMode::Mob => (new MobRunConfig(
@@ -189,6 +190,7 @@ class RunController extends Controller
                 attackIntervalSeconds: $request->filled('attack_interval_seconds')
                     ? $request->integer('attack_interval_seconds')
                     : null,
+                smart: $smart,
             ))->toArray(),
 
             RunMode::Quest => (new QuestRunConfig(
@@ -196,12 +198,14 @@ class RunController extends Controller
                 questId: $request->integer('quest_id'),
                 stopRage: $stopRage,
                 levelUp: $levelUp,
+                smart: $smart,
             ))->toArray(),
 
             RunMode::QuestList => (new QuestListRunConfig(
                 questListId: $this->ownedQuestListId($request, $userId),
                 stopRage: $stopRage,
                 levelUp: $levelUp,
+                smart: $smart,
             ))->toArray(),
 
             RunMode::Pvp => (new PvpRunConfig(

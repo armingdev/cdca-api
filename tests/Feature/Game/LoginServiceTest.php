@@ -9,7 +9,7 @@ it('captures the rga session cookies from the login 302', function () {
     $rga = Rga::factory()->create(['username' => 'linuxx', 'password' => 'hunter2']);
 
     Http::fake([
-        'www.outwar.com/index.php' => Http::response('', 302, [
+        'outwar.com/index.php' => Http::response('', 302, [
             'Location' => 'https://sigil.outwar.com/world?suid=2403&serverid=1&code=1',
             'Set-Cookie' => [
                 'rg_sess_id=d97cabc123; path=/; domain=.outwar.com',
@@ -32,7 +32,7 @@ it('captures the rga session cookies from the login 302', function () {
         ->and($rga->status)->toBe(Rga::STATUS_ACTIVE)
         ->and($rga->last_login_at)->not->toBeNull();
 
-    Http::assertSent(fn ($request) => $request->url() === 'https://www.outwar.com/index.php'
+    Http::assertSent(fn ($request) => $request->url() === 'https://outwar.com/index.php'
         && $request['login_username'] === 'linuxx'
         && $request['login_password'] === 'hunter2'
         && $request['serverid'] === 1);
@@ -41,17 +41,39 @@ it('captures the rga session cookies from the login 302', function () {
 it('fails when the login does not redirect', function () {
     $rga = Rga::factory()->create();
 
-    Http::fake(['www.outwar.com/index.php' => Http::response('Invalid password', 200)]);
+    Http::fake(['outwar.com/index.php' => Http::response('Invalid password', 200)]);
 
     app(LoginService::class)->login($rga);
 })->throws(LoginFailedException::class, 'did not redirect');
+
+it('reports a moved login host instead of silently dropping the post body', function () {
+    $rga = Rga::factory()->create();
+
+    Http::fake([
+        'outwar.com/index.php' => Http::response('', 301, [
+            'Location' => 'https://elsewhere.outwar.com/index.php',
+        ]),
+    ]);
+
+    app(LoginService::class)->login($rga);
+})->throws(LoginFailedException::class, 'OUTWAR_LOGIN_HOST');
+
+it('reads the LE=1 bounce back to the login page as bad credentials', function () {
+    $rga = Rga::factory()->create();
+
+    Http::fake([
+        'outwar.com/index.php' => Http::response('', 302, ['Location' => '/login?LE=1']),
+    ]);
+
+    app(LoginService::class)->login($rga);
+})->throws(LoginFailedException::class, 'rejected the username or password');
 
 it('fails when the redirect sets no rg_sess_id', function () {
     $rga = Rga::factory()->create();
 
     Http::fake([
-        'www.outwar.com/index.php' => Http::response('', 302, [
-            'Location' => 'https://www.outwar.com/login',
+        'outwar.com/index.php' => Http::response('', 302, [
+            'Location' => 'https://outwar.com/login',
         ]),
     ]);
 

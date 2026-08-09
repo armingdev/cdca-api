@@ -36,6 +36,9 @@ class RunQuestJob extends RunJob
             RunEndReason::ExternalStop => RunStatus::Stopped,
             RunEndReason::ExternalPause => RunStatus::Paused,
             RunEndReason::Completed => RunStatus::Completed,
+            // Terminal by design: parking would only burn the same rage on the
+            // same unwinnable fight later.
+            RunEndReason::Outmatched => RunStatus::Stopped,
             default => RunStatus::Stopped,
         };
 

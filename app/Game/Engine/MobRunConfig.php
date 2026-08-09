@@ -10,6 +10,10 @@ namespace App\Game\Engine;
  * character performs (0 = unbounded); attack_interval_seconds is the wait
  * between passes (mob respawn time). Neither set (and no Circumspect gate)
  * means the classic single-pass run.
+ *
+ * `smart` is the low-level survival mode: auto-equip the best backpack gear,
+ * level up after a loss (levels grant atk/def), and give up on a mob after
+ * repeated losses instead of grinding rage to zero.
  */
 final readonly class MobRunConfig
 {
@@ -24,6 +28,7 @@ final readonly class MobRunConfig
         public bool $dropJunk = false,
         public int $runCount = 0,
         public ?int $attackIntervalSeconds = null,
+        public bool $smart = false,
     ) {}
 
     /**
@@ -41,6 +46,7 @@ final readonly class MobRunConfig
             attackIntervalSeconds: isset($config['attack_interval_seconds'])
                 ? (int) $config['attack_interval_seconds']
                 : null,
+            smart: (bool) ($config['smart'] ?? false),
         );
     }
 
@@ -57,6 +63,7 @@ final readonly class MobRunConfig
             'drop_junk' => $this->dropJunk,
             'run_count' => $this->runCount,
             'attack_interval_seconds' => $this->attackIntervalSeconds,
+            'smart' => $this->smart,
         ];
     }
 }

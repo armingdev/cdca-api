@@ -25,19 +25,32 @@ class LoginService
 
     public function login(Rga $rga): Rga
     {
+        $loginHost = config('outwar.login_host');
+
         $response = Http::asForm()
             ->withUserAgent(config('outwar.http.user_agent'))
             ->timeout((int) config('outwar.http.timeout'))
             ->withOptions(['allow_redirects' => false])
-            ->post(config('outwar.login_host').'/index.php', [
+            ->post($loginHost.'/index.php', [
                 'serverid' => 1,
                 'login_username' => $rga->username,
                 'login_password' => $rga->password,
                 'submitit' => '',
             ]);
 
+        $location = $response->header('Location');
+
+        if ($response->status() === 301) {
+            throw LoginFailedException::hostMoved($loginHost, $location);
+        }
+
         if ($response->status() !== 302) {
             throw LoginFailedException::unexpectedStatus($response->status());
+        }
+
+        // A rejected login also 302s, but back to the login page with LE=1.
+        if (str_contains($location, 'LE=1')) {
+            throw LoginFailedException::badCredentials();
         }
 
         $cookies = $this->extractSessionCookies($response);

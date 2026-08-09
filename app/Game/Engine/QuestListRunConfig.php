@@ -11,6 +11,7 @@ final readonly class QuestListRunConfig
         public int $questListId,
         public int $stopRage = 2500,
         public bool $levelUp = false,
+        public bool $smart = false,
     ) {}
 
     /**
@@ -22,6 +23,7 @@ final readonly class QuestListRunConfig
             questListId: (int) ($config['quest_list_id'] ?? 0),
             stopRage: (int) ($config['stop_rage'] ?? 2500),
             levelUp: (bool) ($config['level_up'] ?? false),
+            smart: (bool) ($config['smart'] ?? false),
         );
     }
 
@@ -34,6 +36,7 @@ final readonly class QuestListRunConfig
             'quest_list_id' => $this->questListId,
             'stop_rage' => $this->stopRage,
             'level_up' => $this->levelUp,
+            'smart' => $this->smart,
         ];
     }
 }

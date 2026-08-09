@@ -77,6 +77,32 @@ it('accepts and stores the mob pass options', function () {
     ])->assertStatus(422)->assertJsonValidationErrorFor('attack_interval_seconds');
 });
 
+it('stores the smart flag on the run config', function () {
+    Queue::fake();
+    $character = Character::factory()->for($this->rga)->create();
+
+    $this->postJson('/api/v1/runs', [
+        'mode' => 'quest',
+        'characters' => [$character->id],
+        'npc' => 'Stella',
+        'quest_id' => 742,
+        'smart' => true,
+    ])->assertCreated()->assertJsonPath('data.config.smart', true);
+
+    expect(Run::first()->config['smart'])->toBeTrue();
+});
+
+it('defaults the smart flag to off', function () {
+    Queue::fake();
+    $character = Character::factory()->for($this->rga)->create();
+
+    $this->postJson('/api/v1/runs', [
+        'mode' => 'mob',
+        'characters' => [$character->id],
+        'mobs' => ['Kix Harvester'],
+    ])->assertCreated()->assertJsonPath('data.config.smart', false);
+});
+
 it('rejects a run for a character already enrolled in an active run', function () {
     Queue::fake();
     $character = Character::factory()->for($this->rga)->create();

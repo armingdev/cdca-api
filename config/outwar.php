@@ -7,13 +7,16 @@ return [
     | Game Hosts
     |--------------------------------------------------------------------------
     |
-    | The RGA login lives on the www host; each game server is a subdomain
+    | The RGA login lives on the apex host; each game server is a subdomain
     | selected by its server id (1 = sigil, 2 = torax). One RGA session works
     | across both servers.
     |
+    | Must stay the apex: as of 2026-08-09 `www.outwar.com` answers a 301 to
+    | `outwar.com`, and the login POST cannot follow it (a 301 drops the body).
+    |
     */
 
-    'login_host' => env('OUTWAR_LOGIN_HOST', 'https://www.outwar.com'),
+    'login_host' => env('OUTWAR_LOGIN_HOST', 'https://outwar.com'),
 
     'servers' => [
         1 => ['name' => 'sigil', 'host' => 'https://sigil.outwar.com'],
