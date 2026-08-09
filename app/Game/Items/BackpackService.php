@@ -3,10 +3,12 @@
 namespace App\Game\Items;
 
 use App\Game\Data\BackpackContents;
+use App\Game\Data\EquipmentSet;
 use App\Game\Data\ItemDetail;
 use App\Game\Exceptions\GameException;
 use App\Game\Http\GameClient;
 use App\Game\Parsers\BackpackContentsParser;
+use App\Game\Parsers\EquipmentPageParser;
 use App\Game\Parsers\ItemRolloverParser;
 use App\Models\Character;
 
@@ -26,6 +28,7 @@ class BackpackService
         private readonly GameClient $client,
         private readonly BackpackContentsParser $contentsParser,
         private readonly ItemRolloverParser $rolloverParser,
+        private readonly EquipmentPageParser $equipmentParser,
     ) {}
 
     public static function forCharacter(Character $character): self
@@ -35,6 +38,7 @@ class BackpackService
             GameClient::forCharacter($character),
             app(BackpackContentsParser::class),
             app(ItemRolloverParser::class),
+            app(EquipmentPageParser::class),
         );
     }
 
@@ -43,6 +47,17 @@ class BackpackService
         $response = $this->client->get('ajax/backpackcontents.php', ['tab' => $tab]);
 
         return $this->contentsParser->parse($response->body());
+    }
+
+    /**
+     * The character's worn gear — equipped items never appear in the backpack
+     * tabs, so this is the only way to see what a slot already holds.
+     */
+    public function equipped(): EquipmentSet
+    {
+        $response = $this->client->get('equipment.php');
+
+        return $this->equipmentParser->parse($response->body());
     }
 
     public function itemDetail(int $iid): ItemDetail

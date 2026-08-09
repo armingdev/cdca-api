@@ -177,6 +177,164 @@ function fakeCombatWorld(int $rage = 5000): void
 }
 
 /**
+ * The battle page a lost fight serves: the captured loss shape — the mob
+ * weakened us, and there is no exp gain anywhere.
+ */
+function losingBattleHtml(string $mobName): string
+{
+    return "var battle_result = \"{$mobName} has weakened Hero by 2<br>\";"
+        .'var attacker_name = "Hero"; var defender_name = "'.$mobName.'";';
+}
+
+/**
+ * Combat world where the target always wins: every attack answers with the
+ * captured loss shape and the mob never dies. Each attack still costs rage, so
+ * a run without smart mode grinds down to the floor exactly as it does today.
+ * $levelUps caps how many times levelup.php reports success, so a test can
+ * hand smart mode a level or refuse it one. The backpack is empty, making gear
+ * passes harmless no-ops. Pair with seedCombatWorld().
+ */
+function fakeLosingWorld(int $rage = 50000, int $levelUps = 0): void
+{
+    $level = 10;
+    $position = 1;
+
+    $roomBlob = function (int $roomId): string {
+        $mobs = $roomId === 2
+            ? [questMobJson('Kix Harvester', 777, 1234, 'hash', level: 60)]
+            : [];
+
+        return json_encode([
+            'error' => '', 'curRoom' => (string) $roomId, 'name' => "Room {$roomId}",
+            'north' => '0', 'east' => $roomId === 1 ? '2' : '0', 'south' => '0', 'west' => $roomId === 2 ? '1' : '0',
+            'roomDetailsNew' => $mobs, 'doorsData' => null,
+        ]);
+    };
+
+    Http::fake(function ($request) use (&$position, &$level, &$levelUps, &$rage, $roomBlob) {
+        $url = $request->url();
+
+        if (str_contains($url, 'userstats.php')) {
+            return Http::response(json_encode([
+                'exp' => '1,000', 'rage' => number_format($rage), 'level' => (string) $level, 'width' => 0,
+            ]));
+        }
+
+        if (str_contains($url, 'levelup.php')) {
+            if ($levelUps <= 0) {
+                return Http::response('<html>You do not have enough experience to level up.</html>');
+            }
+
+            $levelUps--;
+            $level++;
+            $rage = 50000;
+
+            return Http::response(gameFixture('levelup_success.html'));
+        }
+
+        if (str_contains($url, 'backpackcontents.php')) {
+            return Http::response(gameFixture('backpack_contents_empty.html'));
+        }
+
+        if (str_contains($url, 'skills_info.php')) {
+            return Http::response(fakeSkillInfoHtml());
+        }
+
+        if (str_contains($url, 'somethingelse.php')) {
+            $rage = max(0, $rage - 150);
+
+            return Http::response('', 302, ['Location' => 'https://sigil.outwar.com/attack/606/']);
+        }
+
+        if (str_contains($url, 'attack/606')) {
+            return Http::response(losingBattleHtml('Kix Harvester'));
+        }
+
+        if (str_contains($url, 'ajax_changeroomb.php')) {
+            $query = [];
+            parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
+            $position = (int) $query['room'] ?: $position;
+
+            return Http::response($roomBlob($position));
+        }
+
+        return Http::response('<html>world page</html>');
+    });
+}
+
+/**
+ * Quest 742's world where the kill-objective mob always wins: the step never
+ * completes because no kill lands, so smart mode's loss handling decides the
+ * outcome. Level-ups are unavailable and the backpack is empty.
+ */
+function fakeLosingQuestWorld(int $rage = 50000): void
+{
+    $position = 1;
+
+    $roomBlob = function (int $roomId): string {
+        $mobs = match ($roomId) {
+            1 => [questMobJson('Stella', 59293, 888, 'npchash', level: 10)],
+            2 => [questMobJson('Street Crawler', 4000, 5000, 'x', level: 20)],
+            default => [],
+        };
+
+        return json_encode([
+            'error' => '', 'curRoom' => (string) $roomId, 'name' => "Room {$roomId}",
+            'north' => '0', 'east' => $roomId === 1 ? '2' : '0', 'south' => '0', 'west' => $roomId === 2 ? '1' : '0',
+            'roomDetailsNew' => $mobs, 'doorsData' => null,
+        ]);
+    };
+
+    Http::fake(function ($request) use (&$position, &$rage, $roomBlob) {
+        $url = $request->url();
+
+        if (str_contains($url, 'userstats.php')) {
+            return Http::response(json_encode(['exp' => '1,000', 'rage' => number_format($rage), 'level' => '20', 'width' => 0]));
+        }
+
+        if (str_contains($url, 'levelup.php')) {
+            return Http::response('<html>You do not have enough experience to level up.</html>');
+        }
+
+        if (str_contains($url, 'backpackcontents.php')) {
+            return Http::response(gameFixture('backpack_contents_empty.html'));
+        }
+
+        if (str_contains($url, 'skills_info.php')) {
+            return Http::response(fakeSkillInfoHtml());
+        }
+
+        if (str_contains($url, 'mob_talk.php')) {
+            return Http::response(gameFixture('quest/mob_talk_kill_incomplete.html'));
+        }
+
+        if (str_contains($url, 'mob.php')) {
+            return Http::response('<div><a href="mob_talk.php?id=59293&stepid=3378&userspawn=&questid=742">Street Crawler</a></div>');
+        }
+
+        if (str_contains($url, 'somethingelse.php')) {
+            $rage = max(0, $rage - 150);
+
+            return Http::response('', 302, ['Location' => 'https://sigil.outwar.com/attack/908/']);
+        }
+
+        if (str_contains($url, 'attack/908')) {
+            return Http::response(losingBattleHtml('Street Crawler'));
+        }
+
+        if (str_contains($url, 'ajax_changeroomb.php')) {
+            $query = [];
+            parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
+            $position = (int) $query['room'] ?: $position;
+
+            return Http::response($roomBlob($position));
+        }
+
+        return Http::response('<html>world</html>');
+    });
+}
+
+/**
  * DB side of the fake combat world: mapped rooms + the target mob.
  */
 function seedCombatWorld(): void
@@ -229,8 +387,12 @@ function questMobJson(string $name, int $mobId, int $spawnId, string $hash, int 
  * link); 5+ → complete (finish link); the finish href → the reward page.
  * Returns a setter to change the reported rage mid-test (Http::fake callbacks
  * stack first-wins, so re-faking cannot override an earlier catch-all).
+ *
+ * $level is what userstats reports and $levelUps how many times levelup.php
+ * succeeds (each raising the reported level) — enough to exercise smart mode's
+ * "level up to the quest's required level" gate.
  */
-function fakeQuestWorld(int $rage = 50000): Closure
+function fakeQuestWorld(int $rage = 50000, int $level = 20, int $levelUps = 0): Closure
 {
     $position = 1;
     $killed = 0;
@@ -249,11 +411,22 @@ function fakeQuestWorld(int $rage = 50000): Closure
         ]);
     };
 
-    Http::fake(function ($request) use (&$position, &$killed, $roomBlob, &$rage) {
+    Http::fake(function ($request) use (&$position, &$killed, &$level, &$levelUps, $roomBlob, &$rage) {
         $url = $request->url();
 
         if (str_contains($url, 'userstats.php')) {
-            return Http::response(json_encode(['exp' => '1,000', 'rage' => number_format($rage), 'level' => '20', 'width' => 0]));
+            return Http::response(json_encode(['exp' => '1,000', 'rage' => number_format($rage), 'level' => (string) $level, 'width' => 0]));
+        }
+
+        if (str_contains($url, 'levelup.php')) {
+            if ($levelUps <= 0) {
+                return Http::response('<html>You do not have enough experience to level up.</html>');
+            }
+
+            $levelUps--;
+            $level++;
+
+            return Http::response(gameFixture('levelup_success.html'));
         }
 
         if (str_contains($url, 'skills_info.php')) {

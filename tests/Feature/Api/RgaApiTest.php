@@ -73,7 +73,7 @@ it('logs an RGA in, captures its session, and queues a stat refresh per characte
     $rga = Rga::factory()->for($this->user)->create();
     Character::factory()->for($rga)->count(2)->create();
 
-    Http::fake(['www.outwar.com/index.php' => Http::response('', 302, [
+    Http::fake(['outwar.com/index.php' => Http::response('', 302, [
         'Set-Cookie' => ['rg_sess_id=abc; domain=.outwar.com', 'token=def; domain=.outwar.com', 'cuserid2=1; domain=.outwar.com'],
     ])]);
 

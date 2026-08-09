@@ -130,6 +130,7 @@ class QuestListRunner
             questId: $quest->game_quest_id,
             stopRage: $this->config->stopRage,
             levelUp: $this->config->levelUp,
+            smart: $this->config->smart,
         );
 
         try {

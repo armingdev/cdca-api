@@ -21,6 +21,12 @@ enum RunEndReason: string
     /** No way to make progress: unfulfillable objective, unmapped giver, dead link. */
     case Stuck = 'stuck';
 
+    /**
+     * Smart mode gave up on the targets: the same mob won repeatedly even
+     * after levelling and re-gearing, so we stop instead of feeding it rage.
+     */
+    case Outmatched = 'outmatched';
+
     case ExternalStop = 'external_stop';
     case ExternalPause = 'external_pause';
 }

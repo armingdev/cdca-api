@@ -79,6 +79,12 @@ class RunMobJob extends RunJob
             return new ParticipantOutcome(RunStatus::Completed, $summary->stopReason, progress: $progress);
         }
 
+        // Waiting cannot fix being too weak — no exp or gear arrives while
+        // parked — so an outmatched pass ends the run rather than cycling.
+        if ($summary->endReason === RunEndReason::Outmatched) {
+            return new ParticipantOutcome(RunStatus::Stopped, $summary->stopReason, progress: $progress);
+        }
+
         if ($config->runCount > 0 && $cyclesDone >= $config->runCount) {
             return new ParticipantOutcome(
                 RunStatus::Completed,

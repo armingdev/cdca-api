@@ -23,6 +23,19 @@ it('loads and parses a backpack tab', function () {
     Http::assertSent(fn ($request) => str_contains($request->url(), 'tab=regular'));
 });
 
+it('loads and parses the worn equipment', function () {
+    $character = Character::factory()->for(Rga::factory()->withSession())->create();
+
+    Http::fake(['*equipment.php*' => Http::response(gameFixture('equipment_page.html'))]);
+
+    $equipment = BackpackService::forCharacter($character)->equipped();
+
+    expect($equipment->all())->toHaveCount(20)
+        ->and($equipment->itemsInSlotNamed('Weapon')[0]->name)->toBe('Executioner of the Stormforged Conqueror');
+
+    Http::assertSent(fn ($request) => str_contains($request->url(), 'equipment.php'));
+});
+
 it('equips items without a security answer', function () {
     $character = Character::factory()->for(Rga::factory()->withSession())->create();
 

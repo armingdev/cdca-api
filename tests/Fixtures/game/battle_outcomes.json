@@ -1,13 +1,21 @@
 {
-  "_note": "PvE battle-result classification. VERIFIED 2026-07-15 (2 wins + 1 loss captured).",
+  "_note": "PvE battle-result classification. VERIFIED 2026-07-15 (2 wins + 1 loss captured); quest-kill variants + fresh loss re-verified live 2026-08-09 on a low-level char.",
   "win": {
     "battle_result": "AzRaa gained 0 strength<br>AzRaa has gained 676 experience!<br>AzRaa gained 77 gold!",
     "marker": "contains 'has gained {N} experience!' (+ optional stat/gold/drop)"
+  },
+  "win_quest_kill": {
+    "battle_result": "Tribal Hog: </b>1/2 killed<br>PLAYER gained 1 strength<br>PLAYER has gained 1 experience!<br><img src=/images/goldcoin.gif align=absmiddle /> PLAYER gained 1 gold!<br>",
+    "marker": "when the mob is a live quest kill-objective, battle_result is PREFIXED with '{Mob}: </b>{n}/{m} killed<br>' \u2014 free quest progress, no mob_talk fetch needed; exp-gain win rule unchanged"
   },
   "loss": {
     "battle_result": "Grand Sole Protector has weakened LinuXX_2 by 2",
     "marker": "contains '{defenderName} has weakened {yourName} by {N}' AND no 'gained ... experience'"
   },
-  "classification_rule": "Prefer battle_result TEXT: win iff it contains 'has gained {N} experience!'; loss iff '{mob} has weakened {you}' with no exp gain. NOTE: on a re-fetched (persisted) /attack/{id}/ page, the JS var attacker_result can read 'Win!' even for a loss — do NOT rely on attacker_result alone off a persisted page; battle_result text is authoritative.",
+  "loss_2026_08_09": {
+    "battle_result": "Tribal Hog has weakened PLAYER by 2<br>",
+    "marker": "same rule re-verified live: loss body is ONLY the weakened line (note trailing <br>), even mid-quest \u2014 no kill counter on a loss"
+  },
+  "classification_rule": "Prefer battle_result TEXT: win iff it contains 'has gained {N} experience!'; loss iff '{mob} has weakened {you}' with no exp gain. NOTE: on a re-fetched (persisted) /attack/{id}/ page, the JS var attacker_result can read 'Win!' even for a loss \u2014 do NOT rely on attacker_result alone off a persisted page; battle_result text is authoritative.",
   "drop_on_win": "div#found_items 'WIN: Found {item}' (empty = no drop)"
 }

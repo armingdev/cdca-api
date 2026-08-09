@@ -29,6 +29,7 @@ class StoreRunRequest extends FormRequest
             'start_at' => ['sometimes', 'nullable', 'date'],
             'stop_rage' => ['sometimes', 'integer', 'min:0'],
             'level_up' => ['sometimes', 'boolean'],
+            'smart' => ['sometimes', 'boolean'],
 
             // mob mode
             'mobs' => ['required_if:mode,mob', 'array'],

@@ -2,6 +2,7 @@
 
 namespace App\Game\Quest;
 
+use App\Game\Combat\StatsService;
 use App\Game\Data\MobSighting;
 use App\Game\Data\QuestObjective;
 use App\Game\Data\QuestStepPage;
@@ -20,6 +21,7 @@ use App\Game\World\RoomGraph;
 use App\Models\BattleEvent;
 use App\Models\Character;
 use App\Models\Mob;
+use App\Models\Quest;
 use App\Models\QuestItem;
 use Closure;
 
@@ -47,6 +49,7 @@ class QuestRunner
         private readonly QuestService $questService,
         private readonly Navigator $navigator,
         private readonly RoomGraph $graph,
+        private readonly StatsService $stats,
     ) {}
 
     public static function forCharacter(Character $character, QuestRunConfig $config): self
@@ -57,6 +60,7 @@ class QuestRunner
             QuestService::forCharacter($character),
             Navigator::forCharacter($character),
             RoomGraph::fromDatabase(),
+            StatsService::forCharacter($character),
         );
     }
 
@@ -68,6 +72,10 @@ class QuestRunner
     public function run(?Closure $log = null, ?Closure $signal = null, ?Closure $onBattle = null): QuestRunSummary
     {
         $log ??= fn (string $message) => null;
+
+        if ($this->config->smart) {
+            $this->levelUpToQuestRequirement($log);
+        }
 
         $npc = $this->navigateToNpc();
         $quest = collect($this->questService->availableQuests($npc->spawnId, $npc->hash))
@@ -142,6 +150,12 @@ class QuestRunner
                     return $this->summary(completed: false, reason: $farm->stopReason, endReason: RunEndReason::RageExhausted);
                 }
 
+                // Walking back to the giver would only re-enter the same
+                // losing fight, so surface the verdict as it stands.
+                if ($farm !== null && $farm->endReason === RunEndReason::Outmatched) {
+                    return $this->summary(completed: false, reason: $farm->stopReason, endReason: RunEndReason::Outmatched);
+                }
+
                 $this->navigateToNpc();
 
                 if ($wins === 0) {
@@ -201,6 +215,7 @@ class QuestRunner
             stopRage: $this->config->stopRage,
             maxKills: max($objective->remaining(), 1),
             levelUp: $this->config->levelUp,
+            smart: $this->config->smart,
         );
 
         try {
@@ -211,6 +226,32 @@ class QuestRunner
 
             return null;
         }
+    }
+
+    /**
+     * Smart mode: a quest the character is too low for is never offered by the
+     * giver, so spend banked exp before the walk. Seeded required levels can be
+     * stale, so this never blocks the run — it levels what it can and tries.
+     *
+     * @param  Closure(string): void  $log
+     */
+    private function levelUpToQuestRequirement(Closure $log): void
+    {
+        $required = Quest::where('game_quest_id', $this->config->questId)->value('required_level');
+
+        if ($required === null || $this->stats->refresh()->level >= $required) {
+            return;
+        }
+
+        // tryLevelUp() refreshes the character record it shares with us, so
+        // each new level is visible on the next pass of the loop.
+        while ($this->character->level < $required && $this->stats->tryLevelUp()) {
+            //
+        }
+
+        $log($this->character->level >= $required
+            ? "Leveled to {$this->character->level} for quest {$this->config->questId}."
+            : "Quest {$this->config->questId} wants level {$required}, character is {$this->character->level} — trying anyway.");
     }
 
     /**

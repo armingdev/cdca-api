@@ -6,9 +6,12 @@ use App\Game\Combat\AttackService;
 use App\Game\Combat\StatsService;
 use App\Game\Data\MobSighting;
 use App\Game\Data\RoomBlob;
+use App\Game\Data\UserStats;
 use App\Game\Enums\BattleOutcome;
 use App\Game\Enums\RunSignal;
 use App\Game\Exceptions\GameException;
+use App\Game\Exceptions\SessionCollisionException;
+use App\Game\Items\GearManager;
 use App\Game\Items\JunkDropper;
 use App\Game\World\Navigator;
 use App\Game\World\RoomGraph;
@@ -26,6 +29,9 @@ use Closure;
  */
 class MobRunner
 {
+    /** Smart mode: losses in a row to one mob before we accept we cannot beat it. */
+    private const int MAX_CONSECUTIVE_LOSSES = 3;
+
     private int $wins = 0;
 
     private int $losses = 0;
@@ -35,6 +41,13 @@ class MobRunner
     /** Kills carried over from earlier cycles of the same run, counted against max_kills. */
     private int $winsBaseline = 0;
 
+    private int $consecutiveLosses = 0;
+
+    private ?string $lossStreakMob = null;
+
+    /** @var array<string, true> mob names smart mode has given up on for this run */
+    private array $outmatched = [];
+
     public function __construct(
         private readonly Character $character,
         private readonly MobRunConfig $config,
@@ -42,6 +55,7 @@ class MobRunner
         private readonly AttackService $attacker,
         private readonly StatsService $stats,
         private readonly ?JunkDropper $junkDropper = null,
+        private readonly ?GearManager $gearManager = null,
     ) {}
 
     public static function forCharacter(Character $character, MobRunConfig $config): self
@@ -53,6 +67,7 @@ class MobRunner
             AttackService::forCharacter($character),
             StatsService::forCharacter($character),
             JunkDropper::forCharacter($character),
+            GearManager::forCharacter($character),
         );
     }
 
@@ -100,6 +115,11 @@ class MobRunner
 
         $graph = RoomGraph::fromDatabase();
         $current = $this->stats->refresh();
+
+        if ($this->config->smart) {
+            $this->optimizeGear($current->level, $log);
+        }
+
         $blob = $this->navigator->loadCurrentRoom();
         $graph->addRoom($blob->curRoom, $blob->exits);
         $exhausted = [];
@@ -137,6 +157,23 @@ class MobRunner
                 $onBattle?->__invoke($event);
 
                 $current = $this->stats->refresh();
+
+                if ($event->outcome === BattleOutcome::Win) {
+                    $this->consecutiveLosses = 0;
+                    $this->lossStreakMob = null;
+                }
+
+                if ($event->outcome === BattleOutcome::Loss && $this->config->smart) {
+                    $current = $this->handleLoss($sighting, $current, $log);
+
+                    if ($this->allTargetsOutmatched()) {
+                        return $this->summary(
+                            "Outmatched by {$sighting->name} — stopping to preserve rage.",
+                            RunEndReason::Outmatched,
+                        );
+                    }
+                }
+
                 $blob = $this->navigator->loadCurrentRoom();
 
                 continue;
@@ -168,12 +205,88 @@ class MobRunner
     private function liveTarget(RoomBlob $blob): ?MobSighting
     {
         foreach ($blob->mobs as $sighting) {
-            if (! $sighting->isDead && in_array($sighting->name, $this->config->mobNames, true)) {
+            if ($sighting->isDead || isset($this->outmatched[$sighting->name])) {
+                continue;
+            }
+
+            if (in_array($sighting->name, $this->config->mobNames, true)) {
                 return $sighting;
             }
         }
 
         return null;
+    }
+
+    /**
+     * Smart mode's reaction to a lost battle: level up (levels grant atk/def
+     * and refill rage for free), then re-check gear — the fight may have
+     * dropped something wearable, and a new level can unlock what we already
+     * carry. A mob that wins MAX_CONSECUTIVE_LOSSES in a row anyway is marked
+     * outmatched so we stop feeding it rage.
+     *
+     * Returns the stats to keep running with; a level-up changes them.
+     *
+     * @param  Closure(string): void  $log
+     */
+    private function handleLoss(MobSighting $sighting, UserStats $current, Closure $log): UserStats
+    {
+        if ($sighting->name !== $this->lossStreakMob) {
+            $this->lossStreakMob = $sighting->name;
+            $this->consecutiveLosses = 0;
+        }
+
+        $this->consecutiveLosses++;
+
+        if ($this->stats->tryLevelUp()) {
+            $current = $this->stats->refresh();
+            $this->consecutiveLosses = 0;
+            $log("Leveled up to {$current->level} after a loss — rage refilled, retrying stronger.");
+        }
+
+        $this->optimizeGear($current->level, $log);
+
+        if ($this->consecutiveLosses >= self::MAX_CONSECUTIVE_LOSSES) {
+            $this->outmatched[$sighting->name] = true;
+            $log("Giving up on {$sighting->name} after {$this->consecutiveLosses} straight losses.");
+        }
+
+        return $current;
+    }
+
+    /**
+     * True once every configured target has beaten us into the outmatched
+     * list — nothing left to try, so the pass ends rather than wandering.
+     */
+    private function allTargetsOutmatched(): bool
+    {
+        foreach ($this->config->mobNames as $name) {
+            if (! isset($this->outmatched[$name])) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Auto-equip pass (smart mode). Gear is an optimisation, never a reason to
+     * end a run — a failure here is logged and shrugged off.
+     *
+     * @param  Closure(string): void  $log
+     */
+    private function optimizeGear(int $characterLevel, Closure $log): void
+    {
+        if ($this->gearManager === null) {
+            return;
+        }
+
+        try {
+            $this->gearManager->optimize($characterLevel, $log);
+        } catch (SessionCollisionException $exception) {
+            throw $exception;
+        } catch (GameException $exception) {
+            $log("Gear check failed: {$exception->getMessage()}");
+        }
     }
 
     /**

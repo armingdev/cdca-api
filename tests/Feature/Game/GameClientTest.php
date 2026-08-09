@@ -45,7 +45,7 @@ it('detects a session collision and invalidates the rga', function () {
     $rga = Rga::factory()->withSession()->create();
 
     Http::fake([
-        'www.outwar.com/*' => Http::response('<html><title>Rampid Gaming Login</title></html>'),
+        'outwar.com/*' => Http::response('<html><title>Rampid Gaming Login</title></html>'),
     ]);
 
     expect(fn () => GameClient::forRga($rga)->get('some_page.php'))
@@ -57,7 +57,7 @@ it('detects the ajax logged-out error box and invalidates the rga', function () 
     $rga = Rga::factory()->withSession()->create();
 
     Http::fake([
-        'www.outwar.com/*' => Http::response('<font>You must be logged in to view this page.</font>'),
+        'outwar.com/*' => Http::response('<font>You must be logged in to view this page.</font>'),
     ]);
 
     expect(fn () => GameClient::forRga($rga)->get('ajax/trusteeList.php', ['dropdown' => 1]))

@@ -2,6 +2,43 @@
 
 Notes for API consumers (Angular/mobile clients). Newest first.
 
+## 2026-08-09 — Login host fix (`www` → apex)
+
+Outwar started 301-redirecting `www.outwar.com` to `outwar.com`. A POST cannot
+follow a 301 (the body is dropped), so **every `POST /api/v1/rgas/{id}/login`
+was failing** with "Login did not redirect into the world (HTTP 301)". The
+login host now defaults to `https://outwar.com` (override:
+`OUTWAR_LOGIN_HOST`). No request/response contract change.
+
+Two clearer failure messages for clients to surface:
+
+- `The game rejected the username or password.` — the game bounced the login
+  back to `/login?LE=1`. Previously reported as a missing-cookie error.
+- `The login host … now redirects to … — point OUTWAR_LOGIN_HOST at the new
+  host.` — so a future host move is diagnosable from the error alone.
+
+## 2026-08-09 — Smart questing (auto-equip, loss-driven level-ups)
+
+### API contract changes (client-facing)
+
+**`POST /api/v1/runs`** (mob, quest and quest-list modes) — new optional field:
+
+| Field | Type | Notes |
+|---|---|---|
+| `smart` | boolean, default false | Low-level survival mode. Auto-equips the best backpack item per slot (respecting each item's required level), levels up after a lost battle, and abandons a mob after 3 straight losses instead of grinding rage to zero. |
+
+`smart` round-trips in the run's `config` object like `level_up`/`drop_junk`,
+and a quest-list run passes it down to every quest and mob farm it spawns.
+The CLI equivalent is `php artisan outwar:run-start … --smart`.
+
+**New run outcome**: a participant stopped by the loss-streak rule finishes as
+`stopped` with a `last_activity` of `Outmatched by {Mob} — stopping to preserve
+rage.` This is terminal — unlike a rage-out it is never re-dispatched, because
+waiting brings neither exp nor gear. Clients showing run history should treat
+"outmatched" as "the character is too weak for this target yet".
+
+Runs without `smart` behave exactly as before.
+
 ## 2026-07-24 — Items domain, security answer, junk-drop, trustees
 
 ### API contract changes (client-facing)

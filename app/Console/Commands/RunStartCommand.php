@@ -33,6 +33,7 @@ use Illuminate\Support\Collection;
     {--run-count=0 : (mob mode) Full passes per character (0 = unbounded while cycling)}
     {--attack-interval= : (mob mode) Seconds to wait between passes (min 60)}
     {--level-up : Level up (refills rage) instead of stopping when rage is low}
+    {--smart : Smart mode: auto-equip backpack gear, level up after a loss, stop when outmatched}
     {--cast-on-start : Cast the character\'s selected skills before the run begins}
     {--require-circ : Only run while Circumspect is active (cast it if possible, else gate off)}
     {--restart-every= : Re-dispatch the run every N minutes after it finishes}
@@ -154,6 +155,7 @@ class RunStartCommand extends Command
             attackIntervalSeconds: $this->option('attack-interval') !== null
                 ? max((int) $this->option('attack-interval'), 60)
                 : null,
+            smart: (bool) $this->option('smart'),
         ))->toArray();
     }
 
@@ -173,6 +175,7 @@ class RunStartCommand extends Command
             questId: (int) $this->option('quest'),
             stopRage: (int) $this->option('stop-rage'),
             levelUp: (bool) $this->option('level-up'),
+            smart: (bool) $this->option('smart'),
         ))->toArray();
     }
 
@@ -199,6 +202,7 @@ class RunStartCommand extends Command
             questListId: $list->id,
             stopRage: (int) $this->option('stop-rage'),
             levelUp: (bool) $this->option('level-up'),
+            smart: (bool) $this->option('smart'),
         ))->toArray();
     }
 

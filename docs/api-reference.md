@@ -263,6 +263,7 @@ Common fields (all modes):
 | `characters` | int[] | your character ids (required, ≥1). `422` if any isn't yours |
 | `stop_rage` | int | rage-pool floor; stop below it (default 2500) |
 | `level_up` | bool | level up (refills rage) instead of stopping when low |
+| `smart` | bool | smart mode (mob/quest/quest-list): auto-equip the best backpack gear, level up after a lost battle, and stop with an `outmatched` reason after 3 straight losses to the same mob instead of grinding rage away. Built for low-level characters that start with no gear |
 | `cast_on_start` | bool | cast the characters' selected skills before the run |
 | `require_circumspect` | bool | run on the Circumspect cycle: cast it when possible, otherwise park `waiting` and auto-resume when its cooldown ends |
 | `restart_every_minutes` | int? | re-dispatch this run every N minutes after it **completes** |
