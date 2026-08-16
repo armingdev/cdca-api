@@ -16,7 +16,10 @@ it('captures the rga session cookies from the login 302', function () {
                 'token=7b50def456; path=/; domain=.outwar.com; Max-Age=604800',
                 'cuserid2=3920; path=/; domain=.outwar.com; Max-Age=604800',
                 'owip=203.0.113.7; path=/; domain=.outwar.com; Max-Age=604800',
-                'ow_userid=deleted; expires=Thu, 01-Jan-1970 00:00:01 GMT',
+                // The game clears these three on the login 302 (captured 2026-08-16).
+                'ow_userid=deleted; expires=Thu, 01-Jan-1970 00:00:01 GMT; Max-Age=0',
+                'ow_serverid=deleted; expires=Thu, 01-Jan-1970 00:00:01 GMT; Max-Age=0',
+                'cauldronitems=deleted; expires=Thu, 01-Jan-1970 00:00:01 GMT; Max-Age=0',
             ],
         ]),
     ]);

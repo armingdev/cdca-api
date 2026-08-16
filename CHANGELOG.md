@@ -2,6 +2,25 @@
 
 Notes for API consumers (Angular/mobile clients). Newest first.
 
+## 2026-08-16 — Booted sessions are detected again
+
+Live capture against a genuinely booted session showed the game had changed
+its logged-out wording per endpoint: `You must be logged in to **use** this
+page` (userstats), `…to do that` (questHelper), `No account id`
+(accounts.php), a bare 500 (ajax), a 302 to login (full pages). Our sentinel
+pinned the exact string `You must be logged in to view this page`, so it
+matched **none** of them — a booted session went undetected, the RGA was never
+marked invalid, and the automatic re-login never fired. Runs instead died with
+opaque parser errors.
+
+The client now matches the bare `You must be logged in` prefix, the
+`No account id` body, and login redirects. A 5xx is deliberately still *not*
+treated as a dead session (a server blip looks identical and would cause
+re-login storms) — it surfaces as a request failure.
+
+No client contract change; runs that mysteriously stalled after a session
+takeover should now recover on their own.
+
 ## 2026-08-09 — Login host fix (`www` → apex)
 
 Outwar started 301-redirecting `www.outwar.com` to `outwar.com`. A POST cannot

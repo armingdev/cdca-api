@@ -26,8 +26,20 @@ class GameClient
 {
     public const string BOOT_SENTINEL = 'Rampid Gaming Login';
 
-    /** Ajax endpoints answer 200 with this error box when the session is dead. */
-    public const string LOGGED_OUT_SENTINEL = 'You must be logged in to view this page';
+    /**
+     * Dead-session sentinel. Deliberately the bare prefix: the game phrases
+     * the rest per endpoint — "…to view this page", "…to use this page"
+     * (userstats.php), "…to do that" (world_questHelper.php) — and pinning
+     * the full 'view this page' wording silently matched none of them
+     * (re-captured 2026-08-16 against a genuinely booted session).
+     */
+    public const string LOGGED_OUT_SENTINEL = 'You must be logged in';
+
+    /**
+     * accounts.php is the odd one out: a dead session gets 200 with this
+     * 13-byte body instead of any "logged in" wording.
+     */
+    public const string NO_ACCOUNT_SENTINEL = 'No account id';
 
     private function __construct(
         private readonly ?Rga $rga,
@@ -185,10 +197,32 @@ class GameClient
 
         $body = $response->body();
 
-        if (str_contains($body, self::BOOT_SENTINEL) || str_contains($body, self::LOGGED_OUT_SENTINEL)) {
+        $booted = str_contains($body, self::BOOT_SENTINEL)
+            || str_contains($body, self::LOGGED_OUT_SENTINEL)
+            || trim($body) === self::NO_ACCOUNT_SENTINEL
+            // Full pages (e.g. Navigator's /world reset hatch) bounce to the
+            // login screen rather than rendering a sentinel.
+            || $this->isLoginRedirect($response);
+
+        if ($booted) {
             $this->rga->update(['status' => Rga::STATUS_INVALID]);
 
             throw SessionCollisionException::booted();
         }
+    }
+
+    /**
+     * A 3xx whose Location points at the login page. Note a dead session also
+     * makes some ajax endpoints answer 500 with an empty body — deliberately
+     * NOT treated as booted, because a genuine server blip is indistinguishable
+     * and invalidating on it would trigger pointless re-login storms.
+     */
+    private function isLoginRedirect(Response $response): bool
+    {
+        if ($response->status() < 300 || $response->status() >= 400) {
+            return false;
+        }
+
+        return str_contains($response->header('Location'), '/login');
     }
 }
