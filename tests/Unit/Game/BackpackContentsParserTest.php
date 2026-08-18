@@ -41,3 +41,37 @@ it('parses the captured empty utility tab', function () {
         ->and($contents->itemCount)->toBe(0)
         ->and($contents->isOver)->toBeFalse();
 });
+
+it('parses the key tab: teleport items carry the activate flag, gating keys do not', function () {
+    $contents = new BackpackContentsParser()->parse(gameFixture('backpack_key_tab.html'));
+
+    expect($contents->items)->toHaveCount(42);
+
+    $activatable = array_values(array_filter(
+        $contents->items,
+        fn ($item): bool => $item->canActivate(),
+    ));
+
+    expect($activatable)->toHaveCount(28);
+
+    $ward = $contents->itemsNamed('Astral Ward')[0];
+    expect($ward->iid)->toBe(340588211)
+        ->and($ward->gameItemId)->toBe(4839)
+        ->and($ward->menuFlags)->toBe('acvs')
+        ->and($ward->canActivate())->toBeTrue()
+        ->and($ward->canEquip())->toBeFalse();
+
+    $carryKey = $contents->itemsNamed('Key to Kraw Village')[0];
+    expect($carryKey->menuFlags)->toBe('cvs')
+        ->and($carryKey->canActivate())->toBeFalse();
+});
+
+it('parses the catalog item id, which is stable where the instance id is not', function () {
+    $contents = new BackpackContentsParser()->parse(gameFixture('backpack_key_tab.html'));
+
+    $key = $contents->itemsNamed('Key to Scientific District')[0];
+
+    expect($key->gameItemId)->toBe(2281)
+        ->and($key->iid)->toBe(9180887)
+        ->and($key->qty)->toBe(2);
+});

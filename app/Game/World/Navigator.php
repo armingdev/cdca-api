@@ -79,8 +79,11 @@ class Navigator
     }
 
     /**
-     * GET /world.php?teleport=1 teleports to a bar (302 → /world; lands in
-     * the Dusty Glass Tavern). The cheap way to reach a trainer for leveling.
+     * GET /world.php?teleport=1 teleports to the character's *home* tavern
+     * (302 → /world). Dusty Glass Tavern (258) is only the default home — it
+     * is re-homed via `world.php?teleportupdate=1&tavern={roomId}`, the link
+     * served in a tavern room's `tavernData`. The cheap way to reach a trainer
+     * for leveling. See docs/game-api/teleports.md.
      */
     public function teleportToBar(): RoomBlob
     {

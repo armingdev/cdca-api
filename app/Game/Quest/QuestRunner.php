@@ -18,6 +18,8 @@ use App\Game\Exceptions\GameException;
 use App\Game\Exceptions\QuestNotAvailableException;
 use App\Game\World\Navigator;
 use App\Game\World\RoomGraph;
+use App\Game\World\TeleportPlanner;
+use App\Game\World\TeleportService;
 use App\Models\BattleEvent;
 use App\Models\Character;
 use App\Models\Mob;
@@ -50,6 +52,7 @@ class QuestRunner
         private readonly Navigator $navigator,
         private readonly RoomGraph $graph,
         private readonly StatsService $stats,
+        private readonly ?TeleportService $teleports = null,
     ) {}
 
     public static function forCharacter(Character $character, QuestRunConfig $config): self
@@ -61,6 +64,7 @@ class QuestRunner
             Navigator::forCharacter($character),
             RoomGraph::fromDatabase(),
             StatsService::forCharacter($character),
+            TeleportService::forCharacter($character),
         );
     }
 
@@ -366,13 +370,21 @@ class QuestRunner
         $this->graph->addRoom($blob->curRoom, $blob->exits);
 
         if (! $rooms->contains($blob->curRoom)) {
-            $path = $this->graph->pathToNearest($blob->curRoom, fn (int $roomId): bool => $rooms->contains($roomId));
+            // Free item anchors only — a quest run must not spend rage or the
+            // Teleport skill's cooldown just to reach the giver.
+            $plan = new TeleportPlanner($this->graph)->planToNearest(
+                $blob->curRoom,
+                fn (int $roomId): bool => $rooms->contains($roomId),
+                $this->teleports?->freeAnchors() ?? [],
+            );
 
-            if ($path === null) {
+            if ($plan === null) {
                 throw new GameException("No path to quest-giver '{$this->config->npcName}'.");
             }
 
-            $blob = $this->navigator->walk($path);
+            $blob = $this->teleports !== null
+                ? $this->teleports->travel($plan)
+                : $this->navigator->walk($plan->walkPath);
         }
 
         foreach ($blob->mobs as $sighting) {

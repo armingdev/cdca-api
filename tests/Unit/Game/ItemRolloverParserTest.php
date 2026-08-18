@@ -38,3 +38,21 @@ it('parses a statless quest item without a slot', function () {
 it('throws on an empty response', function () {
     new ItemRolloverParser()->parse('');
 })->throws(ParseException::class);
+
+it('parses an activatable teleport item', function () {
+    $item = new ItemRolloverParser()->parse(gameFixture('item_rollover_astral_ward.html'));
+
+    expect($item->name)->toBe('Astral Ward')
+        ->and($item->slot)->toBe('Other')
+        ->and($item->requiredLevel)->toBeNull()
+        ->and($item->activatable)->toBeTrue()
+        ->and($item->description)->toBe(
+            'Teleports you to the entrance of the Astral World. Grants ability to travel through the Astral Rift.',
+        );
+});
+
+it('does not mark ordinary gear as activatable', function () {
+    $item = new ItemRolloverParser()->parse(gameFixture('item_rollover.html'));
+
+    expect($item->activatable)->toBeFalse();
+});

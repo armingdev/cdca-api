@@ -23,6 +23,10 @@ final readonly class ItemDetail
         public ?int $requiredLevel,
         public array $stats,
         public ?int $tradesLeftToday,
+        /** The tooltip's italic "click to activate" marker — a usable item. */
+        public bool $activatable = false,
+        /** Flavour/effect prose, e.g. "Teleports you to the Plane of Fire." */
+        public ?string $description = null,
     ) {}
 
     public function stat(string $name): int

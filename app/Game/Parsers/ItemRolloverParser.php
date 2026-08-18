@@ -31,7 +31,26 @@ class ItemRolloverParser
             tradesLeftToday: preg_match('/Can change hands\s+([\d,]+)\s+more time/is', $text, $trade)
                 ? (int) str_replace(',', '', $trade[1])
                 : null,
+            activatable: str_contains($text, 'click to activate'),
+            description: $this->parseDescription($body),
         );
+    }
+
+    /**
+     * The prose blocks under the tag line — the game renders them as plain
+     * (non-bold) divs, which is what separates them from the stat column.
+     * Teleport items carry their destination here ("Teleports you to …").
+     */
+    private function parseDescription(string $body): ?string
+    {
+        preg_match_all('/<div[^>]*style="[^"]*font-(?:weight:normal|style:italic)[^"]*"[^>]*>(.*?)<\/div>/is', $body, $divs);
+
+        $lines = array_filter(array_map(
+            fn (string $div): string => trim($this->toText($div)),
+            $divs[1] ?? [],
+        ));
+
+        return $lines === [] ? null : implode(' ', $lines);
     }
 
     private function toText(string $body): string

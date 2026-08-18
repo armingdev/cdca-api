@@ -27,6 +27,7 @@ class Character extends Model
         'school',
         'crew',
         'current_room_id',
+        'home_tavern_room_id',
         'last_stats_at',
         'status',
     ];
@@ -46,6 +47,7 @@ class Character extends Model
             'school' => SkillSchool::class,
             'status' => CharacterActivity::class,
             'current_room_id' => 'integer',
+            'home_tavern_room_id' => 'integer',
             'last_stats_at' => 'datetime',
         ];
     }
@@ -67,11 +69,30 @@ class Character extends Model
     }
 
     /**
+     * The tavern world.php?teleport=1 returns to. Null = never set, so the
+     * game's default (Dusty Glass Tavern, room 258) applies.
+     *
+     * @return BelongsTo<Room, $this>
+     */
+    public function homeTavern(): BelongsTo
+    {
+        return $this->belongsTo(Room::class, 'home_tavern_room_id');
+    }
+
+    /**
      * @return HasMany<CharacterSkill, $this>
      */
     public function skills(): HasMany
     {
         return $this->hasMany(CharacterSkill::class);
+    }
+
+    /**
+     * @return HasMany<CharacterTeleportAnchor, $this>
+     */
+    public function teleportAnchors(): HasMany
+    {
+        return $this->hasMany(CharacterTeleportAnchor::class);
     }
 
     /**

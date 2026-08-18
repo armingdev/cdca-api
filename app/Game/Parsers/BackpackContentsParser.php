@@ -11,7 +11,8 @@ use App\Game\Data\BackpackItem;
  *
  *   makemenu(this,event,100,'{flags}','','{slotIndex}','{iid}','{ownerId}', '{equipSlotType}')
  *
- * flags (e.g. `edzcvs`) select the menu's actions — `e` = equippable.
+ * flags (e.g. `edzcvs`) select the menu's actions — `e` = equippable,
+ * `a` = activatable (teleport items in the key tab).
  * The capacity footer is `<span id="backpackmaxval" data-maxval data-isover
  * data-curitemct>` (maxval -1 = uncapped).
  */
@@ -38,6 +39,7 @@ class BackpackContentsParser
 
             preg_match('/data-name="([^"]*)"/', $tag, $name);
             preg_match('/data-itemidqty="(\d+)"/', $tag, $qty);
+            preg_match('/data-itemid="(\d+)"/', $tag, $gameItemId);
             preg_match('/src="([^"]+)"/', $tag, $src);
 
             $items[] = new BackpackItem(
@@ -49,6 +51,7 @@ class BackpackContentsParser
                 menuFlags: $menu[1],
                 equipSlotType: (int) $menu[5],
                 image: $src[1] ?? '',
+                gameItemId: isset($gameItemId[1]) ? (int) $gameItemId[1] : null,
             );
         }
 

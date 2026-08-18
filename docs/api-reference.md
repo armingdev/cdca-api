@@ -160,7 +160,7 @@ All your characters (across RGAs), ordered by level desc. Filters:
 { "data": [ { "id": 5, "rga_id": 1, "suid": 2403, "server_id": 1,
   "server": "sigil", "name": "RealLinuXX", "level": 95, "rage": 244093,
   "exp": 169548518310, "crew": "Collective 2", "current_room_id": 258,
-  "status": "running", "last_stats_at": "…" } ] }
+  "home_tavern_room_id": 376, "status": "running", "last_stats_at": "…" } ] }
 ```
 `rage`/`exp`/`level`/`current_room_id` update live while a run is active
 (after every attack), and `status` is the live activity (`idle` · `running` ·
@@ -192,6 +192,60 @@ Synchronous single-character refresh (one live `userstats.php` read).
 - `POST /characters/{id}/cast` — cast now. Either `{ "skill_id": 3008 }` (one
   skill) or `{ "on_start": true }` (the whole selected set). `200 { "message": … }`,
   or `422` if the cast was rejected (rage/cooldown/not learned).
+
+### Per-character teleports
+
+Teleports are fast travel: an **item** anchor (free, no cooldown, reusable), a
+**skill** anchor (the Teleport skill: 100 rage, 60-minute cooldown, only if the
+character trained it), or the character's **home tavern** (free).
+
+**Availability is per character** — item anchors depend on level and quest
+progress, so two characters on the same account have different sets, and a
+higher-level character is not guaranteed to hold every anchor. Never cache an
+anchor list globally or reuse one character's list for another.
+
+- `GET /characters/{id}/teleports` — what this character can jump with:
+  ```json
+  { "data": [ { "anchor_id": 5, "name": "Astral Ward", "kind": "item",
+    "game_item_id": 4839, "room_id": 26137, "room_name": "Astral Rift",
+    "description": "Teleports you to the entrance of the Astral World.",
+    "required_level": null, "rage_cost": 0, "cooldown_minutes": 0,
+    "free": true, "destination_known": true, "available": true,
+    "last_used_at": null, "synced_at": "…" } ] }
+  ```
+  `kind` is `item` or `skill`. `destination_known: false` means the landing room
+  has never been observed — show it as "unknown destination"; it becomes known
+  the first time it is used. `available: false` = the character no longer holds
+  it (kept for history, do not offer it).
+- `POST /characters/{id}/teleports/sync` — re-read the anchors from the game
+  (the key tab + the Teleport skill's destinations). Returns counts plus the
+  full refreshed list:
+  ```json
+  { "message": "31 teleport anchor(s) available.", "item_anchors": 14,
+    "skill_anchors": 17, "discovered": 0, "unavailable": 0,
+    "without_destination": 0, "anchors": [ … ] }
+  ```
+- `POST /characters/{id}/teleports` — travel. Exactly one of:
+  - `{ "room_id": 26152 }` — the API picks the cheapest route (jump + walk, or
+    plain walk) and executes it;
+  - `{ "anchor_id": 5 }` — jump with that anchor, no walking;
+  - `{ "home_tavern": true }` — free return to the home tavern.
+
+  `200 { "message": "Arrived in Astral Rift (room 26137).", "room_id": 26137,
+  "room_name": "Astral Rift", "teleported": true, "anchor": "Astral Ward",
+  "steps_walked": 1 }`. `422` when the anchor is unusable, the skill is
+  untrained/on cooldown/unaffordable, or no route exists.
+- `POST /characters/{id}/home-tavern` — `{ "room_id": 376 }` sets the free
+  `home_tavern` destination (must be a tavern room the character has reached).
+  The character payload carries the current value as `home_tavern_room_id`.
+
+**Runs use these automatically.** Mob and quest runs route with the character's
+**free** anchors (item jumps) whenever that beats walking — no run config, no
+client change. They never spend rage or the Teleport skill's cooldown on
+travel, and a character with no synced anchors walks exactly as before. A run
+that teleports logs it to `last_activity` ("Teleporting with {anchor}…"), so
+keeping anchors synced makes runs measurably faster, especially for targets in
+areas no walk reaches.
 
 ### Character stats
 
@@ -388,6 +442,11 @@ These backend features aren't built yet; don't design hard dependencies on them:
 - **PvP scouting grid** — target Power/Ele/"Has SS Cast"/"COP Cast"/"Stripped"/
   level-cap flags and skip rules. PvP currently attacks by name without scouting.
 - **Items / inventory** — auto-equip and auto-drop-junk; no item endpoints yet.
+  (Teleport *items* are the exception: they are exposed as anchors under
+  `/characters/{id}/teleports`, not as inventory.)
+- **Paid teleports inside a run** — runs route via *free* item anchors
+  automatically (nothing to configure, see §5), but never spend rage or the
+  Teleport skill's cooldown on travel. There is no per-run teleport setting.
 - **Named PvP target lists** and crew-roster/hitlist import — PvP targets are
   passed inline per run for now.
 - **Raids / God raids.**

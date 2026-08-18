@@ -14,6 +14,8 @@ final readonly class RoomBlob
      * @param  string|null  $questHelpDirection  quest-helper compass while "find my
      *                                           target" is on: north/south/east/west, or null when there is no
      *                                           pointer — in the target room (or helper off)
+     * @param  int|null  $tavernRoomId  set when the room is a tavern: the room id its
+     *                                  "Make {name} my home!" link would set as the home tavern
      */
     public function __construct(
         public int $curRoom,
@@ -23,7 +25,17 @@ final readonly class RoomBlob
         public ?array $doors,
         public string $error,
         public ?string $questHelpDirection = null,
+        public ?int $tavernRoomId = null,
     ) {}
+
+    /**
+     * Taverns are the anchor for the free world.php?teleport=1 jump, so the
+     * spider records them as it walks past.
+     */
+    public function isTavern(): bool
+    {
+        return $this->tavernRoomId !== null;
+    }
 
     public function hasError(): bool
     {

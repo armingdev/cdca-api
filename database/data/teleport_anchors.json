@@ -1,0 +1,301 @@
+{
+ "captured": "2026-08-16",
+ "server": "sigil",
+ "note": "Item anchors + Teleport (skill 27) destinations observed on one level-95 character. Availability is per character; this only preloads the catalog.",
+ "items": [
+  {
+   "game_item_id": 2257,
+   "name": "Key to Industrial District",
+   "room_id": 8178,
+   "room_name": "Cross Roads",
+   "required_level": 50,
+   "description": "Teleports you to the Industrial District."
+  },
+  {
+   "game_item_id": 2276,
+   "name": "Key to Financial District",
+   "room_id": 6535,
+   "room_name": "Financial District",
+   "required_level": 50,
+   "description": "Teleports you to the Financial District."
+  },
+  {
+   "game_item_id": 2281,
+   "name": "Key to Scientific District",
+   "room_id": 6555,
+   "room_name": "Scientific District",
+   "required_level": 50,
+   "description": "Teleports you to the Scientific District."
+  },
+  {
+   "game_item_id": 2031,
+   "name": "Radiation Meter",
+   "room_id": 6317,
+   "room_name": "Kix Woods",
+   "required_level": null,
+   "description": "Teleports you to the entrance of the City of Eternal Star Allows access to the City of Eternal Star"
+  },
+  {
+   "game_item_id": 4839,
+   "name": "Astral Ward",
+   "room_id": 26137,
+   "room_name": "Astral Rift",
+   "required_level": null,
+   "description": "Teleports you to the entrance of the Astral World. Grants ability to travel through the Astral Rift."
+  },
+  {
+   "game_item_id": 2704,
+   "name": "Summoning Staff",
+   "room_id": 8950,
+   "room_name": "Entrance to Crown of the Phoenix",
+   "required_level": null,
+   "description": "Teleports you to the Core of the Phoenix."
+  },
+  {
+   "game_item_id": 3138,
+   "name": "Canteen",
+   "room_id": 10097,
+   "room_name": "Desert of a Lost Era",
+   "required_level": null,
+   "description": "Teleports you to the Desert of a Lost Era."
+  },
+  {
+   "game_item_id": 4310,
+   "name": "Everburning Torch",
+   "room_id": 16734,
+   "room_name": "Narrow Pit",
+   "required_level": null,
+   "description": "Teleports you to the Narrow Pit."
+  },
+  {
+   "game_item_id": 4317,
+   "name": "Stealth Slippers",
+   "room_id": 17042,
+   "room_name": "Breeding Cave",
+   "required_level": null,
+   "description": "Teleports you to the Breeding Cave."
+  },
+  {
+   "game_item_id": 4320,
+   "name": "Q-SEC Base Key",
+   "room_id": 17321,
+   "room_name": "Underground Q-SEC Base",
+   "required_level": null,
+   "description": "Teleports you to the Underground Q-SEC Base."
+  },
+  {
+   "game_item_id": 4329,
+   "name": "Experimental Teleporter",
+   "room_id": 15789,
+   "room_name": "Underground Cavern",
+   "required_level": null,
+   "description": "Teleports you to the Underground Caverns."
+  },
+  {
+   "game_item_id": 4439,
+   "name": "Scuba Mask",
+   "room_id": 19578,
+   "room_name": "Plane of Nature",
+   "required_level": null,
+   "description": "Teleports you to the Plane of Nature."
+  },
+  {
+   "game_item_id": 4445,
+   "name": "Xetu's Blessing",
+   "room_id": 19941,
+   "room_name": "Plane of Fire",
+   "required_level": null,
+   "description": "Teleports you to the Plane of Fire."
+  },
+  {
+   "game_item_id": 4680,
+   "name": "Planes Teleporter",
+   "room_id": 21948,
+   "room_name": "Plane of Darkness",
+   "required_level": null,
+   "description": "Teleports you to the Plane of Darkness."
+  },
+  {
+   "game_item_id": 5030,
+   "name": "Key of Ascension",
+   "room_id": 24792,
+   "room_name": "Acirum Freelands",
+   "required_level": null,
+   "description": "Teleports you to the Acirum Freelands."
+  },
+  {
+   "game_item_id": 5952,
+   "name": "Veldara Teleporter",
+   "room_id": 28125,
+   "room_name": "Veldara Garrison",
+   "required_level": null,
+   "description": "Teleports you to the Veldara Garrison. Allows access to Veldara."
+  },
+  {
+   "game_item_id": 6004,
+   "name": "Chaotic Buffer",
+   "room_id": 31478,
+   "room_name": "Veldara Woods",
+   "required_level": null,
+   "description": "Teleports you to the Veldara Woods. A ward against the thick Chaos pollution."
+  },
+  {
+   "game_item_id": 5635,
+   "name": "Sanctum Key",
+   "room_id": 27496,
+   "room_name": "Diamond City Sanctum",
+   "required_level": null,
+   "description": "Teleports you to the Diamond City Sanctum. Allows access to the Diamond City Sanctum."
+  },
+  {
+   "game_item_id": 5734,
+   "name": "Gladiator Arena Admission",
+   "room_id": 28027,
+   "room_name": "Gladiator Arena",
+   "required_level": null,
+   "description": "Teleports you to the Gladiator Arena."
+  },
+  {
+   "game_item_id": 6005,
+   "name": "Cave Lantern",
+   "room_id": 32247,
+   "room_name": "Veldara Caves",
+   "required_level": null,
+   "description": "Teleports you to the Veldara Caves. A light to navigate the Veldara Caves."
+  },
+  {
+   "game_item_id": 5748,
+   "name": "Contamination Duffel Bag",
+   "room_id": 27674,
+   "room_name": "City of Corruption",
+   "required_level": 80,
+   "description": "Teleports you to the City of Corruption."
+  },
+  {
+   "game_item_id": 6569,
+   "name": "Astral Teleporter",
+   "room_id": 37865,
+   "room_name": "Astral Ruins",
+   "required_level": null,
+   "description": "Teleports you to the Astral Ruins. Allows access to the Astral Dimension."
+  },
+  {
+   "game_item_id": 6007,
+   "name": "Garrison Banner",
+   "room_id": 34542,
+   "room_name": "Tyrisar City",
+   "required_level": null,
+   "description": "Teleports you to Tyrisar City. The Garrison army supports you in all battles."
+  },
+  {
+   "game_item_id": 6147,
+   "name": "Garden Paragon",
+   "room_id": 36153,
+   "room_name": "Garden of Chaos",
+   "required_level": null,
+   "description": "Teleports you to the Garden of Chaos. Allows access to the Garden of Chaos."
+  },
+  {
+   "game_item_id": 6570,
+   "name": "Elemental Dampener",
+   "room_id": 38906,
+   "room_name": "Holy Dimension",
+   "required_level": null,
+   "description": "Teleports you to the Holy Dimension. Allows access to the Elemental Dimensions."
+  },
+  {
+   "game_item_id": 6571,
+   "name": "Ward of Death",
+   "room_id": 41548,
+   "room_name": "Death Dimension",
+   "required_level": null,
+   "description": "Teleports you to the Death Dimension. Allows access to the Death Dimension."
+  },
+  {
+   "game_item_id": 7666,
+   "name": "Triworld Teleporter",
+   "room_id": 42622,
+   "room_name": "Triworld Sanctuary",
+   "required_level": null,
+   "description": "Teleports you to the Triworld Sanctuary. Allows access to the Triworld Sanctuary."
+  },
+  {
+   "game_item_id": 7667,
+   "name": "Grove Insignia",
+   "room_id": 43283,
+   "room_name": "Twilight Grove",
+   "required_level": null,
+   "description": "Teleports you to the Twilight Grove. Allows access to the Twilight Grove."
+  }
+ ],
+ "skill_destinations": [
+  {
+   "room_id": 134,
+   "name": "Sewers Entrance"
+  },
+  {
+   "room_id": 225,
+   "name": "Blackheart's Bank"
+  },
+  {
+   "room_id": 231,
+   "name": "Chuggers Palace Bar"
+  },
+  {
+   "room_id": 238,
+   "name": "Cement Block Company"
+  },
+  {
+   "room_id": 249,
+   "name": "Stizzy Waterway Keep"
+  },
+  {
+   "room_id": 258,
+   "name": "Dusty Glass Tavern"
+  },
+  {
+   "room_id": 299,
+   "name": "Chuggers Palace Bar"
+  },
+  {
+   "room_id": 376,
+   "name": "The Drunken Clam"
+  },
+  {
+   "room_id": 400,
+   "name": "Hard Iron Saloon"
+  },
+  {
+   "room_id": 1107,
+   "name": "Emergency Room"
+  },
+  {
+   "room_id": 1803,
+   "name": "Szecian Badlands"
+  },
+  {
+   "room_id": 1931,
+   "name": "Lower Badlands"
+  },
+  {
+   "room_id": 1951,
+   "name": "Upper Badlands"
+  },
+  {
+   "room_id": 2530,
+   "name": "Dungeon of Eternal Shadow Forgotten Reliquary"
+  },
+  {
+   "room_id": 2772,
+   "name": "Ruins of Old Stizzy"
+  },
+  {
+   "room_id": 3098,
+   "name": "Ken'Drals Castle"
+  },
+  {
+   "room_id": 5006,
+   "name": "Tuntentian Service Wing"
+  }
+ ]
+}

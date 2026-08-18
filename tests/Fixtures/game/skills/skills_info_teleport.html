@@ -1,0 +1,47 @@
+
+<script>
+	function setTarget(){
+		document.getElementById('target').value = document.getElementById('select_target').value;
+	}
+</script>
+
+<div class="text-left">
+    <img class="skilliconinline mr-2" style="width:75px;height:75px;" src="images/skills/teleport.png">
+			<h5>Teleport Level 1</h5>
+			Summon a portal to send you to various places in Diamond City.		</div>
+<br>
+<div class="row">
+	<div class="col-6">
+	<b>Rage Cost:</b><br>
+100<br>
+	<b>Cooldown:</b><br>
+    60 mins<br>	</div>
+	<div class="col-6">
+	<b>Duration:</b><br>
+		</div>
+</div>
+<br>
+
+<form method="post">			<b>Destination</b><br>
+			<select name="dest" class="form-control">
+									<option value="134">Sewers Entrance</option>
+									<option value="225">Blackheart's Bank</option>
+									<option value="231">Chuggers Palace Bar</option>
+									<option value="238">Cement Block Company</option>
+									<option value="249">Stizzy Waterway Keep</option>
+									<option value="258">Dusty Glass Tavern</option>
+									<option value="299">Chuggers Palace Bar</option>
+									<option value="376">The Drunken Clam</option>
+									<option value="400">Hard Iron Saloon</option>
+									<option value="1107">Emergency Room</option>
+									<option value="1803">Szecian Badlands</option>
+									<option value="1931">Lower Badlands</option>
+									<option value="1951">Upper Badlands</option>
+									<option value="2530">Dungeon of Eternal Shadow Forgotten Reliquary</option>
+									<option value="2772">Ruins of Old Stizzy</option>
+									<option value="3098">Ken'Drals Castle</option>
+									<option value="5006">Tuntentian Service Wing</option>
+							</select>
+				<input type="hidden" name="castskillid" value="27">
+		<input type="submit" name="cast" class="btn btn-primary" value="Cast Skill">
+	</form>
