@@ -30,6 +30,7 @@ class CharacterResource extends JsonResource
             'school' => $this->school,
             'crew' => $this->crew,
             'current_room_id' => $this->current_room_id,
+            'home_tavern_room_id' => $this->home_tavern_room_id,
             'status' => $this->status,
             'last_stats_at' => $this->last_stats_at,
         ];

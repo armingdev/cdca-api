@@ -15,6 +15,8 @@ use App\Game\Items\GearManager;
 use App\Game\Items\JunkDropper;
 use App\Game\World\Navigator;
 use App\Game\World\RoomGraph;
+use App\Game\World\TeleportPlanner;
+use App\Game\World\TeleportService;
 use App\Models\BattleEvent;
 use App\Models\Character;
 use App\Models\Mob;
@@ -56,6 +58,7 @@ class MobRunner
         private readonly StatsService $stats,
         private readonly ?JunkDropper $junkDropper = null,
         private readonly ?GearManager $gearManager = null,
+        private readonly ?TeleportService $teleports = null,
     ) {}
 
     public static function forCharacter(Character $character, MobRunConfig $config): self
@@ -68,6 +71,7 @@ class MobRunner
             StatsService::forCharacter($character),
             JunkDropper::forCharacter($character),
             GearManager::forCharacter($character),
+            TeleportService::forCharacter($character),
         );
     }
 
@@ -114,6 +118,18 @@ class MobRunner
         }
 
         $graph = RoomGraph::fromDatabase();
+        $planner = new TeleportPlanner($graph);
+
+        // Free item anchors only: a run must never spend rage (its fuel) or the
+        // Teleport skill's hour-long cooldown on travel. Read once from the DB
+        // — no game requests, and an empty list simply means "walk", exactly
+        // as before the character synced any anchors.
+        $anchors = $this->teleports?->freeAnchors() ?? [];
+
+        if ($anchors !== []) {
+            $log(count($anchors).' teleport anchors available for routing.');
+        }
+
         $current = $this->stats->refresh();
 
         if ($this->config->smart) {
@@ -181,22 +197,30 @@ class MobRunner
 
             $exhausted[$blob->curRoom] = true;
 
-            $path = $graph->pathToNearest(
+            $plan = $planner->planToNearest(
                 $blob->curRoom,
                 fn (int $roomId): bool => $targetRooms->contains($roomId) && ! isset($exhausted[$roomId]),
+                $anchors,
             );
 
-            if ($path === null) {
+            if ($plan === null) {
                 return $this->summary('No live targets remain in any known room.', RunEndReason::Completed);
             }
 
             try {
-                $blob = count($path) > 1 ? $this->navigator->walk($path) : $this->navigator->loadCurrentRoom();
+                if ($plan->anchor !== null) {
+                    $log("Teleporting with {$plan->anchor->name} (saves the walk).");
+                }
+
+                $blob = $this->teleports !== null
+                    ? $this->teleports->travel($plan)
+                    : ($plan->steps() > 0 ? $this->navigator->walk($plan->walkPath) : $this->navigator->loadCurrentRoom());
+
                 $graph->addRoom($blob->curRoom, $blob->exits);
             } catch (GameException $exception) {
                 $log($exception->getMessage());
                 $this->errors++;
-                $exhausted[end($path)] = true;
+                $exhausted[end($plan->walkPath)] = true;
                 $blob = $this->navigator->loadCurrentRoom();
             }
         }

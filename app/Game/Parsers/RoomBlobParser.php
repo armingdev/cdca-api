@@ -47,7 +47,26 @@ class RoomBlobParser
             doors: is_array($data['doorsData'] ?? null) ? $data['doorsData'] : null,
             error: $error,
             questHelpDirection: $this->questHelpDirection($data),
+            tavernRoomId: $this->tavernRoomId($data),
         );
+    }
+
+    /**
+     * A tavern room carries tavernData with its "Make {name} my home!" link:
+     * `<a href="/world.php?teleportupdate=1&tavern=376">…`. Empty for every
+     * other room.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function tavernRoomId(array $data): ?int
+    {
+        $tavern = $data['tavernData'] ?? null;
+
+        if (is_string($tavern) && preg_match('/tavern=(\d+)/', $tavern, $m)) {
+            return (int) $m[1];
+        }
+
+        return null;
     }
 
     /**

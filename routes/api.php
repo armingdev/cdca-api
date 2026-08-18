@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CharacterController;
 use App\Http\Controllers\Api\V1\CharacterSkillController;
+use App\Http\Controllers\Api\V1\CharacterTeleportController;
 use App\Http\Controllers\Api\V1\QuestController;
 use App\Http\Controllers\Api\V1\QuestListController;
 use App\Http\Controllers\Api\V1\QuestListItemController;
@@ -38,6 +39,13 @@ Route::prefix('v1')->group(function () {
         Route::post('characters/{character}/skills/{skill}/train', [CharacterSkillController::class, 'train']);
         Route::post('characters/{character}/cast', [CharacterSkillController::class, 'cast']);
         Route::post('characters/{character}/refresh-stats', [CharacterController::class, 'refreshStats']);
+
+        // Teleports: anchors the character can jump with, and travelling.
+        Route::get('characters/{character}/teleports', [CharacterTeleportController::class, 'index']);
+        Route::post('characters/{character}/teleports/sync', [CharacterTeleportController::class, 'sync']);
+        Route::post('characters/{character}/teleports', [CharacterTeleportController::class, 'store']);
+        Route::post('characters/{character}/home-tavern', [CharacterTeleportController::class, 'setHomeTavern']);
+
         Route::get('characters/{character}/battles', [StatsController::class, 'battles']);
         Route::get('characters/{character}/stats', [StatsController::class, 'summary']);
 

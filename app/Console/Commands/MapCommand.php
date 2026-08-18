@@ -3,11 +3,14 @@
 namespace App\Console\Commands;
 
 use App\Game\Auth\LoginService;
+use App\Game\Data\RoomBlob;
 use App\Game\Exceptions\DesyncException;
+use App\Game\Exceptions\GameException;
 use App\Game\Exceptions\GatedRoomException;
 use App\Game\World\Navigator;
 use App\Game\World\RoomGraph;
 use App\Game\World\RoomObservationRecorder;
+use App\Game\World\TeleportService;
 use App\Models\Character;
 use App\Models\Room;
 use Illuminate\Console\Attributes\Description;
@@ -16,7 +19,8 @@ use Illuminate\Console\Command;
 
 #[Signature('outwar:map {character : Character id or name}
     {--max-rooms=0 : Stop after verifying this many rooms (0 = unlimited)}
-    {--reset : Teleport to the start room before mapping}')]
+    {--reset : Teleport to the start room before mapping}
+    {--teleports : When the walkable component runs dry, jump to the next teleport anchor and keep going}')]
 #[Description('Spider the world graph: walk every unknown or unverified room and record exits + mobs')]
 class MapCommand extends Command
 {
@@ -31,6 +35,14 @@ class MapCommand extends Command
      * @var array<int, mixed>
      */
     private array $unverified = [];
+
+    /**
+     * Teleport anchors already jumped with this run, so the spider never
+     * ping-pongs between the same two components.
+     *
+     * @var array<int, bool>
+     */
+    private array $usedAnchors = [];
 
     public function handle(RoomObservationRecorder $recorder, LoginService $loginService): int
     {
@@ -50,6 +62,12 @@ class MapCommand extends Command
         $navigator = Navigator::forCharacter($character);
         $graph = RoomGraph::fromDatabase();
         $maxRooms = (int) $this->option('max-rooms');
+        $teleports = $this->option('teleports') ? TeleportService::forCharacter($character) : null;
+
+        if ($teleports !== null) {
+            $sync = $teleports->syncAnchors();
+            $this->line("{$sync->total()} teleport anchors available ({$sync->withoutDestination} with an unknown landing room).");
+        }
 
         $this->unverified = Room::whereNull('last_verified_at')
             ->where('is_gated', false)
@@ -88,6 +106,18 @@ class MapCommand extends Command
                     $path = $graph->pathToNearest($current, $isTarget);
 
                     if ($path === null) {
+                        // Walking is exhausted, but teleport anchors open
+                        // components no walk reaches (~90% of the seeded world
+                        // hangs off them) — jump and carry on.
+                        $jumped = $teleports !== null ? $this->jumpToNextComponent($teleports, $graph) : null;
+
+                        if ($jumped !== null) {
+                            $graph->addRoom($jumped->curRoom, $jumped->exits);
+                            $current = $jumped->curRoom;
+
+                            continue;
+                        }
+
                         $this->info(sprintf(
                             'No reachable targets remain — component fully mapped (%d unreachable rooms still unverified).',
                             count($this->unverified),
@@ -166,6 +196,46 @@ class MapCommand extends Command
         ));
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Jump to the next teleport anchor worth spidering from: one whose landing
+     * room is unknown to us (discovery — items are free and not consumed, so a
+     * blind jump costs nothing) or still unverified. Each anchor is used at
+     * most once per run, so this always terminates.
+     */
+    private function jumpToNextComponent(TeleportService $teleports, RoomGraph $graph): ?RoomBlob
+    {
+        $candidates = [...$teleports->discoveryTargets(), ...$teleports->usableAnchors()];
+
+        foreach ($candidates as $anchor) {
+            if (isset($this->usedAnchors[$anchor->id])) {
+                continue;
+            }
+
+            $this->usedAnchors[$anchor->id] = true;
+
+            $landing = $anchor->room_id;
+
+            if ($landing !== null && $graph->has($landing) && ! isset($this->unverified[$landing])) {
+                // Known, already-verified landing room: only worth the jump if
+                // its component still holds unverified rooms.
+                if ($graph->pathToNearest($landing, fn (int $roomId): bool => ! $graph->has($roomId) || isset($this->unverified[$roomId])) === null) {
+                    continue;
+                }
+            }
+
+            try {
+                $blob = $teleports->jump($anchor);
+                $this->line("Teleported with {$anchor->name} → {$blob->curRoom} {$blob->name}.");
+
+                return $blob;
+            } catch (GameException $exception) {
+                $this->warn("{$anchor->name}: {$exception->getMessage()}");
+            }
+        }
+
+        return null;
     }
 
     /**
