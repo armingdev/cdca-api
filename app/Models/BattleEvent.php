@@ -24,6 +24,8 @@ class BattleEvent extends Model
         'kind',
         'mob_id',
         'opponent_name',
+        'opponent_player_id',
+        'opponent_level',
         'room_id',
         'battle_id',
         'outcome',

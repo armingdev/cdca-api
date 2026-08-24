@@ -1,0 +1,276 @@
+<!-- Main Content starts Here -->
+<div id="content" class="main-content">
+    <div class="layout-px-spacing">
+
+        <!-- Original code here -->
+        <div id="tooltip" style="position:absolute;visibility:hidden"></div>
+
+        <div id="levelup" style="background-color: green;border: black;width: 100%; height=50px;display: none;"><table width=100% height=50 cellpadding=0 cellspacing=0 border=0>
+        <td background="/landing/levelupbg.jpg" height=50><div align="center">
+            <table width=600 height=50 cellpadding=0 cellspacing=0 border=0>
+            <td align="center" valign="middle"><a rel="shadowbox;height=510;width=778" class="sbox new-user-level-up" href="levelup.php" onclick="javascript:hidelevelup();"><img src="/landing/levelupcenter.jpg" height="50" border=0></a></td>
+            </table></div>
+        </td>
+        </table></div>
+
+        <div class="row justify-content-center" id="content-header-row">
+
+<script>
+function showAdmin() {
+    admin = document.getElementById('admin_functions');
+    alink = document.getElementById('admin_link');
+
+    if (admin.style.display == "block") {
+        admin.style.display = "none";
+        alink.innerHTML = "Show Admin Functions...";
+    } else {
+        admin.style.display = "block";
+        alink.innerHTML = "Hide Admin Functions...";
+    }
+}
+</script>
+
+<style>
+	
+.table-striped tbody tr:nth-of-type(odd) {
+    background-color: rgb(106 106 167 / 12%) !important;
+}
+
+.card {
+    background: #060818;
+    margin-bottom: 15px;
+}
+
+.card-title {
+    margin-bottom: 0.75rem !important;
+}
+
+.card-title a {
+    color: #007bff;
+    font-size: 14px;
+    float: right;
+    margin-left: 5px;
+}
+
+.table td {
+	padding-top: 4px;
+	padding-bottom: 4px;
+}
+
+
+.table > tbody:before {
+  content: "";
+  }
+</style>
+
+
+<div class="col-lg-6 col-12 layout-spacing">
+    <div class="widget-content widget-content-area br-6">
+        <h2>Asylum</h2>
+        <div class="row">
+            <div class="col-6 pr-1">
+                <ul class="list-group text-left">
+                    <li class="list-group-item"><b>Created On:</b> 07/23/2015</li>
+                    <li class="list-group-item"><b>Leader:</b> <a
+                            href="/characters/267464">DaInfamousScareCr0w</a></li>
+                </ul>
+            </div>
+            <div class="col-6 pl-1">
+                <ul class="list-group text-left">
+                    <li class="list-group-item"><b>Total Members:</b> 33</li>
+                    <li class="list-group-item"><b>Average Level:</b> 47</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="row mt-2">
+
+        
+		<div class="col-6">
+			<a href="trade?isCrewTrade=1&tradeWith=17785"><svg style="vertical-align: bottom;" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-columns"><path d="M12 3h7a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-7m0-18H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h7m0-18v18"></path></svg> Trade</a>
+		</div>
+		<div class="col-6">
+		<a href="/treasury?search_for=Asylum"><svg style="vertical-align: bottom;" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-box"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg> Treasury Items</a>
+		</div>
+        </div>
+
+        <div class="row mt-2">
+            <div class="col">
+                <a href="crew_raidresults.php?crewid=17785&most_recent=1"><svg style="vertical-align: bottom;" xmlns="http://www.w3.org/2000/svg"
+                        width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round" class="feather feather-crosshair">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="22" y1="12" x2="18" y2="12"></line>
+                        <line x1="6" y1="12" x2="2" y2="12"></line>
+                        <line x1="12" y1="6" x2="12" y2="2"></line>
+                        <line x1="12" y1="22" x2="12" y2="18"></line>
+                    </svg> Raid Results</a>
+            </div>
+            <div class="col">
+                <a href="crew_trophyroom.php?crewid=17785"><svg style="vertical-align: bottom;" xmlns="http://www.w3.org/2000/svg" width="20"
+                        height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round" class="feather feather-award">
+                        <circle cx="12" cy="8" r="7"></circle>
+                        <polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"></polyline>
+                    </svg> Trophy Case</a>
+            </div>
+        </div>
+
+        <div class="mt-3 pt-3" style="border-top-color:#474565;border-top-style:solid;border-top-width: 1px;">
+            <img src="https://upload.outwar.com/crewuploaded/s17785.jpg" width="450" height="225">
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-body">
+                <h5 class="card-title">CREW UPGRADES</h5>
+
+                <div>
+                                        <img border="0" src="/images/crewup/gps.gif"
+                        ONMOUSEOVER="popup(event,'<div style=&quot;width:200px&quot;><b>Global Positioning System (Level 0/50 +0)</b><br>Increases chance a crew member will assist you in a fight. Each upgrade gives an additional 1% chance.</div>','808080')"
+                        ; ONMOUSEOUT="kill()">
+                                        <img border="0" src="/images/crewup/depository.gif"
+                        ONMOUSEOVER="popup(event,'<div style=&quot;width:200px&quot;><b>Depository (Level 0/10 +10)</b><br>Increases the amount of points that drop for the crew during successful guardian raids. Each upgrade gives a 1% increase.</div>','808080')"
+                        ; ONMOUSEOUT="kill()">
+                                        <img border="0" src="/images/crewup/morale.gif"
+                        ONMOUSEOVER="popup(event,'<div style=&quot;width:200px&quot;><b>Morale (Level 0/15 +0)</b><br>Increases all crew members HP. Each upgrade gives a 1% HP increase.</div>','808080')"
+                        ; ONMOUSEOUT="kill()">
+                                        <img border="0" src="/images/crewup/wardrums.gif"
+                        ONMOUSEOVER="popup(event,'<div style=&quot;width:200px&quot;><b>War Drums (Level 0/20 +0)</b><br>Increases all members ATK. Each upgrade gives a 1% ATK increase.</div>','808080')"
+                        ; ONMOUSEOUT="kill()">
+                                        <img border="0" src="/images/crewup/fury.gif"
+                        ONMOUSEOVER="popup(event,'<div style=&quot;width:200px&quot;><b>Fury (Level 0/10 +0)</b><br>Gives all crew members additional rage per turn. Each upgrade awards 20 rage per turn.</div>','808080')"
+                        ; ONMOUSEOUT="kill()">
+                                        <img border="0" src="/images/crewup/underfire.gif"
+                        ONMOUSEOVER="popup(event,'<div style=&quot;width:200px&quot;><b>Under Fire (Level 0/15 +15)</b><br>All crew members strip more exp from players. Each upgrade gives 1% increase.</div>','808080')"
+                        ; ONMOUSEOUT="kill()">
+                                        <img border="0" src="/images/crewup/resistance.gif"
+                        ONMOUSEOVER="popup(event,'<div style=&quot;width:200px&quot;><b>Essential Resistance (Level 0/15 +0)</b><br>Increases all crew members resistances during crew raids. Each upgrade gives a 1% increase.</div>','808080')"
+                        ; ONMOUSEOUT="kill()">
+                                        <img border="0" src="/images/crewup/power.gif"
+                        ONMOUSEOVER="popup(event,'<div style=&quot;width:200px&quot;><b>Essential Power (Level 0/10 +0)</b><br>Increases all crew members elemental power during crew raids. Each upgrade gives a 1% increase.</div>','808080')"
+                        ; ONMOUSEOUT="kill()">
+                                        <img border="0" src="/images/crewup/maxcap.gif"
+                        ONMOUSEOVER="popup(event,'<div style=&quot;width:200px&quot;><b>Maximum Temper (Level 0/10 +10)</b><br>Increases all crew members max rage cap. Each upgrade increases cap by 200.</div>','808080')"
+                        ; ONMOUSEOUT="kill()">
+                                    </div>
+                <div class="mt-2">
+
+                                        <img style="border:2px inset;" src="/images/items/stone5.png"
+                        ONMOUSEOVER="popup(event,'<b>Orb of Control Lava</b><br>Orb of Control Lava<br /><b>[</b>, Crew<b>]</b><br>+3 Depository<br>+4 Under Fire<br>+3 Maximum Temper<br><font color=\\\'00FF00\\\'></font>','808080')"
+                        ; ONMOUSEOUT="kill()">
+                                        <img style="border:2px inset;" src="/images/items/stone5.png"
+                        ONMOUSEOVER="popup(event,'<b>Orb of Control Lava</b><br>Orb of Control Lava<br /><b>[</b>, Crew<b>]</b><br>+3 Depository<br>+4 Under Fire<br>+3 Maximum Temper<br><font color=\\\'00FF00\\\'></font>','808080')"
+                        ; ONMOUSEOUT="kill()">
+                                        <img style="border:2px inset;" src="/images/items/stone5.png"
+                        ONMOUSEOVER="popup(event,'<b>Orb of Control Lava</b><br>Orb of Control Lava<br /><b>[</b>, Crew<b>]</b><br>+3 Depository<br>+4 Under Fire<br>+3 Maximum Temper<br><font color=\\\'00FF00\\\'></font>','808080')"
+                        ; ONMOUSEOUT="kill()">
+                                        <img style="border:2px inset;" src="/images/items/stone5.png"
+                        ONMOUSEOVER="popup(event,'<b>Orb of Control Lava</b><br>Orb of Control Lava<br /><b>[</b>, Crew<b>]</b><br>+3 Depository<br>+4 Under Fire<br>+3 Maximum Temper<br><font color=\\\'00FF00\\\'></font>','808080')"
+                        ; ONMOUSEOUT="kill()">
+                                        <img style="border:2px inset; height:32px; width:32px;" src="/images/spacer.gif">
+                                    </div>
+
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-body">
+                <h5 class="card-title">CREW ALLIES</h5>
+
+                <div class="row">
+
+                                    </div>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-body">
+                <h5 class="card-title">CREW ENEMIES</h5>
+
+                <div class="row">
+
+                                    </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+
+<div class="col-lg-6 col-12 layout-spacing">
+    <div class="widget-content widget-content-area br-6">
+		<div class="text-left">
+			Looking For Loyal Active Members!Looking For A Raid Team Too!
+					</div>
+
+		<div class="table-responsive">
+			<table class="table table-bordered table-striped" width="100%" bordercolorlight="#000000">
+				<thead>
+					<th>Rank</th>
+					<th>Name</th>
+					<th>Level</th>
+				</thead>				
+
+										<tr>
+						<td> Leader</td>
+						<td><a href="profile.php?id=267464">DaInfamousScareCr0w</a></td>
+						<td>70</td>
+						</tr>
+											<tr>
+						<td> Leader</td>
+						<td><a href="profile.php?id=267482">TheNightKing</a></td>
+						<td>59</td>
+						</tr>
+											<tr>
+						<td> Psychopathic Roiter Manager</td>
+						<td><a href="profile.php?id=37096">HighLando</a></td>
+						<td>73</td>
+						</tr>
+											<tr>
+						<td> Psychopathic Roiter Manager</td>
+						<td><a href="profile.php?id=143147">Serendipity</a></td>
+						<td>75</td>
+						</tr>
+											<tr>
+						<td> Psychopathic Roiter</td>
+						<td><a href="profile.php?id=123683">KottonMouthKings</a></td>
+						<td>72</td>
+						</tr>
+											
+<!-- 28 further rows trimmed for fixture -->
+</table>
+				</div>
+
+	</div>
+</div>
+
+        
+<style>
+#foot_box {
+position: relative;
+width: 973px;
+background-color:#2b2b2b;
+font-size: 10px;
+font-weight: bold;
+text-align: center;
+padding: 10px;
+}
+
+#foot_box #foot_right {
+    position: absolute;
+    top: 3px;
+    right: 0px;
+    width: 100px;
+    vertical-align: middle;
+    border-style: none;
+    border: 0px;
+    background-color: #2b2b2b;
+    text-align: center;
+}
+
+</style>
+
+</div> <!-- end row -->
+        
+            </div>
+            

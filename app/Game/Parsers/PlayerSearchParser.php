@@ -3,15 +3,21 @@
 namespace App\Game\Parsers;
 
 use App\Game\Data\PlayerSearchResult;
+use App\Game\Parsers\Concerns\ParsesAttackWindows;
 use Symfony\Component\DomCrawler\Crawler;
 
 /**
  * Parses playersearch.php results. Each row wires its attack via
  * showAttackWindow(name, playerId, defaultRage, hash) — the hash is the
  * per-render token needed for the PvP attack POST.
+ *
+ * Shares its extraction with the hitlist parsers via ParsesAttackWindows, so
+ * rows that pass the optional 5th `redir` argument still match.
  */
 class PlayerSearchParser
 {
+    use ParsesAttackWindows;
+
     /**
      * @return list<PlayerSearchResult>
      */
@@ -22,17 +28,17 @@ class PlayerSearchParser
 
         foreach ($crawler->filter('a') as $node) {
             $anchor = new Crawler($node);
-            $onclick = (string) $anchor->attr('onclick');
+            $attack = $this->attackWindowFrom($anchor);
 
-            if (! preg_match("/showAttackWindow\('(.*?)','(\d+)','(\d+)','([a-f0-9]+)'\)/", $onclick, $m)) {
+            if ($attack === null) {
                 continue;
             }
 
-            $results[(int) $m[2]] = new PlayerSearchResult(
-                name: $m[1],
-                playerId: (int) $m[2],
-                defaultRage: (int) $m[3],
-                hash: $m[4],
+            $results[$attack['playerId']] = new PlayerSearchResult(
+                name: $attack['name'],
+                playerId: $attack['playerId'],
+                defaultRage: $attack['rage'],
+                hash: $attack['hash'],
                 level: $this->levelFromRow($anchor),
             );
         }

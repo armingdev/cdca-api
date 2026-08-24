@@ -1,6 +1,7 @@
 <?php
 
 use App\Game\Combat\PvpRunner;
+use App\Game\Combat\Targets\NameListTargetSource;
 use App\Game\Engine\PvpRunConfig;
 use App\Models\BattleEvent;
 use App\Models\Character;
@@ -16,10 +17,13 @@ it('attacks each target the configured number of times', function () {
 
     fakePvpWorld();
 
-    $summary = PvpRunner::forCharacter($character, new PvpRunConfig(
-        targets: ['OFFENSIVE', 'offensive2'],
-        attacksPerTarget: 2,
-    ))->run(log: fn (string $m) => null);
+    $config = new PvpRunConfig(targets: ['OFFENSIVE', 'offensive2'], attacksPerTarget: 2);
+
+    $summary = PvpRunner::forCharacter(
+        $character,
+        $config,
+        NameListTargetSource::forNames($character, $config->targets),
+    )->run(log: fn (string $m) => null);
 
     expect($summary->completed)->toBeTrue()
         ->and($summary->attacks)->toBe(4)
@@ -32,10 +36,13 @@ it('stops at the rage floor before attacking', function () {
 
     fakePvpWorld(rage: 1000);
 
-    $summary = PvpRunner::forCharacter($character, new PvpRunConfig(
-        targets: ['OFFENSIVE'],
-        stopRage: 2500,
-    ))->run(log: fn (string $m) => null);
+    $config = new PvpRunConfig(targets: ['OFFENSIVE'], stopRage: 2500);
+
+    $summary = PvpRunner::forCharacter(
+        $character,
+        $config,
+        NameListTargetSource::forNames($character, $config->targets),
+    )->run(log: fn (string $m) => null);
 
     expect($summary->completed)->toBeFalse()
         ->and($summary->attacks)->toBe(0)

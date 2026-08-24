@@ -24,6 +24,8 @@ class BattleEventResource extends JsonResource
             'mob_id' => $this->mob_id,
             'mob' => $this->when($this->relationLoaded('mob') && $this->mob !== null, fn () => $this->mob?->name),
             'opponent_name' => $this->opponent_name,
+            'opponent_player_id' => $this->opponent_player_id,
+            'opponent_level' => $this->opponent_level,
             'room_id' => $this->room_id,
             'battle_id' => $this->battle_id,
             'exp_gained' => $this->exp_gained,

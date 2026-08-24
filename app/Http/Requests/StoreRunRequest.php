@@ -46,11 +46,27 @@ class StoreRunRequest extends FormRequest
             // quest-list mode
             'quest_list_id' => ['required_if:mode,quest-list', 'integer', 'exists:quest_lists,id'],
 
-            // pvp mode
-            'targets' => ['required_if:mode,pvp', 'array'],
+            // pvp — attack-list mode takes either a saved list or inline names
+            'attack_list_id' => ['sometimes', 'nullable', 'integer', 'exists:attack_lists,id'],
+            'targets' => [
+                'array',
+                // Inline names are required only when no saved list is given.
+                Rule::requiredIf(fn (): bool => $this->input('mode') === RunMode::PvpAttackList->value
+                    && ! $this->filled('attack_list_id')),
+            ],
             'targets.*' => ['string', 'max:255'],
-            'attack_rage' => ['sometimes', 'integer', 'between:2,50'],
+
+            // pvp — crew-members mode
+            'crew_game_id' => ['required_if:mode,pvp-crew-members', 'integer', 'min:1'],
+
+            // pvp — shared options.
+            // No attack_rage: the rage cost is supplied by the server per
+            // target (VERIFIED 2026-08-22), so a client value would be wrong.
             'attacks_per_target' => ['sometimes', 'integer', 'min:1'],
+            'max_attacks' => ['sometimes', 'nullable', 'integer', 'min:1'],
+            'skip_too_strong' => ['sometimes', 'boolean'],
+            'auto_enter_brawl' => ['sometimes', 'boolean'],
+            'cooldown_minutes' => ['sometimes', 'integer', 'min:1', 'max:60'],
             'message' => ['sometimes', 'nullable', 'string', 'max:255'],
         ];
     }

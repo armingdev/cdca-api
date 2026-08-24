@@ -25,7 +25,8 @@ use Illuminate\Support\Collection;
     {--quest= : (quest mode) Quest id to run}
     {--list= : (quest-list mode) Quest list name}
     {--target=* : (pvp mode) Player name(s) to attack}
-    {--attack-rage=50 : (pvp mode) PvP power per attack (2-50)}
+    {--crew= : (pvp crew-members mode) Crew id to pull members from}
+    {--auto-enter-brawl : (pvp brawl modes) Register for the round if not entered}
     {--attacks=1 : (pvp mode) Attacks per target}
     {--message= : (pvp mode) Optional attack message}
     {--stop-rage=2500 : Per-character rage floor}
@@ -107,29 +108,34 @@ class RunStartCommand extends Command
             RunMode::Mob => $this->buildMobConfig(),
             RunMode::Quest => $this->buildQuestConfig(),
             RunMode::QuestList => $this->buildQuestListConfig(),
-            RunMode::Pvp => $this->buildPvpConfig(),
+            RunMode::PvpAttackList => $this->buildPvpConfig(),
+            RunMode::PvpCrewHitlist,
+            RunMode::PvpCrewMembers,
+            RunMode::PvpBrawl,
+            RunMode::PvpFactionBrawl => $this->buildPvpConfig(requireTargets: false),
         };
     }
 
     /**
      * @return array<string, mixed>|null
      */
-    private function buildPvpConfig(): ?array
+    private function buildPvpConfig(bool $requireTargets = true): ?array
     {
         $targets = array_values((array) $this->option('target'));
 
-        if ($targets === []) {
-            $this->error('PvP mode needs at least one --target="PlayerName".');
+        if ($requireTargets && $targets === []) {
+            $this->error('PvP attack-list mode needs at least one --target="PlayerName".');
 
             return null;
         }
 
         return (new PvpRunConfig(
             targets: $targets,
-            attackRage: (int) $this->option('attack-rage'),
+            crewGameId: $this->option('crew') !== null ? (int) $this->option('crew') : null,
             attacksPerTarget: (int) $this->option('attacks'),
             stopRage: (int) $this->option('stop-rage'),
             message: (string) ($this->option('message') ?? ''),
+            autoEnterBrawl: (bool) $this->option('auto-enter-brawl'),
         ))->toArray();
     }
 

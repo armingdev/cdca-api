@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\Api\V1\AttackListController;
+use App\Http\Controllers\Api\V1\AttackListTargetController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CharacterController;
 use App\Http\Controllers\Api\V1\CharacterSkillController;
@@ -65,6 +67,10 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('quest-lists', QuestListController::class)->except(['update']);
         Route::post('quest-lists/{questList}/items', [QuestListItemController::class, 'store']);
         Route::delete('quest-lists/{questList}/items/{position}', [QuestListItemController::class, 'destroy']);
+
+        Route::apiResource('attack-lists', AttackListController::class)->except(['update']);
+        Route::post('attack-lists/{attackList}/targets', [AttackListTargetController::class, 'store']);
+        Route::delete('attack-lists/{attackList}/targets/{position}', [AttackListTargetController::class, 'destroy']);
 
         // Runs — the automation engine.
         Route::apiResource('runs', RunController::class)->only(['index', 'store', 'show', 'destroy']);

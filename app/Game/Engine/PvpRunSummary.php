@@ -9,5 +9,9 @@ final readonly class PvpRunSummary
         public int $attacks,
         public string $stopReason,
         public RunEndReason $endReason,
+        public int $wins = 0,
+        public int $losses = 0,
+        public int $skippedOnCooldown = 0,
+        public ?int $nextFreeInMinutes = null,
     ) {}
 }

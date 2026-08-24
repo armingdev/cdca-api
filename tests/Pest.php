@@ -1,6 +1,7 @@
 <?php
 
 use App\Game\Enums\RunMode;
+use App\Jobs\RunBrawlJob;
 use App\Jobs\RunJob;
 use App\Jobs\RunMobJob;
 use App\Jobs\RunPvpJob;
@@ -78,7 +79,10 @@ function makeRunJob(RunParticipant $participant): RunJob
         RunMode::Mob => new RunMobJob($participant, $token),
         RunMode::Quest => new RunQuestJob($participant, $token),
         RunMode::QuestList => new RunQuestListJob($participant, $token),
-        RunMode::Pvp => new RunPvpJob($participant, $token),
+        RunMode::PvpBrawl, RunMode::PvpFactionBrawl => new RunBrawlJob($participant, $token),
+        RunMode::PvpAttackList,
+        RunMode::PvpCrewHitlist,
+        RunMode::PvpCrewMembers => new RunPvpJob($participant, $token),
     };
 }
 
@@ -616,6 +620,11 @@ function fakePvpWorld(int $rage = 50000): void
 
         if (str_contains($url, 'userstats.php')) {
             return Http::response(json_encode(['exp' => '1,000', 'rage' => number_format($rage), 'level' => '80', 'width' => 0]));
+        }
+
+        if (str_contains($url, 'attacklog')) {
+            // No prior attacks: nothing on cooldown.
+            return Http::response('<html><table></table></html>');
         }
 
         if (str_contains($url, 'playersearch.php')) {

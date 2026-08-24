@@ -16,4 +16,19 @@ final readonly class PlayerSearchResult
         public string $hash,
         public ?int $level,
     ) {}
+
+    /**
+     * The uniform target shape the PvP engine works in, so search results,
+     * hitlist rows, crew members and brawl standings are interchangeable.
+     */
+    public function toAttackTarget(): AttackTarget
+    {
+        return new AttackTarget(
+            playerId: $this->playerId,
+            name: $this->name,
+            level: $this->level,
+            hash: $this->hash,
+            rageCost: $this->defaultRage,
+        );
+    }
 }
