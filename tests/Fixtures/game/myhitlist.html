@@ -1,0 +1,121 @@
+<!-- Main Content starts Here -->
+<div id="content" class="main-content">
+    <div class="layout-px-spacing">
+
+        <!-- Original code here -->
+        <div id="tooltip" style="position:absolute;visibility:hidden"></div>
+
+        <div id="levelup" style="background-color: green;border: black;width: 100%; height=50px;display: none;"><table width=100% height=50 cellpadding=0 cellspacing=0 border=0>
+        <td background="/landing/levelupbg.jpg" height=50><div align="center">
+            <table width=600 height=50 cellpadding=0 cellspacing=0 border=0>
+            <td align="center" valign="middle"><a rel="shadowbox;height=510;width=778" class="sbox new-user-level-up" href="levelup.php" onclick="javascript:hidelevelup();"><img src="/landing/levelupcenter.jpg" height="50" border=0></a></td>
+            </table></div>
+        </td>
+        </table></div>
+
+        <div class="row justify-content-center" id="content-header-row">
+<div id="" class="col-lg-10 layout-spacing">
+	<div class="statbox widget box box-shadow">
+		<div class="widget-header">
+			<div class="row">
+				<div class="col-xl-12 col-md-12 col-sm-12 col-12">
+					<h4>My Personal Hit List</h4>
+				</div>
+			</div>
+		</div>
+		<div class="widget-content widget-content-area">
+			<form method="post">
+				<div class="form-row mb-4">
+					<div class="form-group col-md-6 text-left">
+						<label for="inputEmail4">Name</label>
+						<input type="text" class="form-control" name="hitname" placeholder="name">
+					</div>
+					<div class="form-group col-md-6 text-left">
+						<label for="inputPassword4">Reason</label>
+						<input type="text" class="form-control" placeholder="reason" name="hitreason">
+					</div>
+
+					<button type="submit" class="btn btn-primary mt-3" name="submit">Add to hitlist</button>
+
+				</div>
+
+			</form>
+
+			<div class="table-responsive">
+				<form method="post">
+
+					<table class="table table-striped mb-4">
+						<thead>
+							<tr>
+								<th>Name</th>
+								<th>Level</th>
+								<th>Reason</th>
+								<th>Hits</th>
+								<th>Remove</th>
+							</tr>
+						</thead>
+						<tbody>
+															<tr>
+									<td >
+																				<a href="javascript:void(0);"
+											onclick="showAttackWindow('iRoNIvIaiDeN','14620','500','f49cf6ab')"><img
+												alt="Attack!" border="0" src="images/atk_player_icon.jpg"
+												onMouseOver="popup(event,'Attack');" onMouseOut="kill();" /></a>
+										<a href="profile.php?id=14620">iRoNIvIaiDeN</a>
+									</td>
+									<td >
+										<font color="#00FFFF">
+											40										</font>
+									</td>
+									<td >mali</td>
+									<td ><a href="javascript:pophits(14620)">
+
+											0</a></td>
+
+									<td  align="center"><input type="checkbox" name="remove[]"
+											value="14620"></td>
+								</tr>
+													</tbody>
+					</table>
+
+					<input type="submit" name="subrem" class="btn btn-danger mb-3" value="Remove selected">
+				</form>
+
+
+				<b>Key:</b>
+				<font color="#00FF00">Green</font> - Too weak to attack | <font color="#00FFff">Blue</font>
+				- In range to attack | <font color="#FF0000">Red</font> - Too powerful to
+				attack
+			</div>
+		</div>
+	</div>
+	        
+<style>
+#foot_box {
+position: relative;
+width: 973px;
+background-color:#2b2b2b;
+font-size: 10px;
+font-weight: bold;
+text-align: center;
+padding: 10px;
+}
+
+#foot_box #foot_right {
+    position: absolute;
+    top: 3px;
+    right: 0px;
+    width: 100px;
+    vertical-align: middle;
+    border-style: none;
+    border: 0px;
+    background-color: #2b2b2b;
+    text-align: center;
+}
+
+</style>
+
+</div> <!-- end row -->
+        
+            </div>
+            

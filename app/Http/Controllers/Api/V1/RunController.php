@@ -15,6 +15,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreRunRequest;
 use App\Http\Resources\BattleEventResource;
 use App\Http\Resources\RunResource;
+use App\Models\AttackList;
 use App\Models\BattleEvent;
 use App\Models\Character;
 use App\Models\QuestList;
@@ -208,14 +209,40 @@ class RunController extends Controller
                 smart: $smart,
             ))->toArray(),
 
-            RunMode::Pvp => (new PvpRunConfig(
-                targets: $request->validated('targets'),
-                attackRage: $request->integer('attack_rage', 50),
+            // All five PvP modes share one config; they differ only in which
+            // target-source field the factory reads.
+            RunMode::PvpAttackList,
+            RunMode::PvpCrewHitlist,
+            RunMode::PvpCrewMembers,
+            RunMode::PvpBrawl,
+            RunMode::PvpFactionBrawl => (new PvpRunConfig(
+                targets: $request->validated('targets') ?? [],
+                attackListId: $request->filled('attack_list_id')
+                    ? $this->ownedAttackListId($request, $userId)
+                    : null,
+                crewGameId: $request->filled('crew_game_id') ? $request->integer('crew_game_id') : null,
                 attacksPerTarget: $request->integer('attacks_per_target', 1),
                 stopRage: $stopRage,
                 message: (string) $request->input('message', ''),
+                skipTooStrong: $request->boolean('skip_too_strong', true),
+                autoEnterBrawl: $request->boolean('auto_enter_brawl'),
+                maxAttacks: $request->filled('max_attacks') ? $request->integer('max_attacks') : null,
+                cooldownMinutes: $request->integer('cooldown_minutes', 60),
             ))->toArray(),
         };
+    }
+
+    private function ownedAttackListId(StoreRunRequest $request, int $userId): int
+    {
+        $attackList = AttackList::where('id', $request->integer('attack_list_id'))
+            ->where('user_id', $userId)
+            ->first();
+
+        if ($attackList === null) {
+            throw ValidationException::withMessages(['attack_list_id' => ['Attack list not found.']]);
+        }
+
+        return $attackList->id;
     }
 
     private function ownedQuestListId(StoreRunRequest $request, int $userId): int

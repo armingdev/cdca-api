@@ -307,14 +307,14 @@ it('starts a pvp run and queues a RunPvpJob with the target config', function ()
 
     $this->artisan('outwar:run-start', [
         '--characters' => [(string) $character->id],
-        '--mode' => 'pvp',
+        '--mode' => 'pvp-attack-list',
         '--target' => ['OFFENSIVE', 'offensive2'],
         '--attacks' => 3,
     ])->assertSuccessful();
 
     $run = Run::first();
 
-    expect($run->mode)->toBe(RunMode::Pvp)
+    expect($run->mode)->toBe(RunMode::PvpAttackList)
         ->and($run->config['targets'])->toBe(['OFFENSIVE', 'offensive2'])
         ->and($run->config['attacks_per_target'])->toBe(3);
 
@@ -327,7 +327,7 @@ it('executes a pvp job end to end and completes the run', function () {
     $character = Character::factory()->for(Rga::factory()->withSession())->create();
     $participant = RunParticipant::factory()
         ->for(Run::factory()->state([
-            'mode' => RunMode::Pvp,
+            'mode' => RunMode::PvpAttackList,
             'config' => ['targets' => ['OFFENSIVE'], 'attacks_per_target' => 1, 'stop_rage' => 2500],
             'status' => RunStatus::Running,
         ]))

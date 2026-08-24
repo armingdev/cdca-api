@@ -1,0 +1,592 @@
+<!-- Main Content starts Here -->
+<div id="content" class="main-content">
+    <div class="layout-px-spacing">
+
+        <!-- Original code here -->
+        <div id="tooltip" style="position:absolute;visibility:hidden"></div>
+
+        <div id="levelup" style="background-color: green;border: black;width: 100%; height=50px;display: none;"><table width=100% height=50 cellpadding=0 cellspacing=0 border=0>
+        <td background="/landing/levelupbg.jpg" height=50><div align="center">
+            <table width=600 height=50 cellpadding=0 cellspacing=0 border=0>
+            <td align="center" valign="middle"><a rel="shadowbox;height=510;width=778" class="sbox new-user-level-up" href="levelup.php" onclick="javascript:hidelevelup();"><img src="/landing/levelupcenter.jpg" height="50" border=0></a></td>
+            </table></div>
+        </td>
+        </table></div>
+
+        <div class="row justify-content-center" id="content-header-row">
+
+<style>
+    #divGlad {
+        margin-top: 4px;
+        margin-bottom: 50px;
+    }
+
+    #divGlad #divHeader {
+        position: relative;
+    }
+
+    #divGlad #divHeader img {
+        border: 4px solid #2b2b2b;
+    }
+
+    #divGlad #divHeader h1 {
+        position: absolute;
+        font-size: 40px;
+        right: 50px;
+        top: 70px;
+    }
+
+    #divGlad h3 {
+        position: absolute;
+        left: 65px;
+        top: 10px;
+        font-size: 3em;
+    }
+
+    #divGlad .divData {
+        margin-top: 4px;
+    }
+
+    .divQuest {
+        background-color: #1B1B1B;
+        border-top: 4px solid #2b2b2b;
+        border-bottom: 4px solid #2b2b2b;
+        border-left: 4px solid #2b2b2b;
+        border-right: 4px solid #2b2b2b;
+        margin-top: 4px;
+        position: relative;
+        display: inline-block;
+    }
+
+    .divQuest2 {
+        background-color: #1B1B1B;
+        border-top: 4px solid #2b2b2b;
+        border-bottom: 4px solid #2b2b2b;
+        border-left: 4px solid #2b2b2b;
+        border-right: 4px solid #2b2b2b;
+        margin-top: 4px;
+        position: relative;
+        display: inline-block;
+        float: right;
+    }
+
+    .divQuestTitle {
+        padding: 10px;
+        border-bottom: 4px solid #2b2b2b;
+        text-align: center;
+    }
+
+    .divQuestTitle2 {
+        border-bottom: 2px solid #2b2b2b;
+        font-size: 1.6em;
+    }
+
+    .divQuestTime {
+        padding: 10px;
+        text-align: center;
+        margin-top: 20px;
+    }
+
+    #divGlad .divData .divQuest .divQuestTitle h1 small {
+        font-size: .5em;
+        color: rgb(80, 80, 80);
+        float: right;
+        line-height: 25px;
+    }
+
+    #divGlad .divData .divQuest .divQuestMob {
+        float: right;
+        background-color: #2b2b2b;
+    }
+
+    #divGlad .divData .divQuest .divQuestMob img {
+        width: 200px;
+        height: 198px;
+        border-bottom: 2px solid #2b2b2b;
+    }
+
+    #divGlad .divData .divQuest .divQuestReq {
+        background-color: #333333;
+        height: 48px;
+        display: flex;
+        justify-content: left;
+        border-bottom: 2px solid #2b2b2b;
+    }
+
+    #divGlad .divData .divQuest .divQuestReq2 {
+        background-color: #1B1B1B;
+        height: 48px;
+        display: flex;
+        justify-content: left;
+        border-bottom: 2px solid #2b2b2b;
+    }
+
+    #divGlad .divData .divQuest .divQuestReq .divQuestText {
+        align-self: center;
+        padding-left: 6px;
+        font-size: 1.6em;
+    }
+
+    #divGlad .divData .divQuest .divQuestReq2 .divQuestText {
+        align-self: center;
+        padding-left: 6px;
+        font-size: 1.6em;
+    }
+
+    .grid-container {
+        display: grid;
+        grid-template-columns: auto auto auto auto;
+    }
+
+    .grid-container2 {
+        display: grid;
+        grid-template-columns: auto auto auto auto;
+    }
+
+    .grid-item {
+        padding: 2px 6px 2px 6px;
+        font-size: 16px;
+        overflow: hidden;
+    }
+
+    .clock-builder-output {
+        margin: 0 auto;
+        padding-top: 14px;
+        padding-bottom: 6px;
+        width: 370px;
+    }
+</style>
+
+<div class="col-12 col-lg-6">
+    <div class="widget-content widget-content-area">
+        <h4>PvP Brawl</h4>
+        <ul class="list-group striped-list text-left">
+                        <li class="list-group-item pl-3"><b>Start Date:</b> August 31st 8:00AM</li>
+
+                        <li class="list-group-item pl-3"><b>End Date:</b> August 31st 8:00PM</li>
+            <li class="list-group-item pl-3"><b>Participants:</b>
+                3            </li>
+            <li class="list-group-item pl-3"><b>Rewards:</b> Top 30</li>
+        </ul>
+        <p class="mt-3 text-left">
+                            Every fortnight level 85 players can enter and participate in the PvP Brawl. Starting every second Monday at
+                8am and ending at 8pm, players can attack all other participants 10 times each at any time during the 12
+                hour Brawl. At the end of the Brawl the top 30 ranked players determined by win count will be awarded ranked
+                chests containing Eminent Arena Coins. These coins can be exchanged with the Eminent Mentor.<br>
+                    </p>
+        <h5>
+            Brawl starts in        </h5>
+        <div class="clock-builder-output clock-builder-output-179"></div>
+
+                        <h3 class="mt-3"><a href="/closedpvp?enter=1&type=0"><svg style="vertical-align: baseline;"
+                            xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                            class="feather feather-user-plus">
+                            <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="8.5" cy="7" r="4"></circle>
+                            <line x1="20" y1="8" x2="20" y2="14"></line>
+                            <line x1="23" y1="11" x2="17" y2="11"></line>
+                        </svg> ENTER BRAWL <svg style="vertical-align: baseline;" xmlns="http://www.w3.org/2000/svg" width="24"
+                            height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round" class="feather feather-user-plus">
+                            <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="8.5" cy="7" r="4"></circle>
+                            <line x1="20" y1="8" x2="20" y2="14"></line>
+                            <line x1="23" y1="11" x2="17" y2="11"></line>
+                        </svg></a></h3>
+            </div>
+
+    <div class="widget-content widget-content-area mt-3">
+        <h4><img src="img/iconfinder_Medal.png" height="48"> Previous Champions <img src="img/iconfinder_Medal.png"
+                height="48"></h4>
+
+        <table class="table table-striped">
+            <thead>
+                <th>
+                    Character
+                </th>
+                <th>
+                    Wins
+                </th>
+                <th>
+                    Date
+                </th>
+            </thead>
+
+                            <tr>
+                    <td><a href="profile?id=5814">PaasHaaS</a></td>
+                    <td>
+                        220                    </td>
+                    <td><a href="/closedpvp?roundid=177&type=0">Aug-17</a>
+                    </td>
+                </tr>
+                                <tr>
+                    <td><a href="profile?id=6066">BeastOfTheStorms</a></td>
+                    <td>
+                        220                    </td>
+                    <td><a href="/closedpvp?roundid=175&type=0">Aug-3</a>
+                    </td>
+                </tr>
+                                <tr>
+                    <td><a href="profile?id=1155886">MoistDanny</a></td>
+                    <td>
+                        150                    </td>
+                    <td><a href="/closedpvp?roundid=173&type=0">Jul-20</a>
+                    </td>
+                </tr>
+                                <tr>
+                    <td><a href="profile?id=5814">PaasHaaS</a></td>
+                    <td>
+                        240                    </td>
+                    <td><a href="/closedpvp?roundid=171&type=0">Jul-6</a>
+                    </td>
+                </tr>
+                                <tr>
+                    <td><a href="profile?id=5814">PaasHaaS</a></td>
+                    <td>
+                        410                    </td>
+                    <td><a href="/closedpvp?roundid=169&type=0">Jun-22</a>
+                    </td>
+                </tr>
+                                <tr>
+                    <td><a href="profile?id=1155886">MoistDanny</a></td>
+                    <td>
+                        377                    </td>
+                    <td><a href="/closedpvp?roundid=167&type=0">Jun-8</a>
+                    </td>
+                </tr>
+                                <tr>
+                    <td><a href="profile?id=6066">BeastOfTheStorms</a></td>
+                    <td>
+                        439                    </td>
+                    <td><a href="/closedpvp?roundid=165&type=0">May-25</a>
+                    </td>
+                </tr>
+                                <tr>
+                    <td><a href="profile?id=1155886">MoistDanny</a></td>
+                    <td>
+                        358                    </td>
+                    <td><a href="/closedpvp?roundid=163&type=0">May-11</a>
+                    </td>
+                </tr>
+                                <tr>
+                    <td><a href="profile?id=6066">BeastOfTheStorms</a></td>
+                    <td>
+                        395                    </td>
+                    <td><a href="/closedpvp?roundid=161&type=0">Apr-27</a>
+                    </td>
+                </tr>
+                                <tr>
+                    <td><a href="profile?id=165026">PsychoticBeast</a></td>
+                    <td>
+                        310                    </td>
+                    <td><a href="/closedpvp?roundid=159&type=0">Apr-13</a>
+                    </td>
+                </tr>
+                        </table>
+    </div>
+
+    <div class="widget-content widget-content-area mt-3">
+        <h4><img src="img/trophy.png" height="24"> Top 10 Wins of All Time <img src="img/trophy.png" height="24"></h4>
+
+        <table class="table table-striped">
+            <thead>
+                <th>
+                    Rank
+                </th>
+                <th>
+                    Character
+                </th>
+                <th>
+                    Wins
+                </th>
+                <th>
+                    Date
+                </th>
+            </thead>
+
+                            <tr>
+                    <td>1.</td>
+                    <td><a href="profile?id=6066">BeastOfTheStorms</a></td>
+                    <td>
+                        439                    </td>
+                    <td><a href="closedpvp?roundid=165&type=0">May-25</a>
+                    </td>
+                </tr>
+                                <tr>
+                    <td>2.</td>
+                    <td><a href="profile?id=1155886">MoistDanny</a></td>
+                    <td>
+                        438                    </td>
+                    <td><a href="closedpvp?roundid=165&type=0">May-25</a>
+                    </td>
+                </tr>
+                                <tr>
+                    <td>3.</td>
+                    <td><a href="profile?id=2668">Bpakalak</a></td>
+                    <td>
+                        437                    </td>
+                    <td><a href="closedpvp?roundid=165&type=0">May-25</a>
+                    </td>
+                </tr>
+                                <tr>
+                    <td>4.</td>
+                    <td><a href="profile?id=134580">Trio</a></td>
+                    <td>
+                        436                    </td>
+                    <td><a href="closedpvp?roundid=165&type=0">May-25</a>
+                    </td>
+                </tr>
+                                <tr>
+                    <td>5.</td>
+                    <td><a href="profile?id=165026">PsychoticBeast</a></td>
+                    <td>
+                        430                    </td>
+                    <td><a href="closedpvp?roundid=165&type=0">May-25</a>
+                    </td>
+                </tr>
+                                <tr>
+                    <td>6.</td>
+                    <td><a href="profile?id=193994">iNDiED</a></td>
+                    <td>
+                        426                    </td>
+                    <td><a href="closedpvp?roundid=165&type=0">May-25</a>
+                    </td>
+                </tr>
+                                <tr>
+                    <td>7.</td>
+                    <td><a href="profile?id=7043">Kruel</a></td>
+                    <td>
+                        425                    </td>
+                    <td><a href="closedpvp?roundid=165&type=0">May-25</a>
+                    </td>
+                </tr>
+                                <tr>
+                    <td>8.</td>
+                    <td><a href="profile?id=265538">champ</a></td>
+                    <td>
+                        420                    </td>
+                    <td><a href="closedpvp?roundid=84&type=0">Jun-24</a>
+                    </td>
+                </tr>
+                                <tr>
+                    <td>9.</td>
+                    <td><a href="profile?id=198628">DaddyDon</a></td>
+                    <td>
+                        420                    </td>
+                    <td><a href="closedpvp?roundid=84&type=0">Jun-24</a>
+                    </td>
+                </tr>
+                                <tr>
+                    <td>10.</td>
+                    <td><a href="profile?id=125436">Kriminal1</a></td>
+                    <td>
+                        419                    </td>
+                    <td><a href="closedpvp?roundid=165&type=0">May-25</a>
+                    </td>
+                </tr>
+                        </table>
+    </div>
+
+    <div class="widget-content widget-content-area mt-3">
+        <h4>Rewards</h4>
+
+        <table class="table table-striped">
+            <thead>
+                <th>
+                    Rank
+                </th>
+                <th>
+                    Reward
+                </th>
+            </thead>
+
+            <tr>
+                <td>1</td>
+                <td>20 Coins</td>
+            </tr>
+            <tr>
+                <td>2</td>
+                <td>17 Coins</td>
+            </tr>
+            <tr>
+                <td>3</td>
+                <td>15 Coins</td>
+            </tr>
+            <tr>
+                <td>4</td>
+                <td>13 Coins</td>
+            </tr>
+            <tr>
+                <td>5</td>
+                <td>11 Coins</td>
+            </tr>
+            <tr>
+                <td>6-8</td>
+                <td>10 Coins</td>
+            </tr>
+            <tr>
+                <td>9-11</td>
+                <td>9 Coins</td>
+            </tr>
+            <tr>
+                <td>12-14</td>
+                <td>8 Coins</td>
+            </tr>
+            <tr>
+                <td>15-17</td>
+                <td>7 Coins</td>
+            </tr>
+            <tr>
+                <td>18-20</td>
+                <td>6 Coins</td>
+            </tr>
+            <tr>
+                <td>21-25</td>
+                <td>5 Coins</td>
+            </tr>
+            <tr>
+                <td>26-30</td>
+                <td>4 Coins</td>
+            </tr>
+        </table>
+    </div>
+</div>
+<div class="col-12 col-lg-6">
+    <div class="widget-content widget-content-area">
+
+        <table class="table table-striped">
+            <thead>
+                <th>
+                    Rank
+                </th>
+                                <th>
+                    Character
+                </th>
+                <th>
+                    Wins
+                </th>
+                <th>
+                    Damage
+                </th>
+                            </thead>
+
+                            <tr>
+
+
+                    <td>1.</td>
+                                        <td><a href="profile?id=113903">Oddy</a></td>
+                    <td>
+                        0                    </td>
+                    <td>
+                        0                    </td>
+                                    </tr>
+                                <tr>
+
+
+                    <td>2.</td>
+                                        <td><a href="profile?id=591">OneEightSe7en</a></td>
+                    <td>
+                        0                    </td>
+                    <td>
+                        0                    </td>
+                                    </tr>
+                                <tr>
+
+
+                    <td>3.</td>
+                                        <td><a href="profile?id=374">XxTheDarkLordxX</a></td>
+                    <td>
+                        0                    </td>
+                    <td>
+                        0                    </td>
+                                    </tr>
+                        </table>
+
+                    <h6><a href="closedpvp?roundid=177&type=0">Previous tournament</a>
+            </h6>
+            </div>
+</div>
+
+
+<script type="text/javascript" src="js/clock_assets/flipclock.js"></script>
+<style text="text/css">
+    body .flip-clock-wrapper ul li a div div.inn,
+    body .flip-clock-small-wrapper ul li a div div.inn {
+        color: #CCCCCC;
+        background-color: #333333;
+    }
+
+    body .flip-clock-dot,
+    body .flip-clock-small-wrapper .flip-clock-dot {
+        background: #323434;
+    }
+
+    body .flip-clock-wrapper .flip-clock-meridium a,
+    body .flip-clock-small-wrapper .flip-clock-meridium a {
+        color: #323434;
+    }
+</style>
+
+
+<script type="text/javascript">
+    $(function () {
+        FlipClock.Lang.Custom = {
+            days: 'Days',
+            hours: 'Hours',
+            minutes: 'Minutes',
+            seconds: 'Seconds'
+        };
+        var opts = {
+            clockFace: 'DailyCounter',
+            countdown: true,
+            language: 'Custom'
+        };
+        opts.classes = {
+            active: 'flip-clock-active',
+            before: 'flip-clock-before',
+            divider: 'flip-clock-divider',
+            dot: 'flip-clock-dot',
+            label: 'flip-clock-label',
+            flip: 'flip',
+            play: 'play',
+            wrapper: 'flip-clock-small-wrapper'
+        };
+
+        var countdown = 1788181200  - ((new Date().getTime()) / 1000);
+
+        countdown = Math.max(1, countdown);
+        $('.clock-builder-output-179').FlipClock(countdown, opts);
+    });
+</script>
+
+        
+<style>
+#foot_box {
+position: relative;
+width: 973px;
+background-color:#2b2b2b;
+font-size: 10px;
+font-weight: bold;
+text-align: center;
+padding: 10px;
+}
+
+#foot_box #foot_right {
+    position: absolute;
+    top: 3px;
+    right: 0px;
+    width: 100px;
+    vertical-align: middle;
+    border-style: none;
+    border: 0px;
+    background-color: #2b2b2b;
+    text-align: center;
+}
+
+</style>
+
+</div> <!-- end row -->
+        
+            </div>
+            

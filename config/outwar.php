@@ -60,4 +60,29 @@ return [
 
     'start_room_id' => 1,
 
+    /*
+    |--------------------------------------------------------------------------
+    | Brawls
+    |--------------------------------------------------------------------------
+    |
+    | The two fortnightly Brawl events (Monday 08:00-20:00 game time, every
+    | 14 days). Reading the pages, tracking the schedule and entering a round
+    | are all verified.
+    |
+    | The *in-window* attack mechanics are not: the 2026-08-22 capture caught
+    | both events dormant, so we do not know whether attacks route through the
+    | usual somethingelse.php, whether the 60-minute per-target cooldown is
+    | suspended inside the window (it must be, for 10 hits per opponent in 12
+    | hours), or where the hits-remaining counter is exposed. Until a live
+    | capture confirms all three, brawl runs enter and observe but do not
+    | attack. Set OUTWAR_BRAWL_ATTACKS_VERIFIED=true once confirmed.
+    |
+    */
+
+    'brawl' => [
+        'attacks_verified' => env('OUTWAR_BRAWL_ATTACKS_VERIFIED', false),
+        'window_hours' => 12,
+        'attacks_per_opponent' => 10,
+    ],
+
 ];

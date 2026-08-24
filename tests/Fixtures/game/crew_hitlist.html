@@ -1,0 +1,290 @@
+<!-- Main Content starts Here -->
+<div id="content" class="main-content">
+    <div class="layout-px-spacing">
+
+        <!-- Original code here -->
+        <div id="tooltip" style="position:absolute;visibility:hidden"></div>
+
+        <div id="levelup" style="background-color: green;border: black;width: 100%; height=50px;display: none;"><table width=100% height=50 cellpadding=0 cellspacing=0 border=0>
+        <td background="/landing/levelupbg.jpg" height=50><div align="center">
+            <table width=600 height=50 cellpadding=0 cellspacing=0 border=0>
+            <td align="center" valign="middle"><a rel="shadowbox;height=510;width=778" class="sbox new-user-level-up" href="levelup.php" onclick="javascript:hidelevelup();"><img src="/landing/levelupcenter.jpg" height="50" border=0></a></td>
+            </table></div>
+        </td>
+        </table></div>
+
+        <div class="row justify-content-center" id="content-header-row">
+<style>
+</style>
+
+
+<div class="col-12 layout-spacing">
+	<div class="widget-content widget-content-area br-6 pb-0">
+		<div class="row">
+			<div class="col-auto text-left">
+				<h4><img src="/img/CrewPoints.png" onmouseover="popup(event,'0.29 Crew Points');" onmouseout="kill();">
+					Collective 2</h4>
+			</div>
+			<div class="col">
+				<marquee scrollamount=4 align="middle"></marquee>
+			</div>
+		</div>
+
+
+		<div class="btn-group  mb-3 mr-2" role="group" aria-label="Button group with nested dropdown">
+			<div class="btn-group" role="group">
+				<button id="btnGroupDefault" type="button" class="btn btn-secondary dropdown-toggle"
+					data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+					Edit Crew <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+						fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+						stroke-linejoin="round" class="feather feather-chevron-down">
+						<polyline points="6 9 12 15 18 9"></polyline>
+					</svg>
+				</button>
+				<div class="dropdown-menu" aria-labelledby="btnGroupDefault" style="will-change: transform;">
+					<a class="dropdown-item" href="/crew_home">Crew Home</a>
+					<a class="dropdown-item" href="/crew_profile">Crew Profile</a>
+										<a class="dropdown-item" href="/crew_upgrades">Crew Upgrades</a>
+														</div>
+			</div>
+
+			<div class="btn-group" role="group">
+				<button id="btnGroupDefault" type="button" class="btn btn-secondary dropdown-toggle"
+					data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+					Actions <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+						fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+						stroke-linejoin="round" class="feather feather-chevron-down">
+						<polyline points="6 9 12 15 18 9"></polyline>
+					</svg>
+				</button>
+				<div class="dropdown-menu" aria-labelledby="btnGroupDefault" style="will-change: transform;">
+					<a class="dropdown-item" href="/crew_actionlog">Action Log</a>
+					<a class="dropdown-item" href="/crew_raidsforming">Raids Forming</a>
+					<a class="dropdown-item" href="/crew_hitlist">Crew Hitlist</a>
+					<a class="dropdown-item" href="/crew_hitters">Hitlist Statistics</a>
+					<a class="dropdown-item" href="/crew_bossspawns">Raid Boss Spawns</a>
+				</div>
+			</div>
+
+			<div class="btn-group" role="group">
+				<button id="btnGroupDefault" type="button" class="btn btn-secondary dropdown-toggle"
+					data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+					Storage <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+						fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+						stroke-linejoin="round" class="feather feather-chevron-down">
+						<polyline points="6 9 12 15 18 9"></polyline>
+					</svg>
+				</button>
+				<div class="dropdown-menu" aria-labelledby="btnGroupDefault" style="will-change: transform;">
+					<a class="dropdown-item" href="/crew_vault">Vault</a>
+					<a class="dropdown-item" href="/crew_pointbank">Point Bank</a>
+					<a class="dropdown-item" href="/crew_stones">Upgrade Stones</a>
+					<a class="dropdown-item" href="/crew_treasury">Treasury</a>
+				</div>
+			</div>
+
+			<div class="btn-group" role="group">
+				<button id="btnGroupDefault" type="button" class="btn btn-secondary dropdown-toggle"
+					data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+					Accomplishments <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+						fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+						stroke-linejoin="round" class="feather feather-chevron-down">
+						<polyline points="6 9 12 15 18 9"></polyline>
+					</svg>
+				</button>
+				<div class="dropdown-menu" aria-labelledby="btnGroupDefault" style="will-change: transform;">
+					<a class="dropdown-item" href="/crew_raidresults.php?crewid=8698">Raid Results</a>
+					<a class="dropdown-item" href="/crew_capstatus">Cap Status</a>
+					<a class="dropdown-item" href="/crew_awardmedal">Crew Medals</a>
+					<a class="dropdown-item" href="/crew_trophyroom">Trophy Room</a>
+				</div>
+			</div>
+
+
+		</div>
+	</div>
+</div>
+
+<script>
+  function remove(tid) {
+    if (confirm("Remove player from the Hit List?")) { window.location = "?remove=" + tid; }
+  }
+  function pophits(id) {
+    var popurl = 'showhits.php?id=' + id;
+    winpops = window.open(popurl, "", "width=200,height=400,scrollbars,");
+  }
+</script>
+
+<div class="col-12" style="max-width: 1000px;">
+  <div class="widget-content widget-content-area px-1 mt-3 mt-lg-0">
+    <div class="col text-left">
+      <H4>Crew hitlist</H4>
+      <p>(
+        404 /
+        675)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="crew_hitters.php">View Hitter Statistics</a>
+              </p>
+
+      <form class="form-inline justify-content-center" method="post">
+
+        <div class="input-group mb-2 mr-sm-2">
+          <div class="input-group-prepend">
+            <div class="input-group-text">Name</div>
+          </div>
+          <input type="text" name="hitname" class="form-control" id="inlineFormInputGroupUsername2"
+            placeholder="Player name...">
+        </div>
+
+        <div class="input-group mb-2 mr-sm-2">
+          <div class="input-group-prepend">
+            <div class="input-group-text">Reason</div>
+          </div>
+          <input type="text" name="hitreason" class="form-control" id="inlineFormInputGroupUsername2"
+            placeholder="Reason...">
+        </div>
+
+        <button type="submit" class="btn btn-primary mb-2">Add to hitlist</button>
+      </form>
+      <form method="post">
+        <table class="table table-striped">
+          <thead>
+            <th></th>
+            <th>Name</th>
+            <th>Level</th>
+            <th>Reason</th>
+            <th>Crew hits</th>
+            <th>Posted by</th>
+                          <th>Remove</th>
+                      </thead>
+                      <tr>
+              <td>
+                1.
+              </td>
+              <td>
+                                <a href="javascript:void(0)"
+                  onclick="showAttackWindow('Krongstein','265','500','e1bf5316', 'crew_hitlist')"><img
+                    alt="Attack!" border="0" align="right" src="images/atk_player_icon.jpg"
+                    onMouseOver="popup(event,'Attack');" onMouseOut="kill();" /></a>
+                <a href="profile.php?id=265">Krongstein</a>
+              </td>
+              <td>
+                <font color="#00FFFF">95</font>
+              </td>
+              <td>
+                DDCT Rocks              </td>
+              <td><a href="javascript:pophits(265)">
+
+                  0</a></td>
+              <td><a href="profile.php?id=267642">zProfound01</a></td>
+                              <td><input type="checkbox" name="remove[]" value="265"></td>
+                          </tr>
+                      <tr>
+              <td>
+                2.
+              </td>
+              <td>
+                                <a href="javascript:void(0)"
+                  onclick="showAttackWindow('StarPower','158701','500','3d9d070d', 'crew_hitlist')"><img
+                    alt="Attack!" border="0" align="right" src="images/atk_player_icon.jpg"
+                    onMouseOver="popup(event,'Attack');" onMouseOut="kill();" /></a>
+                <a href="profile.php?id=158701">StarPower</a>
+              </td>
+              <td>
+                <font color="#00FFFF">95</font>
+              </td>
+              <td>
+                DDCT Rocks              </td>
+              <td><a href="javascript:pophits(158701)">
+
+                  0</a></td>
+              <td><a href="profile.php?id=267642">zProfound01</a></td>
+                              <td><input type="checkbox" name="remove[]" value="158701"></td>
+                          </tr>
+                      <tr>
+              <td>
+                3.
+              </td>
+              <td>
+                                <a href="javascript:void(0)"
+                  onclick="showAttackWindow('steven8904b10','198929','500','2a26fdd1', 'crew_hitlist')"><img
+                    alt="Attack!" border="0" align="right" src="images/atk_player_icon.jpg"
+                    onMouseOver="popup(event,'Attack');" onMouseOut="kill();" /></a>
+                <a href="profile.php?id=198929">steven8904b10</a>
+              </td>
+              <td>
+                <font color="#00FFFF">95</font>
+              </td>
+              <td>
+                DDCT Rocks              </td>
+              <td><a href="javascript:pophits(198929)">
+
+                  300</a></td>
+              <td><a href="profile.php?id=267642">zProfound01</a></td>
+                              <td><input type="checkbox" name="remove[]" value="198929"></td>
+                          </tr>
+                      <tr>
+              <td>
+                4.
+              </td>
+              <td>
+                                <a href="javascript:void(0)"
+                  onclick="showAttackWindow('Shawty','4619','500','823e23c3', 'crew_hitlist')"><img
+                    alt="Attack!" border="0" align="right" src="images/atk_player_icon.jpg"
+                    onMouseOver="popup(event,'Attack');" onMouseOut="kill();" /></a>
+                <a href="profile.php?id=4619">Shawty</a>
+              </td>
+              <td>
+                <font color="#00FFFF">95</font>
+              </td>
+              <td>
+                DDCT Rocks              </td>
+              <td><a href="javascript:pophits(4619)">
+
+                  0</a></td>
+              <td><a href="profile.php?id=267642">zProfound01</a></td>
+                              <td><input type="checkbox" name="remove[]" value="4619"></td>
+                          </tr>
+                      
+<!-- 401 further rows trimmed for fixture -->
+</table>
+    </div>
+          <input type="submit" name="subrem" value="Remove" class="btn btn-danger">
+    
+    </form>
+  </div>
+</div>
+
+
+<table width=788 border="0" cellpadding="4" cellspacing="4">
+  <tr valign="top">
+    <td valign="top">
+
+              
+<style>
+#foot_box {
+position: relative;
+width: 973px;
+background-color:#2b2b2b;
+font-size: 10px;
+font-weight: bold;
+text-align: center;
+padding: 10px;
+}
+
+#foot_box #foot_right {
+    position: absolute;
+    top: 3px;
+    right: 0px;
+    width: 100px;
+    vertical-align: middle;
+    border-style: none;
+    border: 0px;
+    background-color: #2b2b2b;
+    text-align: center;
+}
+
+</style>
+
+</div> <!-- end row -->
+        
+            </div>
+            

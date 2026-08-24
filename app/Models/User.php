@@ -51,6 +51,14 @@ class User extends Authenticatable
     /**
      * @return HasMany<QuestList, $this>
      */
+    /**
+     * @return HasMany<AttackList, $this>
+     */
+    public function attackLists(): HasMany
+    {
+        return $this->hasMany(AttackList::class);
+    }
+
     public function questLists(): HasMany
     {
         return $this->hasMany(QuestList::class);

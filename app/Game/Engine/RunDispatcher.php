@@ -3,6 +3,7 @@
 namespace App\Game\Engine;
 
 use App\Game\Enums\RunMode;
+use App\Jobs\RunBrawlJob;
 use App\Jobs\RunMobJob;
 use App\Jobs\RunPvpJob;
 use App\Jobs\RunQuestJob;
@@ -28,7 +29,11 @@ class RunDispatcher
             RunMode::Mob => new RunMobJob($participant, $token),
             RunMode::Quest => new RunQuestJob($participant, $token),
             RunMode::QuestList => new RunQuestListJob($participant, $token),
-            RunMode::Pvp => new RunPvpJob($participant, $token),
+            RunMode::PvpBrawl, RunMode::PvpFactionBrawl => new RunBrawlJob($participant, $token),
+            // The list-based PvP modes differ only in their target source.
+            RunMode::PvpAttackList,
+            RunMode::PvpCrewHitlist,
+            RunMode::PvpCrewMembers => new RunPvpJob($participant, $token),
         };
 
         return $delayUntil !== null ? dispatch($job->delay($delayUntil)) : dispatch($job);

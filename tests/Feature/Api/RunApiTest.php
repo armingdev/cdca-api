@@ -46,7 +46,7 @@ it('starts a pvp run', function () {
     $character = Character::factory()->for($this->rga)->create();
 
     $this->postJson('/api/v1/runs', [
-        'mode' => 'pvp',
+        'mode' => 'pvp-attack-list',
         'characters' => [$character->id],
         'targets' => ['OFFENSIVE'],
         'attacks_per_target' => 3,
