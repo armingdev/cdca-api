@@ -100,3 +100,35 @@ it('refuses to start a run from someone else\'s attack list', function () {
         'attack_list_id' => $theirs->id,
     ])->assertUnprocessable()->assertJsonValidationErrors('attack_list_id');
 });
+
+it('echoes back only the config keys the mode can use', function (string $mode, array $absent, array $present) {
+    $rga = Rga::factory()->for($this->user)->create();
+    $character = Character::factory()->for($rga)->create();
+
+    $payload = [
+        'mode' => $mode,
+        'characters' => [$character->id],
+        'targets' => ['Someone'],
+        'crew_game_id' => 8698,
+        'auto_enter_brawl' => true,
+    ];
+
+    $this->postJson('/api/v1/runs', $payload)->assertCreated();
+
+    $config = Run::latest('id')->first()->config;
+
+    foreach ($absent as $key) {
+        expect($config)->not->toHaveKey($key);
+    }
+
+    foreach ($present as $key) {
+        expect($config)->toHaveKey($key);
+    }
+})->with([
+    // A crew-hitlist run carrying auto_enter_brawl invites the client to
+    // render a control that does nothing.
+    'crew hitlist' => ['pvp-crew-hitlist', ['auto_enter_brawl', 'targets', 'crew_game_id'], ['attacks_per_target']],
+    'crew members' => ['pvp-crew-members', ['auto_enter_brawl', 'targets'], ['crew_game_id']],
+    'attack list' => ['pvp-attack-list', ['auto_enter_brawl', 'crew_game_id'], ['targets']],
+    'brawl' => ['pvp-brawl', ['targets', 'crew_game_id'], ['auto_enter_brawl']],
+]);

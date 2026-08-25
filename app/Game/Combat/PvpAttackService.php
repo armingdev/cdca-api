@@ -13,6 +13,7 @@ use App\Game\Parsers\BattleResultParser;
 use App\Game\Parsers\PlayerSearchParser;
 use App\Models\BattleEvent;
 use App\Models\Character;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Player-vs-player: search by name, then attack via a POST that carries the
@@ -128,6 +129,20 @@ class PvpAttackService
         $battleId = (int) $m[1];
         $result = $this->resultParser->parse($this->client->get("plrattack/{$battleId}/")->body());
 
+        // BattleResultParser's win/loss rules were derived from PvE fights.
+        // A PvP result we cannot classify means the attack happened and we
+        // could not read it — log the raw text so the rule can be written from
+        // evidence instead of guessed at.
+        if ($result->outcome === BattleOutcome::Unknown) {
+            Log::warning('Unclassified PvP battle result.', [
+                'character_id' => $this->character->id,
+                'opponent_player_id' => $target->playerId,
+                'opponent_name' => $target->name,
+                'battle_id' => $battleId,
+                'battle_result' => str($result->rawBattleResult)->squish()->limit(400)->toString(),
+            ]);
+        }
+
         return BattleEvent::create([
             'character_id' => $this->character->id,
             'kind' => BattleKind::Pvp,
@@ -137,6 +152,11 @@ class PvpAttackService
             'battle_id' => $battleId,
             'outcome' => $result->outcome,
             'exp_gained' => $result->expGained,
+            'exp_stripped' => $result->expStripped,
+            // Was omitted while the PvE path recorded both — the asymmetry is
+            // what let it go unnoticed.
+            'gold_gained' => $result->goldGained,
+            'drop_name' => $result->dropName,
             'occurred_at' => now(),
         ]);
     }
@@ -155,6 +175,18 @@ class PvpAttackService
         $refusal = $this->refusalParser->parse($body, $finalUrl);
         $this->lastRefusal = $refusal;
 
+        // The game refuses attacks for reasons we have not captured yet (level
+        // bands, protections). Record the body with its context so the next
+        // one can be classified from a log rather than guessed at.
+        if ($refusal->reason === AttackRefusalReason::Unknown) {
+            Log::warning('Unclassified PvP attack refusal.', [
+                'character_id' => $this->character->id,
+                'opponent_player_id' => $target->playerId,
+                'opponent_name' => $target->name,
+                'body' => $refusal->message,
+            ]);
+        }
+
         return BattleEvent::create([
             'character_id' => $this->character->id,
             'kind' => BattleKind::Pvp,
@@ -167,12 +199,19 @@ class PvpAttackService
         ]);
     }
 
+    /**
+     * `fail_reason` is a varchar(255), and a refusal body is attacker-supplied
+     * text we do not control — so clip here too, not only in the parser. An
+     * over-long reason must never be able to fail the insert and kill the job.
+     */
     private function failReason(AttackRefusal $refusal): string
     {
         if ($refusal->reason === AttackRefusalReason::Cooldown) {
             return "On cooldown — attacked {$refusal->minutesSinceLastAttack}m ago, free in {$refusal->retryInMinutes()}m.";
         }
 
-        return $refusal->message !== '' ? $refusal->message : 'No redirect from the PvP attack.';
+        $message = str($refusal->message)->squish()->limit(180)->toString();
+
+        return $message !== '' ? $message : 'No redirect from the PvP attack.';
     }
 }

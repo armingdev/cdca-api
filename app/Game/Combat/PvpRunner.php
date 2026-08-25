@@ -28,6 +28,8 @@ class PvpRunner
 
     private int $losses = 0;
 
+    private int $unknown = 0;
+
     private int $skippedOnCooldown = 0;
 
     public function __construct(
@@ -204,6 +206,7 @@ class PvpRunner
         match ($outcome) {
             BattleOutcome::Win => $this->wins++,
             BattleOutcome::Loss => $this->losses++,
+            BattleOutcome::Unknown => $this->unknown++,
             default => null,
         };
     }
@@ -213,6 +216,9 @@ class PvpRunner
         return match ($outcome) {
             BattleOutcome::Win => "Beat {$opponent}.",
             BattleOutcome::Loss => "Lost to {$opponent}.",
+            // The attack landed; the result page did not match a known
+            // win/loss shape. Saying "failed" would misreport it.
+            BattleOutcome::Unknown => "Attacked {$opponent} — result unreadable.",
             default => "Attack on {$opponent} failed.",
         };
     }
@@ -226,6 +232,7 @@ class PvpRunner
             endReason: $endReason,
             wins: $this->wins,
             losses: $this->losses,
+            unknown: $this->unknown,
             skippedOnCooldown: $this->skippedOnCooldown,
             nextFreeInMinutes: $this->cooldowns->nextFreeInMinutes(),
         );

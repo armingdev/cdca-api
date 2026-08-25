@@ -2,6 +2,8 @@
 
 namespace App\Game\Engine;
 
+use App\Game\Enums\RunMode;
+
 /**
  * Per-run PvP options — stored as the run's jsonb config.
  *
@@ -48,11 +50,17 @@ final readonly class PvpRunConfig
     }
 
     /**
+     * The stored config, echoed back on the Run resource.
+     *
+     * Pass the mode to drop the keys it cannot use — a crew-hitlist run
+     * carrying `auto_enter_brawl` invites the client to render a control that
+     * does nothing.
+     *
      * @return array<string, mixed>
      */
-    public function toArray(): array
+    public function toArray(?RunMode $mode = null): array
     {
-        return [
+        $config = [
             'targets' => $this->targets,
             'attack_list_id' => $this->attackListId,
             'crew_game_id' => $this->crewGameId,
@@ -64,5 +72,25 @@ final readonly class PvpRunConfig
             'max_attacks' => $this->maxAttacks,
             'cooldown_minutes' => $this->cooldownMinutes,
         ];
+
+        if ($mode === null) {
+            return $config;
+        }
+
+        return array_diff_key($config, array_flip(self::irrelevantKeys($mode)));
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function irrelevantKeys(RunMode $mode): array
+    {
+        return match ($mode) {
+            RunMode::PvpAttackList => ['crew_game_id', 'auto_enter_brawl'],
+            RunMode::PvpCrewHitlist => ['targets', 'attack_list_id', 'crew_game_id', 'auto_enter_brawl'],
+            RunMode::PvpCrewMembers => ['targets', 'attack_list_id', 'auto_enter_brawl'],
+            RunMode::PvpBrawl, RunMode::PvpFactionBrawl => ['targets', 'attack_list_id', 'crew_game_id'],
+            default => [],
+        };
     }
 }

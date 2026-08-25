@@ -144,3 +144,30 @@ it('reports no wait when nothing is on cooldown', function () {
 
     expect(trackerFor($character)->nextFreeInMinutes())->toBeNull();
 });
+
+it('parks a structurally unattackable target for a week instead of retrying hourly', function () {
+    $character = Character::factory()->for(Rga::factory()->withSession())->create();
+    $target = new AttackTarget(playerId: 365, name: 'GuardianLiam');
+
+    $refusal = new AttackRefusal(AttackRefusalReason::Allied, 'GuardianLiam is your ally');
+
+    $cooldown = trackerFor($character)->recordRefusal($target, $refusal);
+
+    expect($cooldown->source)->toBe('allied')
+        ->and($cooldown->minutesRemaining())->toBe(60 * 24 * 7);
+
+    // And it is filtered out of the next pass, so it costs no request at all.
+    expect(trackerFor($character)->attackable([$target]))->toBe([]);
+});
+
+it('re-checks a temporary PvP immunity on the normal cadence', function () {
+    $character = Character::factory()->for(Rga::factory()->withSession())->create();
+
+    $cooldown = trackerFor($character)->recordRefusal(
+        new AttackTarget(playerId: 121729, name: 'xCouldBePrem0x'),
+        new AttackRefusal(AttackRefusalReason::PvpImmunity, 'under the effects of PVP Immunity'),
+    );
+
+    expect($cooldown->source)->toBe('pvp-immunity')
+        ->and($cooldown->minutesRemaining())->toBe(60);
+});

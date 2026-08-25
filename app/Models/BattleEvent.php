@@ -30,6 +30,7 @@ class BattleEvent extends Model
         'battle_id',
         'outcome',
         'exp_gained',
+        'exp_stripped',
         'gold_gained',
         'drop_name',
         'fail_reason',

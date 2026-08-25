@@ -134,3 +134,57 @@ it('skips a brawl pass when the character is not entered and auto-enter is off',
 
     Http::assertNotSent(fn ($request) => str_contains($request->url(), 'enter=1'));
 });
+
+it('counts an unreadable result separately from an error', function () {
+    // An attack that 302'd, fetched its battle page and spent rage is not an
+    // error just because we could not classify the result. Counting the two
+    // together made a working 135-attack run read as 115 errors.
+    Http::fake(function ($request) {
+        $url = $request->url();
+
+        return match (true) {
+            str_contains($url, 'attacklog') => Http::response('<html><table></table></html>'),
+            str_contains($url, 'crew_hitlist') => Http::response(gameFixture('crew_hitlist.html')),
+            str_contains($url, 'userstats') => Http::response(json_encode(['exp' => '1', 'rage' => '90000', 'level' => '95', 'width' => 0])),
+            str_contains($url, 'somethingelse') => Http::response('', 302, ['Location' => '/plrattack/950/']),
+            str_contains($url, 'plrattack/950') => Http::response('var battle_result = "phrasing we cannot read";'),
+            default => Http::response('<html></html>'),
+        };
+    });
+
+    $participant = pvpParticipant(RunMode::PvpCrewHitlist);
+
+    makeRunJob($participant)->handle(app(LoginService::class));
+
+    $fresh = $participant->fresh();
+
+    expect($fresh->unknown)->toBeGreaterThan(0)
+        ->and($fresh->errors)->toBe(0)
+        ->and($fresh->last_activity)->not->toContain('failed');
+});
+
+it('parks allied targets so a crew hitlist stops spending requests on them', function () {
+    // A crew hitlist is mostly allies; without this every pass re-attacks
+    // every one of them forever.
+    Http::fake(function ($request) {
+        $url = $request->url();
+
+        return match (true) {
+            str_contains($url, 'attacklog') => Http::response('<html><table></table></html>'),
+            str_contains($url, 'crew_hitlist') => Http::response(gameFixture('crew_hitlist.html')),
+            str_contains($url, 'userstats') => Http::response(json_encode(['exp' => '1', 'rage' => '90000', 'level' => '95', 'width' => 0])),
+            str_contains($url, 'somethingelse') => Http::response(gameFixture('pvp_attack_refusal_allied_crew.html')),
+            default => Http::response('<html></html>'),
+        };
+    });
+
+    $participant = pvpParticipant(RunMode::PvpCrewHitlist);
+
+    makeRunJob($participant)->handle(app(LoginService::class));
+
+    expect(AttackCooldown::where('source', 'allied')->count())->toBeGreaterThan(0);
+
+    $blocked = AttackCooldown::where('source', 'allied')->first();
+
+    expect($blocked->minutesRemaining())->toBe(60 * 24 * 7);
+});

@@ -228,7 +228,7 @@ class RunController extends Controller
                 autoEnterBrawl: $request->boolean('auto_enter_brawl'),
                 maxAttacks: $request->filled('max_attacks') ? $request->integer('max_attacks') : null,
                 cooldownMinutes: $request->integer('cooldown_minutes', 60),
-            ))->toArray(),
+            ))->toArray($mode),
         };
     }
 
