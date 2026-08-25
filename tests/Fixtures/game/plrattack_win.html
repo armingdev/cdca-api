@@ -1,0 +1,620 @@
+<!-- Main Content starts Here -->
+<div id="content" class="main-content">
+    <div class="layout-px-spacing">
+
+        <!-- Original code here -->
+        <div id="tooltip" style="position:absolute;visibility:hidden"></div>
+
+        <div id="levelup" style="background-color: green;border: black;width: 100%; height=50px;display: none;"><table width=100% height=50 cellpadding=0 cellspacing=0 border=0>
+        <td background="/landing/levelupbg.jpg" height=50><div align="center">
+            <table width=600 height=50 cellpadding=0 cellspacing=0 border=0>
+            <td align="center" valign="middle"><a rel="shadowbox;height=510;width=778" class="sbox new-user-level-up" href="levelup.php" onclick="javascript:hidelevelup();"><img src="/landing/levelupcenter.jpg" height="50" border=0></a></td>
+            </table></div>
+        </td>
+        </table></div>
+
+        <div class="row justify-content-center" id="content-header-row">
+
+<script>
+	function goToByScroll(id) {
+		switchLog(); //shows/hides the combat log
+		$('html,body').animate({
+			scrollTop: $("#" + id).offset().top
+		}, 'slow');
+	}
+
+	
+	//start for keyboard use
+	var key1 = "69"; //E
+	var key2 = "101"; //e
+	var x = '';
+	var movement;
+	movement = true;
+
+	function handler(e) {
+		if (movement == true) {
+			if (document.all) {
+				var evnt = window.event;
+				x = evnt.keyCode;
+			} else {
+				x = e.charCode;
+			}
+
+							if (x == key1) {
+					location.href = "/world.php";
+				}
+				if (x == key2) {
+					location.href = "/world.php";
+				}
+					}
+	}
+	if (!document.all) {
+		window.captureEvents(Event.KEYPRESS);
+		window.onkeypress = handler;
+	} else {
+		document.onkeypress = handler;
+	}
+	//end of keyboard use
+</script>
+
+<style>
+	#result_notice_window {
+		font-size: 18pt;
+		display: none;
+		text-align: center;
+		padding: 5px;
+		width: 340px;
+		border: 2px solid #cccccc;
+		color: #cc0000;
+		background-color: black;
+
+
+					position: absolute;
+			left: 456px;
+			top: 140px;
+			}
+
+	#attacker_name {
+		font-size: 14pt;
+		vertical-align: middle;
+		width: 245px;
+		height: 50px;
+		border: 2px inset;
+		background-color: black;
+		padding-top: 8px;
+	}
+
+	#defender_name {
+		font-size: 14pt;
+		vertical-align: middle;
+		width: 245px;
+		height: 50px;
+		border: 2px inset;
+		background-color: black;
+		padding-top: 8px;
+	}
+
+	#attacker_window {
+		display: none;
+		text-align: center;
+		padding: 5px;
+		border: 1px solid #333333;
+		background-color: black;
+		font-weight: bold;
+		font-size: 18pt;
+		color: #CC0000;
+	}
+
+	#defender_window {
+		display: none;
+		text-align: center;
+		padding: 5px;
+		border: 1px solid #333333;
+		background-color: black;
+		font-weight: bold;
+		font-size: 18pt;
+		color: #CC0000;
+	}
+
+	#attacker_health {
+		margin-top: 10px;
+		margin-right: 9px;
+		background-color: #009900;
+		height: 15px;
+		width: 228px;
+	}
+
+	#defender_health {
+		margin-top: 10px;
+		margin-left: 8px;
+		background-color: #009900;
+		height: 15px;
+		width: 228px;
+	}
+
+	#combat_log {
+		padding-bottom: 35px;
+		position: relative;
+		height: 490px;
+		color: white;
+	}
+
+	#battle_result {
+		padding-bottom: 10px;
+		width: 767px;
+		background: url(/images/atk_bottom_bg.jpg);
+		background-repeat: repeat-y;
+	}
+
+	#result_text {
+		font-weight: bold;
+		font-size: 12pt;
+		padding-bottom: 15px;
+	}
+
+	.float-div-left {
+		position: absolute;
+		top: 0;
+		left: -70px;
+		border-width: 2px;
+		border-style: ridge;
+		height: 50px;
+		min-width: 70px;
+		padding-top: 8px;
+		background: black;
+		font-size: smaller;
+	}
+
+	.float-div-right {
+		position: absolute;
+		top: 0;
+		right: -70px;
+		border-width: 2px;
+		border-style: ridge;
+		height: 50px;
+		min-width: 70px;
+		padding-top: 8px;
+		background: black;
+		font-size: smaller;
+	}
+</style>
+
+<center>
+
+	<table cellpadding="0" cellspacing="0" width="100%"
+		style="height:505px;background:url(/img/atkusize.jpg);background-repeat:no-repeat;background-position:top center;position:relative">
+		<tr>
+			<td align="center" valign="top" style="padding-top:10px;">
+
+				<!-- Character Names -->
+				<table border="0" cellspacing="0" cellpadding="0" width="600px;"
+					style="font-family:Impact,sans-serif;font-weight:normal;font-size:18pt;">
+					<tr>
+						<td width="250" align="center" valign="middle" style="position:relative">
+							
+							<div id="attacker_name"><a
+									href="/characters/2403">RealLinuXX</a>
+							</div>
+						</td>
+						<td width="100"></td>
+						<td width="250" align="center" valign="middle" style="position:relative">
+														<div id="defender_name">
+								azraid5							</div>
+						</td>
+					</tr>
+				</table>
+
+				<!-- Character Pics -->
+				<table border="0" cellspacing="0" cellpadding="0" width="580" height="280" style="margin-top:20px;">
+					<tr>
+						<td width="270" valign="middle" align="center" style="position:relative;">
+							<div
+								style="width:100%;height:100%;top:13px;left:7px;position: absolute;background-image:url(https://upload.outwar.com/uploaded/s2403.jpg);background-repeat:no-repeat;background-position:center center;">
+							</div>
+							<table style="position: relative;">
+								<tr>
+									<td id="attacker_window"></td>
+								</tr>
+							</table>
+						</td>
+						<td width="40"></td>
+						<td width="270" valign="middle" align="center" style="position:relative;">
+							<div
+								style="width:100%;height:100%;top:13px;left:-2px;position: absolute;background-image:url(/images/gangster1.jpg);background-repeat:no-repeat;background-position:center center;">
+							</div>
+							<table style="position: relative;">
+								<tr>
+									<td id="defender_window"></td>
+								</tr>
+							</table>
+						</td>
+					</tr>
+				</table>
+
+				<!-- Character Health Bars -->
+				<table border="0" cellspacing="0" cellpadding="0" width="550" height="40"
+					style="margin-left:8px;margin-top:50px;">
+					<tr>
+						<td width="245" valign="top" align="right"
+							style="background-image:url(/images/health_bar.jpg);background-repeat:no-repeat;background-position:center center;">
+							<div id="attacker_health" align="center" style="font:bold"></div>
+						</td>
+						<td width="60"></td>
+						<td width="245" valign="top" align="left"
+							style="background-image:url(/images/health_bar.jpg);background-repeat:no-repeat;background-position:center center;">
+							<div id="defender_health" align="center" style="font:bold"></div>
+						</td>
+					</tr>
+				</table>
+
+				<!-- Character Skills -->
+				<table border="0" cellspacing="0" cellpadding="0" width="550" height="40"
+					style="margin-left:8px;margin-top:2px;">
+					<tr>
+						<td width="245" valign="top" align="right">
+																<img src="/images/skills/skill_2952.gif" width="25" height="25"
+										onmouseover="popup(event,'<b>Level 1 Underlings</b><br>');" onmouseout="kill();">
+																	<img src="/images/skills/streetsmarts.png" width="25" height="25"
+										onmouseover="popup(event,'<b>Level 9 Street Smarts</b><br>Your experience can not be stripped.');" onmouseout="kill();">
+																	<img src="/images/skills/onguard.png" width="25" height="25"
+										onmouseover="popup(event,'<b>Level 9 On Guard</b><br>You never tire. Your strength cannot be stolen in battle.');" onmouseout="kill();">
+														</td>
+						<td width="60"></td>
+						<td width="245" valign="top" align="left">
+													</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+
+			<!-- Battle Result -->
+		<div id="battle_result">
+			<div id="result_text">
+			</div>
+			<div id="found_items">
+							</div>
+			<!-- Combat Log -->
+			<div id="combat_log" style=""></div>
+
+					</div>
+		<div id="result_notice_window"></div>
+
+
+	<script language="JavaScript">
+		function switchLog() {
+			if (combat_log.style.display == 'none') {
+				combat_log.style.display = 'block';
+								combat_log_link.innerHTML = 'Hide Combat Log';
+			} else {
+
+									combat_log.style.display = 'none';
+					combat_log_link.innerHTML = 'Show Combat Log';
+							}
+		}
+
+		function Damage(amount, dmg_type) {
+			this.amount = amount;
+			this.dmg_type = dmg_type;
+		}
+
+		var viewer = "attacker";
+
+		var combat_log = document.getElementById('combat_log');
+		var combat_log_link = document.getElementById('combat_log_link');
+
+		var successful = 1;
+		var result_text = document.getElementById('result_text');
+		var battle_result = "RAMPAGE!<br>RealLinuXX takes pity on azraid5<br>";
+
+		var attacker_name = "RealLinuXX";
+		var defender_name = "azraid5";
+
+		var attacker_gps_name = "zar1";
+		var attacker_gps_dmg = "18907";
+
+		var defender_gps_name = "0";
+		var defender_gps_dmg = "0";
+
+		var combat_log = document.getElementById('combat_log');
+		var attacker_window = document.getElementById('attacker_window');
+		var defender_window = document.getElementById('defender_window');
+
+		var result_notice_window = document.getElementById('result_notice_window');
+
+		var attacker_health = document.getElementById('attacker_health');
+		var defender_health = document.getElementById('defender_health');
+
+		var newtimeout = 0;
+
+		var attacker_health_start = 105871;
+		var defender_health_start = 68;
+
+		var attacker_health_new = attacker_health_start;
+		var defender_health_new = defender_health_start;
+
+		var total_rounds = 1;
+
+		var attacker_survival = -1;
+		var defender_survival = -1;
+
+		var attacker_taken = new Array();
+		
+		var defender_taken = new Array();
+		
+		var unleashPowerDamage = -1;
+		var unleashPowerRound = -1;
+
+		var attacker_elemental_taken = new Array();
+		
+		var defender_elemental_taken = new Array();
+		
+
+		var elementalDamageColors = {};
+		elementalDamageColors['fire'] = "#FF0000";
+		elementalDamageColors['holy'] = "#00FFFF";
+		elementalDamageColors['shadow'] = "#9f02d3";
+		elementalDamageColors['arcane'] = "#FFFF00";
+		elementalDamageColors['kinetic'] = "#00FF00";
+		elementalDamageColors['chaos'] = "#f441be";
+
+		function showDamages() {
+
+			attacker_name = attacker_name.replace(/\'/g, '\\\'');
+			defender_name = defender_name.replace(/\'/g, '\\\'');
+
+			var elementals = new Array('fire', 'holy', 'kinetic', 'arcane', 'shadow', 'chaos');
+
+			for (var x = 0; x < total_rounds; x++) {
+				if (attacker_gps_name != "0" && x == 0) {
+					newtimeout = newtimeout + 500;
+					setTimeout("attacker_window.style.display='none'", newtimeout);
+					setTimeout("defender_window.style.display='block'", newtimeout);
+					setTimeout("defender_window.innerHTML='" + attacker_gps_name + " steps in to help and hits for " + attacker_gps_dmg + "'", newtimeout);
+					setTimeout("combat_log.innerHTML+='" + attacker_gps_name + " stepped in to help and hit for " + attacker_gps_dmg + "<br>'", newtimeout);
+					defender_health_new = defender_health_new - attacker_gps_dmg;
+					if (defender_health_new <= 0) defender_health_new = 0;
+					health_width = 228 * (defender_health_new / defender_health_start);
+					//setTimeout("defender_health.innerHTML='"+defender_health_new+"'",newtimeout);
+					setTimeout("defender_health.style.width=" + health_width, newtimeout);
+				}
+				// Damage taken by Defender
+				if (defender_taken[x]) {
+					newtimeout = newtimeout + 500;
+					taken = defender_taken[x];
+					setTimeout("attacker_window.style.display='none'", newtimeout);
+					setTimeout("defender_window.style.display='block'", newtimeout);
+					if (taken == "block")
+						setTimeout("defender_window.innerHTML='block'", newtimeout);
+					else if (taken == "blind")
+						setTimeout("defender_window.innerHTML='blind'", newtimeout);
+					else if (taken < 0)
+						setTimeout("defender_window.innerHTML='+" + Math.abs(taken) + "'", newtimeout);
+					else
+						setTimeout("defender_window.innerHTML='-" + taken + "'", newtimeout);
+
+					if (taken == "block") {
+						setTimeout("combat_log.innerHTML += '" + defender_name + " blocked " + attacker_name + "\\'s attack!<br>'", newtimeout);
+					} else if (taken == "blind") {
+						setTimeout("combat_log.innerHTML += '" + attacker_name + " has been blinded by " + defender_name + "!<br>'", newtimeout);
+					} else {
+						defender_health_new = defender_health_new - taken;
+						if (defender_health_new <= 0) defender_health_new = 0;
+						health_width = 228 * (defender_health_new / defender_health_start);
+						//setTimeout("defender_health.innerHTML='"+defender_health_new+"'",newtimeout);
+						setTimeout('defender_health.style.width="' + health_width + 'px"', newtimeout);
+						if (taken > 0)
+							setTimeout("combat_log.innerHTML += '" + attacker_name + " hit " + defender_name + " for " + taken + " damage!<br>'", newtimeout);
+						else if (taken < 0)
+							setTimeout("combat_log.innerHTML += '" + defender_name + " gains " + Math.abs(taken) + " from " + attacker_name + "!<br>'", newtimeout);
+					}
+
+					if (defender_elemental_taken[x]) {
+						newtimeout = newtimeout + 200;
+						var damageString = "";
+						for (y = 0; y < defender_elemental_taken[x].length; y++) {
+							taken = defender_elemental_taken[x][y].amount;
+							dmg_type = defender_elemental_taken[x][y].dmg_type;
+							defender_health_new = defender_health_new - taken;
+							if (defender_health_new < 0) defender_health_new = 0;
+							health_width = 228 * (defender_health_new / defender_health_start);
+							setTimeout("attacker_window.innerHTML=''", newtimeout);
+
+							var color = elementalDamageColors[dmg_type];
+
+							damageString = damageString + '<font color="' + color + '">';
+
+							if (taken > 0)
+								damageString = damageString + "-" + taken + " " + dmg_type + "</font><br>";
+							else
+								damageString = damageString + "+" + Math.abs(taken) + " " + dmg_type + "</font><br>";
+
+
+							setTimeout("defender_window.innerHTML='+" + Math.abs(taken) + "<Br>" + dmg_type + "'", newtimeout);
+
+							setTimeout('defender_health.style.width="' + health_width + 'px"', newtimeout);
+
+							if (taken > 0)
+								setTimeout("combat_log.innerHTML += '<font color=\"" + color + "\">" + attacker_name + " hit " + defender_name + " for " + taken + " " + dmg_type + " damage!</font><br>'", newtimeout);
+							else if (taken < 0)
+								setTimeout("combat_log.innerHTML += '" + defender_name + " gains " + Math.abs(taken) + " from " + dmg_type + " attack!<br>'", newtimeout);
+						}
+						setTimeout("defender_window.innerHTML='" + damageString + "'", newtimeout);
+					}
+				}
+
+				if (defender_survival == x) {
+					newtimeout = newtimeout + 500;
+					setTimeout("defender_window.innerHTML='<font color=\"#00ea35\">SURVIVAL!</font>'", newtimeout);
+					setTimeout("combat_log.innerHTML+='" + defender_name + "\\'s Survival triggered!<br>'", newtimeout);
+				}
+
+				if (unleashPowerRound == x) {
+					newtimeout = newtimeout + 500;
+					setTimeout("defender_window.style.display='block'", newtimeout);
+					setTimeout("attacker_window.style.display='none'", newtimeout);
+					setTimeout("defender_window.innerHTML='<font color=\"#772aa5\">" + attacker_name + " UNLEASHES POWER for " + unleashPowerDamage + "</font>'", newtimeout);
+					setTimeout("combat_log.innerHTML+='<font color=\"#772aa5\">" + attacker_name + " unleashes power for " + unleashPowerDamage + "</font><br>'", newtimeout);
+					defender_health_new = defender_health_new - unleashPowerDamage;
+					if (defender_health_new <= 0)
+						defender_health_new = 0;
+					health_width = 228 * (defender_health_new / defender_health_start);
+					setTimeout('defender_health.style.width="' + health_width + 'px"', newtimeout);
+				}
+
+				if (defender_gps_name != "0" && x == 0) {
+					newtimeout = newtimeout + 500;
+					setTimeout("defender_window.style.display='none'", newtimeout);
+					setTimeout("attacker_window.style.display='block'", newtimeout);
+					setTimeout("attacker_window.innerHTML='" + defender_gps_name + " steps in to help and hits for " + defender_gps_dmg + "'", newtimeout);
+					setTimeout("combat_log.innerHTML+='" + defender_gps_name + " stepped in to help and hit for " + defender_gps_dmg + "<br>'", newtimeout);
+					attacker_health_new = attacker_health_new - defender_gps_dmg;
+					if (attacker_health_new <= 0) attacker_health_new = 0;
+					health_width = 228 * (attacker_health_new / attacker_health_start);
+					//setTimeout("defender_health.innerHTML='"+defender_health_new+"'",newtimeout);
+					setTimeout('attacker_health.style.width="' + health_width + 'px"', newtimeout);
+				}
+				// Damage taken by Attacker
+				if (attacker_taken[x]) {
+					newtimeout = newtimeout + 500;
+					taken = attacker_taken[x];
+					setTimeout("defender_window.style.display='none'", newtimeout);
+					setTimeout("attacker_window.style.display='block'", newtimeout);
+
+					if (taken == "block")
+						setTimeout("attacker_window.innerHTML='block'", newtimeout);
+					else if (taken == "blind")
+						setTimeout("attacker_window.innerHTML='blind'", newtimeout);
+					else
+						setTimeout("attacker_window.innerHTML='-" + taken + "'", newtimeout);
+
+					if (taken == "block") {
+						setTimeout("combat_log.innerHTML += '" + attacker_name + " blocked " + defender_name + "\\'s attack!<br>'", newtimeout);
+					} else if (taken == "blind") {
+						setTimeout("combat_log.innerHTML += '" + defender_name + " has been blinded by " + attacker_name + "!<br>'", newtimeout);
+					} else {
+						attacker_health_new = attacker_health_new - taken;
+						if (attacker_health_new < 0) attacker_health_new = 0;
+						health_width = 228 * (attacker_health_new / attacker_health_start);
+						//setTimeout("attacker_health.innerHTML='"+attacker_health_new+"'",newtimeout);
+						setTimeout('attacker_health.style.width="' + health_width + 'px"', newtimeout);
+						setTimeout("combat_log.innerHTML += '" + defender_name + " hit " + attacker_name + " for " + taken + " damage!<br>'", newtimeout);
+					}
+					if (attacker_elemental_taken[x]) {
+						newtimeout = newtimeout + 500;
+						var damageString = "";
+						for (y = 0; y < attacker_elemental_taken[x].length; y++) {
+							taken = attacker_elemental_taken[x][y].amount;
+							dmg_type = attacker_elemental_taken[x][y].dmg_type;
+							attacker_health_new = attacker_health_new - taken;
+							if (attacker_health_new < 0) attacker_health_new = 0;
+							health_width = 228 * (attacker_health_new / attacker_health_start);
+
+							setTimeout("defender_window.innerHTML=''", newtimeout);
+
+							var color = elementalDamageColors[dmg_type];
+							damageString = damageString + '<font color="' + color + '">';
+
+
+							damageString = damageString + "-" + taken + " " + dmg_type + "</font><br>";
+
+							setTimeout('attacker_health.style.width="' + health_width + 'px"', newtimeout);
+
+							setTimeout("combat_log.innerHTML += '<font color=\"" + color + "\">" + defender_name + " hit " + attacker_name + " for " + taken + " " + dmg_type + " damage!</font><br>'", newtimeout);
+
+						}
+						setTimeout("attacker_window.innerHTML='" + damageString + "'", newtimeout);
+					}
+				}
+
+
+				if (attacker_survival == x) {
+					newtimeout = newtimeout + 500;
+					setTimeout("attacker_window.innerHTML='<font color=\"#00ea35\">SURVIVAL!</font>'", newtimeout);
+					setTimeout("combat_log.innerHTML+='" + attacker_name + "\\'s Survival triggered!<br>'", newtimeout);
+				}
+
+			}
+			// Sets ending tag on if attacker or defender won
+			newtimeout = newtimeout + 500;
+			if (successful) {
+				var attacker_result = "Win!";
+				var defender_result = "Defeated!";
+
+				if (viewer == "attacker")
+					var result_notice = "You have won the battle!";
+				else if (viewer == "defender")
+					var result_notice = "You have been defeated!";
+				else
+					var result_notice = attacker_name + " has won the battle!";
+
+				setTimeout("combat_log.innerHTML += '<b>" + attacker_name + " has defeated " + defender_name + "!</b>'", newtimeout);
+			} else {
+				var attacker_result = "Defeated!";
+				var defender_result = "Win!";
+
+				if (viewer == "defender")
+					var result_notice = "You have won the battle!";
+				else if (viewer == "attacker")
+					var result_notice = "You have been defeated!<br><a href='/userbuff.php?castboost=1'><img border='0' align='absmiddle' src='/landing/clicktopowerup.jpg'></a>";
+				else
+					var result_notice = defender_name + " has won the battle!";
+
+				setTimeout("combat_log.innerHTML += '<b>" + attacker_name + " has been defeated by " + defender_name + "!</b>'", newtimeout);
+			}
+
+			//setTimeout("attacker_window.innerHTML='"+attacker_result+"'",newtimeout);
+			//setTimeout("defender_window.innerHTML='"+defender_result+"'",newtimeout);
+						setTimeout(function () {
+
+										result_notice += "<div style='font-size:11pt;'><a href='/world.php'><< Return to World</a></div>";
+				
+				battle_result = battle_result.replace(/\'/g, '\\\'');
+
+								//goToByScroll(battleresults);            
+				result_notice += "<BR><div style='font-size:11pt;'><font color=#ffffff>"
+				 + battle_result + "</font ></div > ";
+				
+				result_notice_window.innerHTML = result_notice;
+				result_notice_window.style.display = "block";
+			}, newtimeout);
+
+							setTimeout("result_text.innerHTML='<b>" + battle_result + "</b>'", newtimeout);
+			
+		}
+
+		showDamages();
+
+		const ps = new PerfectScrollbar('#combat_log');
+	</script>
+	
+	        
+<style>
+#foot_box {
+position: relative;
+width: 973px;
+background-color:#2b2b2b;
+font-size: 10px;
+font-weight: bold;
+text-align: center;
+padding: 10px;
+}
+
+#foot_box #foot_right {
+    position: absolute;
+    top: 3px;
+    right: 0px;
+    width: 100px;
+    vertical-align: middle;
+    border-style: none;
+    border: 0px;
+    background-color: #2b2b2b;
+    text-align: center;
+}
+
+</style>
+
+</div> <!-- end row -->
+        
+            </div>
+            

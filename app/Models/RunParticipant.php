@@ -23,6 +23,7 @@ class RunParticipant extends Model
         'wins',
         'losses',
         'errors',
+        'unknown',
         'last_activity',
         'progress',
         'resume_at',

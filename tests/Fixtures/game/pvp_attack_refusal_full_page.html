@@ -1,0 +1,106 @@
+<!-- Sanitized reproduction of the page chrome that wraps every game page.
+     Kept because the refusal parser must ignore all of it: the menu's
+     "Points: 0.00" is the stray period that used to anchor the message, and
+     "Attack Message / This attack will cost you rage." used to end it. -->
+<div class="header-container">
+  <ul class="navbar-item">
+    <li><a href="#">Points: 0.00 Premium: 0.00 Tokens: 0 Skill: 7</a></li>
+  </ul>
+  <nav class="sidebar-wrapper">
+    <ul class="menu-categories">
+      <li><a href="/myaccount">MY RGA</a></li>
+      <li><a href="/home">HOME</a></li>
+      <li><a href="/profile">PROFILE</a></li>
+      <li><a href="/closedpvp">PVP BRAWL</a></li>
+      <li><a href="/attack_search">ATTACK / SEARCH</a></li>
+      <li><a href="/attacklog">ATTACK LOG</a></li>
+      <li><a href="/myhitlist">MY HITLIST</a></li>
+      <li><a href="/crew_hitlist">CREW HITLIST</a></li>
+      <li><a href="/world">WORLD</a></li>
+    </ul>
+  </nav>
+</div>
+
+<div class="modal fade" id="attackmodal" tabindex="-1" role="dialog" aria-hidden="true">
+  <div class="modal-content">
+    <h5 class="modal-title" id="attacktitle">Attack</h5>
+    <form id="attackform" method="post">
+      <p>Attack Message</p>
+      <input id="attackmessage" type="text" name="message" class="form-control">
+      This attack will cost you <span id="ragelabel"></span> rage.
+      <input size="1" type="hidden" id="rage-value" name="rage">
+      <input type="hidden" name="hash" id="attackhash">
+    </form>
+  </div>
+</div>
+
+<div class="modal fade" id="securityconfirm" tabindex="-1" role="dialog" aria-hidden="true">
+  <div class="modal-content">
+    <h5 class="modal-title">Security Confirm</h5>
+    <div class="modal-body"><p id="securityconfirm-text"></p></div>
+    <div class="modal-footer"><button>Cancel</button><button>Delete</button></div>
+  </div>
+</div>
+
+<!-- Main Content starts Here -->
+<div id="content" class="main-content">
+    <div class="layout-px-spacing">
+
+        <!-- Original code here -->
+        <div id="tooltip" style="position:absolute;visibility:hidden"></div>
+
+        <div id="levelup" style="background-color: green;border: black;width: 100%; height=50px;display: none;"><table width=100% height=50 cellpadding=0 cellspacing=0 border=0>
+        <td background="/landing/levelupbg.jpg" height=50><div align="center">
+            <table width=600 height=50 cellpadding=0 cellspacing=0 border=0>
+            <td align="center" valign="middle"><a rel="shadowbox;height=510;width=778" class="sbox new-user-level-up" href="levelup.php" onclick="javascript:hidelevelup();"><img src="/landing/levelupcenter.jpg" height="50" border=0></a></td>
+            </table></div>
+        </td>
+        </table></div>
+
+        <div class="row justify-content-center" id="content-header-row">
+		<div class="row text-center w-100 justify-content-center mt-3">
+			<div align="center" class="statbox widget box box-shadow" style="max-width: 650px;">
+				<div class="row">
+					<div class="col-12 col-sm">
+						<img class="mb-3" src="/img/error.png" /><br>
+						<font face="Verdana, Arial, Helvetica, sans-serif">You can only attack someone once every 60 minutes, and you attacked this person 3 minutes ago. (0)</font>
+					</div>
+					<div class="col-sm col-12 justify-content-center mt-sm-0 mt-3" id="errorimagebox">
+						<img src="/images/ErrorImg.jpg" />
+					</div>
+				</div>
+			</div>
+		</div>
+		        
+<style>
+#foot_box {
+position: relative;
+width: 973px;
+background-color:#2b2b2b;
+font-size: 10px;
+font-weight: bold;
+text-align: center;
+padding: 10px;
+}
+
+#foot_box #foot_right {
+    position: absolute;
+    top: 3px;
+    right: 0px;
+    width: 100px;
+    vertical-align: middle;
+    border-style: none;
+    border: 0px;
+    background-color: #2b2b2b;
+    text-align: center;
+}
+
+</style>
+
+</div> <!-- end row -->
+        
+            </div>
+            
+<div class="footer-wrapper">
+  <p><a href="/privacy">Privacy Policy |</a> <a href="/contact">Contact Info</a></p>
+</div>

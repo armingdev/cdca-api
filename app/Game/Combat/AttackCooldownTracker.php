@@ -131,23 +131,44 @@ class AttackCooldownTracker
     }
 
     /**
-     * Correct the record from a refusal. The game names how long ago we hit
-     * the target, so we learn the exact free-at time rather than guessing a
-     * fresh full window from now.
+     * Correct the record from a refusal, so the next pass does not spend a
+     * request on a target the game has already told us it will not accept.
+     *
+     * A cooldown refusal names how long ago we hit the target, so we learn the
+     * exact free-at time rather than guessing a fresh full window. Structural
+     * refusals (an ally, PvP immunity) carry their own block window instead —
+     * see AttackRefusalReason::blockMinutes(). A refusal we cannot classify
+     * blocks nothing: we have no idea when it would succeed.
      */
     public function recordRefusal(AttackTarget $target, AttackRefusal $refusal): ?AttackCooldown
     {
-        if ($refusal->reason !== AttackRefusalReason::Cooldown || $refusal->minutesSinceLastAttack === null) {
+        $blockMinutes = $refusal->reason->blockMinutes();
+
+        if ($blockMinutes === null) {
             return null;
+        }
+
+        if ($refusal->reason === AttackRefusalReason::Cooldown) {
+            if ($refusal->minutesSinceLastAttack === null) {
+                return null;
+            }
+
+            return AttackCooldown::record(
+                characterId: $this->character->id,
+                opponentPlayerId: $target->playerId,
+                opponentName: $target->name,
+                at: now()->subMinutes($refusal->minutesSinceLastAttack),
+                cooldownMinutes: $this->cooldownMinutes,
+                source: 'refusal',
+            );
         }
 
         return AttackCooldown::record(
             characterId: $this->character->id,
             opponentPlayerId: $target->playerId,
             opponentName: $target->name,
-            at: now()->subMinutes($refusal->minutesSinceLastAttack),
-            cooldownMinutes: $this->cooldownMinutes,
-            source: 'refusal',
+            cooldownMinutes: $blockMinutes,
+            source: $refusal->reason->value,
         );
     }
 

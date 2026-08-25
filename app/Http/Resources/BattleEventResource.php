@@ -29,6 +29,7 @@ class BattleEventResource extends JsonResource
             'room_id' => $this->room_id,
             'battle_id' => $this->battle_id,
             'exp_gained' => $this->exp_gained,
+            'exp_stripped' => $this->exp_stripped,
             'gold_gained' => $this->gold_gained,
             'drop_name' => $this->drop_name,
             'fail_reason' => $this->fail_reason,

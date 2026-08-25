@@ -138,6 +138,9 @@ abstract class RunJob implements ShouldQueue
                     match ($event->outcome) {
                         BattleOutcome::Win => $participant->increment('wins'),
                         BattleOutcome::Loss => $participant->increment('losses'),
+                        // The attack happened and cost rage; we just could not
+                        // read the result page. That is not an error.
+                        BattleOutcome::Unknown => $participant->increment('unknown'),
                         default => $participant->increment('errors'),
                     };
                 },
