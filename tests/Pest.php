@@ -101,8 +101,11 @@ function fakeSkillInfoHtml(): string
  * Stateful fake game for combat tests: two mapped rooms (1 –E– 2), a Kix
  * Harvester in room 2 that dies after one successful attack, configurable
  * rage. Pair with rooms/mob seeded via seedCombatWorld().
+ *
+ * Returns a respawn closure that stands the Harvester back up — re-faking
+ * cannot do it, since Http::fake callbacks stack first-wins.
  */
-function fakeCombatWorld(int $rage = 5000): void
+function fakeCombatWorld(int $rage = 5000): Closure
 {
     $position = 1;
     $killed = false;
@@ -178,6 +181,10 @@ function fakeCombatWorld(int $rage = 5000): void
 
         return Http::response('<html>world page</html>');
     });
+
+    return function () use (&$killed): void {
+        $killed = false;
+    };
 }
 
 /**
@@ -376,12 +383,12 @@ function seedQuestCatalog(): array
     ];
 }
 
-function questMobJson(string $name, int $mobId, int $spawnId, string $hash, int $level): array
+function questMobJson(string $name, int $mobId, int $spawnId, string $hash, int $level, bool $isDead = false): array
 {
     return [
         'name' => $name, 'level' => (string) $level, 'rage' => '100', 'h' => $hash,
         'encid' => 'ENC'.$spawnId, 'mobId' => (string) $mobId, 'spawnId' => (string) $spawnId,
-        'isDead' => false, 'type' => 0, 'canForm' => false,
+        'isDead' => $isDead, 'type' => 0, 'canForm' => false,
     ];
 }
 
@@ -389,22 +396,27 @@ function questMobJson(string $name, int $mobId, int $spawnId, string $hash, int 
  * Stateful fake of quest 742 (Street Crawler, step 3378): serves the real
  * captured mob_talk fixtures by kill count. Under 5 → incomplete (no finish
  * link); 5+ → complete (finish link); the finish href → the reward page.
- * Returns a setter to change the reported rage mid-test (Http::fake callbacks
- * stack first-wins, so re-faking cannot override an earlier catch-all).
+ * Returns a setter to change the reported rage and/or the live-mob pool
+ * mid-test (Http::fake callbacks stack first-wins, so re-faking cannot
+ * override an earlier catch-all).
  *
  * $level is what userstats reports and $levelUps how many times levelup.php
  * succeeds (each raising the reported level) — enough to exercise smart mode's
  * "level up to the quest's required level" gate.
+ *
+ * $liveMobs caps how many Street Crawlers can be killed before the room
+ * renders a corpse instead — the world running dry mid-objective. Raising it
+ * through the returned setter is a respawn.
  */
-function fakeQuestWorld(int $rage = 50000, int $level = 20, int $levelUps = 0): Closure
+function fakeQuestWorld(int $rage = 50000, int $level = 20, int $levelUps = 0, int $liveMobs = PHP_INT_MAX): Closure
 {
     $position = 1;
     $killed = 0;
 
-    $roomBlob = function (int $roomId): string {
+    $roomBlob = function (int $roomId) use (&$killed, &$liveMobs): string {
         $mobs = match ($roomId) {
             1 => [questMobJson('Stella', 59293, 888, 'npchash', level: 10)],
-            2 => [questMobJson('Street Crawler', 4000, 5000, 'x', level: 20)],
+            2 => [questMobJson('Street Crawler', 4000, 5000, 'x', level: 20, isDead: $killed >= $liveMobs)],
             default => [],
         };
 
@@ -476,8 +488,19 @@ function fakeQuestWorld(int $rage = 50000, int $level = 20, int $levelUps = 0): 
         return Http::response('<html>world</html>');
     });
 
-    return function (int $newRage) use (&$rage): void {
-        $rage = $newRage;
+    // Aliased so the setter can take the same parameter names as the fake's
+    // own options ($setWorld(liveMobs: 99)) without shadowing them.
+    $ragePool = &$rage;
+    $livePool = &$liveMobs;
+
+    return function (?int $rage = null, ?int $liveMobs = null) use (&$ragePool, &$livePool): void {
+        if ($rage !== null) {
+            $ragePool = $rage;
+        }
+
+        if ($liveMobs !== null) {
+            $livePool = $liveMobs;
+        }
     };
 }
 
@@ -527,17 +550,23 @@ function collectStepHtml(int $collected): string
  * Includes the quest-helper: the tracker offers a "find my target" toggle for
  * the crystal, and while it is on, room blobs carry the compass (room 1
  * points east; room 2 is the designated target room).
+ *
+ * $liveKills caps how many Keepers can be killed before the room renders a
+ * corpse — the source mobs running dry before the item drops. $dropChance of
+ * 0 makes kills yield no crystal, so the pool can be exhausted without the
+ * objective completing. The returned setter raises the pool (a respawn).
  */
-function fakeCollectQuestWorld(int $rage = 50000, bool $helper = true): void
+function fakeCollectQuestWorld(int $rage = 50000, bool $helper = true, int $liveKills = PHP_INT_MAX, bool $drops = true): Closure
 {
     $position = 1;
     $dropped = 0;
+    $kills = 0;
     $helpOn = false;
 
-    $roomBlob = function (int $roomId) use (&$helpOn): string {
+    $roomBlob = function (int $roomId) use (&$helpOn, &$kills, &$liveKills): string {
         $mobs = match ($roomId) {
             1 => [questMobJson('Rune Master', 60001, 910, 'npchash', level: 80)],
-            2 => [questMobJson('Holy Elemental Keeper', 60002, 920, 'y', level: 60)],
+            2 => [questMobJson('Holy Elemental Keeper', 60002, 920, 'y', level: 60, isDead: $kills >= $liveKills)],
             default => [],
         };
 
@@ -549,7 +578,7 @@ function fakeCollectQuestWorld(int $rage = 50000, bool $helper = true): void
         ]);
     };
 
-    Http::fake(function ($request) use (&$position, &$dropped, &$helpOn, $roomBlob, $rage, $helper) {
+    Http::fake(function ($request) use (&$position, &$dropped, &$kills, &$helpOn, $roomBlob, $rage, $helper, $drops) {
         $url = $request->url();
 
         if (str_contains($url, 'userstats.php')) {
@@ -585,7 +614,11 @@ function fakeCollectQuestWorld(int $rage = 50000, bool $helper = true): void
         }
 
         if (str_contains($url, 'somethingelse.php')) {
-            $dropped++;
+            $kills++;
+
+            if ($drops) {
+                $dropped++;
+            }
 
             return Http::response('', 302, ['Location' => 'https://sigil.outwar.com/attack/901/']);
         }
@@ -593,7 +626,7 @@ function fakeCollectQuestWorld(int $rage = 50000, bool $helper = true): void
         if (str_contains($url, 'attack/901')) {
             return Http::response(
                 'var battle_result = "Hero has gained 500 experience!"; var defender_name = "Holy Elemental Keeper";'
-                .'<div id="found_items"><b>WIN: Found Holy Elemental Crystal</b></div>'
+                .($drops ? '<div id="found_items"><b>WIN: Found Holy Elemental Crystal</b></div>' : '')
             );
         }
 
@@ -607,6 +640,10 @@ function fakeCollectQuestWorld(int $rage = 50000, bool $helper = true): void
 
         return Http::response('<html>world</html>');
     });
+
+    return function (int $newLiveKills) use (&$liveKills): void {
+        $liveKills = $newLiveKills;
+    };
 }
 
 /**

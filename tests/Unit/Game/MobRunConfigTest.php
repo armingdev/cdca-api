@@ -15,7 +15,7 @@ it('defaults drop_junk to off', function () {
     expect(MobRunConfig::fromArray(['mob_names' => []])->dropJunk)->toBeFalse();
 });
 
-it('round-trips the pass options and defaults them to a single unpaced run', function () {
+it('round-trips the pass options and defaults them to an unpaced endless farm', function () {
     $legacy = MobRunConfig::fromArray(['mob_names' => ['Kix Harvester']]);
 
     expect($legacy->runCount)->toBe(0)
@@ -30,6 +30,15 @@ it('round-trips the pass options and defaults them to a single unpaced run', fun
 
     expect($rebuilt->runCount)->toBe(3)
         ->and($rebuilt->attackIntervalSeconds)->toBe(300);
+});
+
+it('reads an absent and an explicit run_count of 0 alike as an endless farm', function () {
+    $absent = MobRunConfig::fromArray(['mob_names' => ['Kix Harvester']]);
+    $explicit = MobRunConfig::fromArray(['mob_names' => ['Kix Harvester'], 'run_count' => 0]);
+
+    expect($absent->runCount)->toBe(0)
+        ->and($explicit->runCount)->toBe(0)
+        ->and(MobRunConfig::fromArray($explicit->toArray())->runCount)->toBe(0);
 });
 
 it('defaults smart mode to off in every run config', function () {

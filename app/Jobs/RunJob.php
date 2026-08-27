@@ -14,8 +14,11 @@ use App\Game\Skills\SkillCaster;
 use App\Game\Skills\SkillSyncService;
 use App\Models\BattleEvent;
 use App\Models\Character;
+use App\Models\CharacterSkill;
+use App\Models\Run;
 use App\Models\RunParticipant;
 use App\Models\Skill;
+use Carbon\CarbonInterface;
 use Closure;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -41,6 +44,13 @@ abstract class RunJob implements ShouldQueue
 
     /** Session-collision re-logins tolerated per cycle before failing loudly. */
     private const int MAX_RELOGIN_ATTEMPTS = 3;
+
+    /**
+     * Consecutive respawn waits that produce nothing before we accept the
+     * targets are not coming back (bad seed data, a contested spawn, a mob
+     * moved). Generous on purpose — waiting is the point.
+     */
+    protected const int MAX_BARREN_RESPAWN_WAITS = 30;
 
     public int $timeout = 7200;
 
@@ -133,7 +143,7 @@ abstract class RunJob implements ShouldQueue
                 $character,
                 $participant,
                 log: $log,
-                signal: $this->signalClosure($participant),
+                signal: $this->signalClosure($participant, $this->circumspectExpiryFor($character, $run)),
                 onBattle: function (BattleEvent $event) use ($participant): void {
                     match ($event->outcome) {
                         BattleOutcome::Win => $participant->increment('wins'),
@@ -235,23 +245,74 @@ abstract class RunJob implements ShouldQueue
     }
 
     /**
+     * The quest cycle outcome shared by quest and quest-list modes: the
+     * objective's targets are all dead, so park until they respawn and let the
+     * resume scheduler re-drive the participant. Progress is re-read from the
+     * game on pickup, so nothing but the barren-wait counter needs carrying.
+     *
+     * @param  array<string, mixed>  $progress  must already carry the incremented 'respawn_waits'
+     */
+    protected function waitForRespawn(string $reason, int $waitSeconds, array $progress): ParticipantOutcome
+    {
+        if ((int) ($progress['respawn_waits'] ?? 0) > self::MAX_BARREN_RESPAWN_WAITS) {
+            return new ParticipantOutcome(
+                RunStatus::Stopped,
+                rtrim($reason, '.').'. Nothing respawned after '.self::MAX_BARREN_RESPAWN_WAITS.' waits — giving up.',
+                progress: $progress,
+            );
+        }
+
+        $resumeAt = now()->addSeconds(max($waitSeconds, 1));
+
+        return new ParticipantOutcome(
+            RunStatus::Waiting,
+            rtrim($reason, '.').". Resumes {$resumeAt->format('Y-m-d H:i')}.",
+            $resumeAt,
+            $progress,
+        );
+    }
+
+    /**
+     * When this character's Circumspect buff runs out, for a run that is gated
+     * on it. Read once at pickup — the window is fixed for the whole pass, so
+     * the per-iteration check stays a clock comparison instead of a query.
+     */
+    private function circumspectExpiryFor(Character $character, Run $run): ?CarbonInterface
+    {
+        if (! $run->require_circumspect) {
+            return null;
+        }
+
+        return CharacterSkill::with('skill')
+            ->where('character_id', $character->id)
+            ->where('skill_id', Skill::CIRCUMSPECT_ID)
+            ->first()
+            ?->buffEndsAt();
+    }
+
+    /**
      * The engines' per-iteration control check: the cache signal is the fast
      * path; every Nth call falls back to an authoritative DB read so a lost
-     * cache entry can never strand a stop or pause.
+     * cache entry can never strand a stop or pause. A gated run also ends its
+     * pass the moment Circumspect lapses.
      *
      * @return Closure(): RunSignal
      */
-    private function signalClosure(RunParticipant $participant): Closure
+    private function signalClosure(RunParticipant $participant, ?CarbonInterface $circumspectExpiresAt = null): Closure
     {
         $calls = 0;
 
-        return function () use ($participant, &$calls): RunSignal {
+        return function () use ($participant, &$calls, $circumspectExpiresAt): RunSignal {
             $calls++;
 
             $signal = $participant->run->currentSignal();
 
             if ($signal !== RunSignal::None) {
                 return $signal;
+            }
+
+            if ($circumspectExpiresAt !== null && $circumspectExpiresAt->isPast()) {
+                return RunSignal::CircumspectExpired;
             }
 
             if ($calls % self::DB_SIGNAL_CHECK_EVERY === 0) {

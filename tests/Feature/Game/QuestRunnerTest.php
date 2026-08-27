@@ -1,6 +1,7 @@
 <?php
 
 use App\Game\Engine\QuestRunConfig;
+use App\Game\Engine\RunEndReason;
 use App\Game\Exceptions\GameException;
 use App\Game\Quest\QuestRunner;
 use App\Models\Character;
@@ -122,6 +123,47 @@ it('stops with a clear reason when a collect item has no known source and no hel
     expect($summary->completed)->toBeFalse()
         ->and($summary->stopReason)->toBe("Could not make progress on objective 'Holy Elemental Crystal'.")
         ->and(collect($log)->contains(fn ($l) => str_contains($l, 'No known way to fulfill')))->toBeTrue();
+});
+
+it('parks a kill objective for respawn when the world runs out of live targets', function () {
+    $character = Character::factory()->for(Rga::factory()->withSession())->create();
+
+    // Quest 742 needs 5 kills but only 2 Street Crawlers are alive.
+    fakeQuestWorld(liveMobs: 2);
+
+    $summary = QuestRunner::forCharacter($character, new QuestRunConfig(
+        npcName: 'Stella',
+        questId: 742,
+    ))->run();
+
+    expect($summary->completed)->toBeFalse()
+        ->and($summary->endReason)->toBe(RunEndReason::TargetsDepleted)
+        ->and($summary->kills)->toBe(2)
+        ->and($summary->stopReason)->toBe("All 'Street Crawler' targets are dead — waiting for respawn.");
+});
+
+it('parks a collect objective for respawn when the source mobs are all dead', function () {
+    $character = Character::factory()->for(Rga::factory()->withSession())->create();
+
+    seedCollectQuestWorld();
+    QuestItem::factory()->create([
+        'name' => 'Holy Elemental Crystal',
+        'source_mobs' => ['Holy Elemental Keeper'],
+    ]);
+
+    // Two Keepers alive, neither drops the crystal — the pool empties before
+    // the objective is met, exactly the "kill everything, still need items" case.
+    fakeCollectQuestWorld(liveKills: 2, drops: false);
+
+    $summary = QuestRunner::forCharacter($character, new QuestRunConfig(
+        npcName: 'Rune Master',
+        questId: 1449,
+    ))->run();
+
+    expect($summary->completed)->toBeFalse()
+        ->and($summary->endReason)->toBe(RunEndReason::TargetsDepleted)
+        ->and($summary->kills)->toBe(2)
+        ->and($summary->stopReason)->toBe("All 'Holy Elemental Crystal' targets are dead — waiting for respawn.");
 });
 
 it('drives the whole flow through the outwar:quest command', function () {

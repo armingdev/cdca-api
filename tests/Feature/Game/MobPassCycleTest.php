@@ -30,6 +30,7 @@ function passEndOutcome(
     array $progress = [],
     bool $requireCircumspect = false,
     int $wins = 1,
+    bool $sawDeadTargets = false,
 ): ParticipantOutcome {
     $config = MobRunConfig::fromArray(array_merge(['mob_names' => ['Kix Harvester']], $configOverrides));
     $run = Run::factory()->state([
@@ -46,20 +47,57 @@ function passEndOutcome(
         errors: 0,
         stopReason: $endReason === RunEndReason::RageExhausted ? 'Rage below the 2500 floor.' : 'No live targets remain in any known room.',
         endReason: $endReason,
+        sawDeadTargets: $sawDeadTargets,
     );
 
     return new RunMobJob($participant, (string) Str::uuid())
         ->outcomeForPassEnd($summary, $config, $run, $progress, $character);
 }
 
-it('keeps the classic single pass when no cycling option is set', function () {
-    $completed = passEndOutcome(RunEndReason::Completed);
+it('farms on by default rather than stopping when the world is empty', function () {
+    $this->freezeTime();
+
+    // No run_count at all and an explicit 0 both mean "keep farming".
+    $implicit = passEndOutcome(RunEndReason::Completed, sawDeadTargets: true);
+    $explicit = passEndOutcome(RunEndReason::Completed, ['run_count' => 0], sawDeadTargets: true);
+
+    expect($implicit->status)->toBe(RunStatus::Waiting)
+        ->and($implicit->resumeAt->timestamp)->toBe(now()->addSeconds(60)->timestamp)
+        ->and($implicit->reason)->toContain('waiting for respawns')
+        ->and($implicit->progress)->toMatchArray(['kills_done' => 1, 'cycles_done' => 1])
+        ->and($explicit->status)->toBe(RunStatus::Waiting);
+});
+
+it('waits for rage on an endless farm instead of ending it', function () {
     $ragedOut = passEndOutcome(RunEndReason::RageExhausted);
 
-    expect($completed->status)->toBe(RunStatus::Completed)
-        ->and($completed->progress)->toMatchArray(['kills_done' => 1, 'cycles_done' => 1])
-        ->and($ragedOut->status)->toBe(RunStatus::Completed)
-        ->and($ragedOut->reason)->toContain('Rage below');
+    expect($ragedOut->status)->toBe(RunStatus::Waiting)
+        ->and($ragedOut->reason)->toContain('Rage depleted');
+});
+
+it('does a single pass when run_count is 1', function () {
+    $outcome = passEndOutcome(RunEndReason::Completed, ['run_count' => 1]);
+
+    expect($outcome->status)->toBe(RunStatus::Completed)
+        ->and($outcome->reason)->toContain('Reached 1 pass(es)')
+        ->and($outcome->progress)->toMatchArray(['kills_done' => 1, 'cycles_done' => 1]);
+});
+
+it('keeps farming forever however many passes are already done', function () {
+    $outcome = passEndOutcome(
+        RunEndReason::Completed,
+        ['run_count' => 0],
+        progress: ['cycles_done' => 99, 'kills_done' => 400],
+    );
+
+    expect($outcome->status)->toBe(RunStatus::Waiting)
+        ->and($outcome->progress)->toMatchArray(['cycles_done' => 100, 'kills_done' => 401]);
+});
+
+it('still lets max_kills stop an endless farm', function () {
+    $outcome = passEndOutcome(RunEndReason::TargetReached, ['run_count' => 0, 'max_kills' => 50]);
+
+    expect($outcome->status)->toBe(RunStatus::Completed);
 });
 
 it('waits out the attack interval between passes', function () {
@@ -147,4 +185,39 @@ it('cycles a run_count-bounded farm end to end through the resume scheduler', fu
         ->and($participant->last_activity)->toContain('Reached 2 pass(es)')
         ->and($participant->progress['cycles_done'])->toBe(2)
         ->and($run->fresh()->status)->toBe(RunStatus::Completed);
+});
+
+it('parks an endless farm when the room is cleared and resumes it after the respawn', function () {
+    Queue::fake();
+    $respawn = fakeCombatWorld();
+
+    $character = Character::factory()->for(Rga::factory()->withSession())->create();
+    $run = Run::factory()->state([
+        'config' => ['mob_names' => ['Kix Harvester'], 'run_count' => 0],
+        'status' => RunStatus::Running,
+    ])->create();
+    $participant = RunParticipant::factory()->for($run)->for($character)->create();
+
+    makeRunJob($participant)->handle(app(LoginService::class));
+
+    $participant->refresh();
+
+    expect($participant->status)->toBe(RunStatus::Waiting)
+        ->and($participant->last_activity)->toContain('waiting for respawns')
+        ->and($participant->progress)->toMatchArray(['kills_done' => 1, 'cycles_done' => 1])
+        ->and($run->fresh()->status)->toBe(RunStatus::Waiting);
+
+    $this->travelTo($participant->resume_at->addMinute());
+
+    $this->artisan('outwar:runs-resume-due')->assertSuccessful();
+    Queue::assertPushed(RunMobJob::class, 1);
+
+    // The Harvester is back: the farm keeps going rather than ending.
+    $respawn();
+    makeRunJob($participant->fresh())->handle(app(LoginService::class));
+
+    $participant->refresh();
+
+    expect($participant->status)->toBe(RunStatus::Waiting)
+        ->and($participant->progress)->toMatchArray(['kills_done' => 2, 'cycles_done' => 2]);
 });

@@ -43,6 +43,9 @@ class StoreRunRequest extends FormRequest
             'npc' => ['required_if:mode,quest', 'string', 'max:255'],
             'quest_id' => ['required_if:mode,quest', 'integer', 'min:1'],
 
+            // quest + quest-list: pause before re-checking rooms whose targets were all dead
+            'respawn_wait_seconds' => ['sometimes', 'nullable', 'integer', 'min:60', 'max:86400'],
+
             // quest-list mode
             'quest_list_id' => ['required_if:mode,quest-list', 'integer', 'exists:quest_lists,id'],
 

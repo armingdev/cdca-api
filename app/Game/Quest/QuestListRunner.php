@@ -90,6 +90,10 @@ class QuestListRunner
                 return $this->summary(completed: false, reason: 'Pause requested.', endReason: RunEndReason::ExternalPause);
             }
 
+            if ($control === RunSignal::CircumspectExpired) {
+                return $this->summary(completed: false, reason: 'Circumspect expired.', endReason: RunEndReason::CircumspectExpired);
+            }
+
             $outcome = $this->runQuest($item, $log, $signal, $onBattle);
 
             if ($outcome !== null) {
@@ -131,6 +135,7 @@ class QuestListRunner
             stopRage: $this->config->stopRage,
             levelUp: $this->config->levelUp,
             smart: $this->config->smart,
+            respawnWaitSeconds: $this->config->respawnWaitSeconds,
         );
 
         try {
@@ -153,10 +158,18 @@ class QuestListRunner
             return $this->summary(completed: false, reason: 'Pause requested.', endReason: RunEndReason::ExternalPause);
         }
 
+        if ($summary->endReason === RunEndReason::CircumspectExpired) {
+            return $this->summary(completed: false, reason: $summary->stopReason, endReason: RunEndReason::CircumspectExpired);
+        }
+
         if (! $summary->completed) {
+            // A depleted quest parks the list rather than ending it, so the
+            // wrapper must not read "Stopped".
+            $verb = $summary->endReason === RunEndReason::TargetsDepleted ? 'Waiting' : 'Stopped';
+
             return $this->summary(
                 completed: false,
-                reason: "Stopped on {$item->displayName()}: {$summary->stopReason}",
+                reason: "{$verb} on {$item->displayName()}: {$summary->stopReason}",
                 endReason: $summary->endReason,
             );
         }

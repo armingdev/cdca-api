@@ -77,6 +77,17 @@ it('accepts and stores the mob pass options', function () {
     ])->assertStatus(422)->assertJsonValidationErrorFor('attack_interval_seconds');
 });
 
+it('defaults a mob run to an endless farm', function () {
+    Queue::fake();
+    $character = Character::factory()->for($this->rga)->create();
+
+    $this->postJson('/api/v1/runs', [
+        'mode' => 'mob',
+        'characters' => [$character->id],
+        'mobs' => ['Kix Harvester'],
+    ])->assertCreated()->assertJsonPath('data.config.run_count', 0);
+});
+
 it('stores the smart flag on the run config', function () {
     Queue::fake();
     $character = Character::factory()->for($this->rga)->create();
@@ -101,6 +112,40 @@ it('defaults the smart flag to off', function () {
         'characters' => [$character->id],
         'mobs' => ['Kix Harvester'],
     ])->assertCreated()->assertJsonPath('data.config.smart', false);
+});
+
+it('stores a custom respawn wait on quest runs and defaults it otherwise', function () {
+    Queue::fake();
+    $character = Character::factory()->for($this->rga)->create();
+    $other = Character::factory()->for($this->rga)->create();
+
+    $this->postJson('/api/v1/runs', [
+        'mode' => 'quest',
+        'characters' => [$character->id],
+        'npc' => 'Stella',
+        'quest_id' => 742,
+        'respawn_wait_seconds' => 600,
+    ])->assertCreated()->assertJsonPath('data.config.respawn_wait_seconds', 600);
+
+    $this->postJson('/api/v1/runs', [
+        'mode' => 'quest',
+        'characters' => [$other->id],
+        'npc' => 'Stella',
+        'quest_id' => 742,
+    ])->assertCreated()->assertJsonPath('data.config.respawn_wait_seconds', 60);
+});
+
+it('rejects a respawn wait below the one-minute floor', function () {
+    Queue::fake();
+    $character = Character::factory()->for($this->rga)->create();
+
+    $this->postJson('/api/v1/runs', [
+        'mode' => 'quest',
+        'characters' => [$character->id],
+        'npc' => 'Stella',
+        'quest_id' => 742,
+        'respawn_wait_seconds' => 5,
+    ])->assertStatus(422)->assertJsonValidationErrorFor('respawn_wait_seconds');
 });
 
 it('rejects a run for a character already enrolled in an active run', function () {
@@ -153,6 +198,29 @@ it('shows a run and stops it gracefully', function () {
         ->assertJsonPath('data.status', 'stopping');
 
     expect($participant->fresh()->status)->toBe(RunStatus::Stopping);
+});
+
+it('stops a run that is parked waiting for a respawn or a cooldown', function () {
+    Queue::fake();
+
+    $run = Run::factory()->for($this->user)->state(['status' => RunStatus::Waiting])->create();
+    $waiting = RunParticipant::factory()->for($run)->for(Character::factory()->for($this->rga))
+        ->create(['status' => RunStatus::Waiting, 'resume_at' => now()->addHour()]);
+
+    $this->postJson("/api/v1/runs/{$run->id}/stop")
+        ->assertOk()
+        ->assertJsonPath('data.status', 'stopped');
+
+    expect($waiting->fresh()->status)->toBe(RunStatus::Stopped)
+        ->and($waiting->fresh()->resume_at)->toBeNull()
+        ->and($waiting->fresh()->finished_at)->not->toBeNull();
+
+    // The resume scheduler must not pick it back up.
+    $this->travelTo(now()->addHours(2));
+    $this->artisan('outwar:runs-resume-due')->assertSuccessful();
+
+    expect($waiting->fresh()->status)->toBe(RunStatus::Stopped);
+    Queue::assertNothingPushed();
 });
 
 it('pauses a running run and resumes it with a fresh dispatch', function () {

@@ -83,15 +83,29 @@ class CharacterSkill extends Model
      */
     public function isBuffActive(): bool
     {
+        $endsAt = $this->buffEndsAt();
+
+        return $endsAt !== null && $endsAt->isFuture();
+    }
+
+    /**
+     * When the current buff window closes: the server-read value when known,
+     * otherwise last cast + the (level-scaled, else catalog) duration. Null
+     * when the skill was never cast and no window was read.
+     */
+    public function buffEndsAt(): ?CarbonInterface
+    {
         if ($this->buff_until !== null) {
-            return $this->buff_until->isFuture();
+            return $this->buff_until;
         }
 
         $duration = $this->current_duration_minutes ?? $this->skill->duration_minutes;
 
-        return $this->last_cast_at !== null
-            && $duration !== null
-            && $this->last_cast_at->addMinutes($duration)->isFuture();
+        if ($this->last_cast_at === null || $duration === null) {
+            return null;
+        }
+
+        return $this->last_cast_at->addMinutes($duration);
     }
 
     /**

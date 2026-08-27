@@ -31,8 +31,9 @@ use Illuminate\Support\Collection;
     {--message= : (pvp mode) Optional attack message}
     {--stop-rage=2500 : Per-character rage floor}
     {--max-kills=0 : (mob mode) Stop each character after this many wins (0 = unlimited)}
-    {--run-count=0 : (mob mode) Full passes per character (0 = unbounded while cycling)}
+    {--run-count=0 : (mob mode) Full passes per character (0 = farm indefinitely, waiting out respawns)}
     {--attack-interval= : (mob mode) Seconds to wait between passes (min 60)}
+    {--respawn-wait= : (quest modes) Seconds to wait for mob respawns before retrying an objective (min 60)}
     {--level-up : Level up (refills rage) instead of stopping when rage is low}
     {--smart : Smart mode: auto-equip backpack gear, level up after a loss, stop when outmatched}
     {--cast-on-start : Cast the character\'s selected skills before the run begins}
@@ -182,6 +183,7 @@ class RunStartCommand extends Command
             stopRage: (int) $this->option('stop-rage'),
             levelUp: (bool) $this->option('level-up'),
             smart: (bool) $this->option('smart'),
+            respawnWaitSeconds: $this->respawnWaitSeconds(),
         ))->toArray();
     }
 
@@ -209,7 +211,15 @@ class RunStartCommand extends Command
             stopRage: (int) $this->option('stop-rage'),
             levelUp: (bool) $this->option('level-up'),
             smart: (bool) $this->option('smart'),
+            respawnWaitSeconds: $this->respawnWaitSeconds(),
         ))->toArray();
+    }
+
+    private function respawnWaitSeconds(): int
+    {
+        return $this->option('respawn-wait') !== null
+            ? max((int) $this->option('respawn-wait'), 60)
+            : QuestRunConfig::DEFAULT_RESPAWN_WAIT_SECONDS;
     }
 
     /**
