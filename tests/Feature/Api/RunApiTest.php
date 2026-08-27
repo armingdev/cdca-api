@@ -290,3 +290,17 @@ it('lists only the user\'s runs and forbids others', function () {
     $this->getJson('/api/v1/runs')->assertOk()->assertJsonCount(1, 'data');
     $this->getJson("/api/v1/runs/{$other->id}")->assertForbidden();
 });
+
+it('paginates the run history and caps the page size', function () {
+    Run::factory()->for($this->user)->count(3)->create();
+
+    $this->getJson('/api/v1/runs?per_page=2')
+        ->assertOk()
+        ->assertJsonCount(2, 'data')
+        ->assertJsonPath('meta.total', 3)
+        ->assertJsonPath('meta.per_page', 2);
+
+    $this->getJson('/api/v1/runs?per_page=5000')
+        ->assertUnprocessable()
+        ->assertJsonValidationErrorFor('per_page');
+});

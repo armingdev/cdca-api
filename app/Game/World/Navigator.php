@@ -55,6 +55,8 @@ class Navigator
 
     /**
      * Walk a BFS path (list of room ids beginning at the current room).
+     *
+     * @param  list<int>  $path
      */
     public function walk(array $path): ?RoomBlob
     {

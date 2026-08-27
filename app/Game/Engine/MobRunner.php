@@ -54,7 +54,6 @@ class MobRunner
     private bool $sawDeadTargets = false;
 
     public function __construct(
-        private readonly Character $character,
         private readonly MobRunConfig $config,
         private readonly Navigator $navigator,
         private readonly AttackService $attacker,
@@ -67,7 +66,6 @@ class MobRunner
     public static function forCharacter(Character $character, MobRunConfig $config): self
     {
         return new self(
-            $character,
             $config,
             Navigator::forCharacter($character),
             AttackService::forCharacter($character),
@@ -232,7 +230,10 @@ class MobRunner
             } catch (GameException $exception) {
                 $log($exception->getMessage());
                 $this->errors++;
-                $exhausted[end($plan->walkPath)] = true;
+                // end() takes its argument by reference, and walkPath is a
+                // readonly property — passing it directly is a fatal Error.
+                $walkPath = $plan->walkPath;
+                $exhausted[end($walkPath)] = true;
                 $blob = $this->navigator->loadCurrentRoom();
             }
         }

@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Api\V1;
 
-use App\Game\Exceptions\GameException;
 use App\Game\World\Navigator;
 use App\Game\World\RoomGraph;
 use App\Game\World\TeleportPlanner;
@@ -65,23 +64,19 @@ class CharacterTeleportController extends Controller
 
         $service = TeleportService::forCharacter($character);
 
-        try {
-            if ($request->filled('anchor_id')) {
-                $blob = $service->jump(TeleportAnchor::findOrFail($request->integer('anchor_id')));
+        if ($request->filled('anchor_id')) {
+            $blob = $service->jump(TeleportAnchor::findOrFail($request->integer('anchor_id')));
 
-                return $this->arrived($blob->curRoom, $blob->name, jumped: true, steps: 0);
-            }
-
-            if ($request->boolean('home_tavern') && ! $request->filled('room_id')) {
-                $blob = $service->toHomeTavern();
-
-                return $this->arrived($blob->curRoom, $blob->name, jumped: true, steps: 0);
-            }
-
-            return $this->travelTo($character, $service, $request->integer('room_id'));
-        } catch (GameException $exception) {
-            return response()->json(['message' => $exception->getMessage()], 422);
+            return $this->arrived($blob->curRoom, $blob->name, jumped: true, steps: 0);
         }
+
+        if ($request->boolean('home_tavern') && ! $request->filled('room_id')) {
+            $blob = $service->toHomeTavern();
+
+            return $this->arrived($blob->curRoom, $blob->name, jumped: true, steps: 0);
+        }
+
+        return $this->travelTo($character, $service, $request->integer('room_id'));
     }
 
     /**

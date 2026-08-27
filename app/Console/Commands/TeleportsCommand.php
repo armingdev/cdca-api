@@ -72,7 +72,7 @@ class TeleportsCommand extends Command
                 $link->anchor->id,
                 $link->anchor->kind->value,
                 $link->anchor->room_id !== null
-                    ? $link->anchor->room_id.' '.(Room::find($link->anchor->room_id)?->name ?? '')
+                    ? $link->anchor->room_id.' '.(Room::find($link->anchor->room_id)->name ?? '')
                     : '— unknown —',
                 $link->anchor->isFree() ? 'free' : "{$link->anchor->rage_cost} rage / {$link->anchor->cooldown_minutes}m",
                 $link->is_available ? 'yes' : 'no',
@@ -81,7 +81,7 @@ class TeleportsCommand extends Command
 
         $home = $character->home_tavern_room_id;
         $this->line($home !== null
-            ? "Home tavern: {$home} ".(Room::find($home)?->name ?? '')
+            ? "Home tavern: {$home} ".(Room::find($home)->name ?? '')
             : 'Home tavern: not known yet (run `go --room=` or teleport home once).');
 
         return self::SUCCESS;

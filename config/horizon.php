@@ -45,6 +45,22 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Horizon Dashboard Access
+    |--------------------------------------------------------------------------
+    |
+    | Email addresses allowed to view the Horizon dashboard outside the local
+    | environment, as a comma-separated HORIZON_AUTHORIZED_EMAILS value. An
+    | empty list locks the dashboard to local only.
+    |
+    */
+
+    'authorized_emails' => array_values(array_filter(array_map(
+        trim(...),
+        explode(',', (string) env('HORIZON_AUTHORIZED_EMAILS', '')),
+    ))),
+
+    /*
+    |--------------------------------------------------------------------------
     | Horizon Redis Connection
     |--------------------------------------------------------------------------
     |

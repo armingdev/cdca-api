@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\LoginRequest;
 use App\Http\Requests\RegisterRequest;
+use App\Http\Resources\UserResource;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -15,10 +16,10 @@ class AuthController extends Controller
 {
     public function register(RegisterRequest $request): JsonResponse
     {
-        $user = User::create($request->validated());
-        $token = $user->createToken($request->input('device_name', 'api'))->plainTextToken;
+        $user = User::create($request->safe()->except('device_name'));
+        $token = $user->createToken($request->validated('device_name') ?? 'api')->plainTextToken;
 
-        return response()->json(['user' => $user, 'token' => $token], 201);
+        return response()->json(['user' => UserResource::make($user), 'token' => $token], 201);
     }
 
     public function login(LoginRequest $request): JsonResponse
@@ -29,9 +30,9 @@ class AuthController extends Controller
             throw ValidationException::withMessages(['email' => ['These credentials do not match our records.']]);
         }
 
-        $token = $user->createToken($request->input('device_name', 'api'))->plainTextToken;
+        $token = $user->createToken($request->validated('device_name') ?? 'api')->plainTextToken;
 
-        return response()->json(['user' => $user, 'token' => $token]);
+        return response()->json(['user' => UserResource::make($user), 'token' => $token]);
     }
 
     public function logout(Request $request): JsonResponse
@@ -43,6 +44,6 @@ class AuthController extends Controller
 
     public function user(Request $request): JsonResponse
     {
-        return response()->json(['user' => $request->user()]);
+        return response()->json(['user' => UserResource::make($request->user())]);
     }
 }

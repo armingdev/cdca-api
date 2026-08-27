@@ -67,6 +67,11 @@ class QuestLocationResolver
         $mobsByName = $mobs->groupBy('name');
         $mobsById = $mobs->keyBy('id');
 
+        // One representative mob per name, for the by-name lookups that only
+        // need a single match. Reversed first, so that when a name repeats the
+        // earliest mob wins the key — keyBy() otherwise keeps the last.
+        $firstMobByName = $mobs->reverse()->keyBy('name');
+
         return [
             'giver' => $mobsByName->get($quest->giver, collect())
                 ->flatMap(fn (Mob $mob) => $this->locations($mob->rooms))
@@ -82,8 +87,8 @@ class QuestLocationResolver
             'items' => $collectItems
                 ->mapWithKeys(fn (string $name) => [$name => $this->itemSources(
                     $questItems->get($name),
-                    collect($observedSources->get($name, []))->map(fn (int $id) => $mobsById->get($id))->filter(),
-                    $mobsByName,
+                    $mobsById->only($observedSources->get($name, []))->values(),
+                    $firstMobByName,
                 )])
                 ->all(),
         ];
@@ -91,21 +96,19 @@ class QuestLocationResolver
 
     /**
      * @param  Collection<int, Mob>  $confirmedMobs
-     * @param  Collection<string, Collection<int, Mob>>  $mobsByName
+     * @param  Collection<array-key, Mob>  $firstMobByName
      * @return array<string, mixed>
      */
-    private function itemSources(?QuestItem $item, Collection $confirmedMobs, Collection $mobsByName): array
+    private function itemSources(?QuestItem $item, Collection $confirmedMobs, Collection $firstMobByName): array
     {
-        $seeded = collect($item?->source_mobs ?? [])
-            ->map(fn (string $name) => $mobsByName->get($name, collect())->first())
-            ->filter();
+        $seeded = $this->mobsNamed($item->source_mobs ?? [], $firstMobByName);
 
         $confirmedIds = $confirmedMobs->pluck('id');
 
         $mobs = $confirmedMobs
             ->merge($seeded->reject(fn (Mob $mob) => $confirmedIds->contains($mob->id)))
             ->map(fn (Mob $mob) => [
-                ...$this->mobInfo($mob),
+                ...$this->mobDetails($mob),
                 'confirmed_drop' => $confirmedIds->contains($mob->id),
             ])
             ->values()
@@ -121,14 +124,41 @@ class QuestLocationResolver
     }
 
     /**
+     * The catalog mobs matching the given names, skipping names we have never
+     * seen in the world (a seed list may name a mob that was never crawled).
+     *
+     * @param  list<string>  $names
+     * @param  Collection<array-key, Mob>  $firstMobByName
+     * @return Collection<int, Mob>
+     */
+    private function mobsNamed(array $names, Collection $firstMobByName): Collection
+    {
+        $found = [];
+
+        foreach ($names as $name) {
+            $mob = $firstMobByName->get($name);
+
+            if ($mob instanceof Mob) {
+                $found[] = $mob;
+            }
+        }
+
+        return collect($found);
+    }
+
+    /**
      * @return array<string, mixed>|null
      */
     private function mobInfo(?Mob $mob): ?array
     {
-        if ($mob === null) {
-            return null;
-        }
+        return $mob === null ? null : $this->mobDetails($mob);
+    }
 
+    /**
+     * @return array<string, mixed>
+     */
+    private function mobDetails(Mob $mob): array
+    {
         return [
             'id' => $mob->id,
             'name' => $mob->name,

@@ -2,6 +2,7 @@
 <phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
          bootstrap="vendor/autoload.php"
+         cacheDirectory=".phpunit.cache"
          colors="true"
 >
     <testsuites>
@@ -23,6 +24,10 @@
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="BROADCAST_CONNECTION" value="null"/>
         <env name="CACHE_STORE" value="array"/>
+        <!-- Pinned, not inherited: the app relies on PostgreSQL-only SQL
+             (make_interval, FILTER, ilike), so tests must never fall back
+             to another driver. -->
+        <env name="DB_CONNECTION" value="pgsql"/>
         <env name="DB_DATABASE" value="testing"/>
         <env name="DB_URL" value=""/>
         <env name="MAIL_MAILER" value="array"/>

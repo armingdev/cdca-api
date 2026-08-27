@@ -24,18 +24,6 @@ beforeEach(function () {
     seedCombatWorld();
 });
 
-function seedCircumspect(): Skill
-{
-    return Skill::create([
-        'id' => Skill::CIRCUMSPECT_ID,
-        'name' => 'Circumspect',
-        'school' => 'ferocity',
-        'rage_cost' => 20,
-        'cooldown_minutes' => 720,
-        'duration_minutes' => 60,
-    ]);
-}
-
 it('re-dispatches only due participants of self-propelling runs', function () {
     Queue::fake();
 

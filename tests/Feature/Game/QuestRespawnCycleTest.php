@@ -14,6 +14,7 @@ use App\Models\Character;
 use App\Models\Rga;
 use App\Models\Run;
 use App\Models\RunParticipant;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 
 beforeEach(function () {
@@ -141,6 +142,10 @@ it('clears the barren tally on every terminal quest outcome', function () {
 
 it('parks a quest and a quest list until Circumspect can be recast', function () {
     seedCircumspect();
+
+    // The gate reads the live recharge window off skills_info.php before it
+    // decides how long to park the run.
+    Http::fake(['*skills_info.php*' => Http::response(fakeSkillInfoHtml())]);
 
     $quest = questEndOutcome(RunEndReason::CircumspectExpired, progress: ['respawn_waits' => 4]);
     $list = questListEndOutcome(RunEndReason::CircumspectExpired, progress: ['position' => 3]);

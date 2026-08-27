@@ -12,6 +12,8 @@ use App\Game\Enums\RunMode;
 use App\Game\Enums\RunStatus;
 use App\Game\Exceptions\CharactersBusyException;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\IndexBattleEventsRequest;
+use App\Http\Requests\IndexRunsRequest;
 use App\Http\Requests\StoreRunRequest;
 use App\Http\Resources\BattleEventResource;
 use App\Http\Resources\RunResource;
@@ -21,7 +23,6 @@ use App\Models\Character;
 use App\Models\QuestList;
 use App\Models\Run;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Gate;
@@ -29,10 +30,18 @@ use Illuminate\Validation\ValidationException;
 
 class RunController extends Controller
 {
-    public function index(Request $request): AnonymousResourceCollection
+    /**
+     * The run history grows without bound, so this is the one index that
+     * paginates — the fleet-shaped lists (characters, RGAs, skills) stay whole.
+     */
+    public function index(IndexRunsRequest $request): AnonymousResourceCollection
     {
         return RunResource::collection(
-            $request->user()->runs()->with('participants.character')->latest()->get()
+            $request->user()->runs()
+                ->with('participants.character')
+                ->latest()
+                ->paginate($request->integer('per_page', 25))
+                ->withQueryString()
         );
     }
 
@@ -156,7 +165,7 @@ class RunController extends Controller
     /**
      * Battle events across the run's characters (newest first, paginated).
      */
-    public function battles(Request $request, Run $run): AnonymousResourceCollection
+    public function battles(IndexBattleEventsRequest $request, Run $run): AnonymousResourceCollection
     {
         Gate::authorize('view', $run);
 

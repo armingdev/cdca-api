@@ -1,0 +1,19 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    level: 6
+
+    # Models declare casts through `protected function casts(): array` with a
+    # `@return array<string, string>` docblock. That docblock hides the constant
+    # array Larastan needs, so it must read the method body instead — without
+    # this every cast attribute degrades to string and enum/array access breaks.
+    parseModelCastsMethod: true
+
+    # Production code only. The test suite leans on framework dynamism PHPStan
+    # cannot model (facade spies, pivot attributes, by-reference fake-world
+    # closures) and is already verified by running it.
+    paths:
+        - app
+        - database
+        - routes

@@ -84,6 +84,21 @@ it('logs an RGA in, captures its session, and queues a stat refresh per characte
     Queue::assertPushed(RefreshCharacterStatsJob::class, 2);
 });
 
+it('reports rejected credentials as a 422 and queues nothing', function () {
+    Queue::fake();
+    $rga = Rga::factory()->for($this->user)->create();
+    Character::factory()->for($rga)->create();
+
+    Http::fake(['outwar.com/index.php' => Http::response('', 302, ['Location' => '/login?LE=1'])]);
+
+    $this->postJson("/api/v1/rgas/{$rga->id}/login")
+        ->assertUnprocessable()
+        ->assertJsonPath('message', fn (string $message) => str_contains($message, 'rejected the username or password'));
+
+    expect($rga->fresh()->hasSession())->toBeFalse();
+    Queue::assertNothingPushed();
+});
+
 it('queues a fleet-wide stat refresh on demand and rejects it without a session', function () {
     Queue::fake();
     $connected = Rga::factory()->for($this->user)->withSession()->create();

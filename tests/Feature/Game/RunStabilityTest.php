@@ -2,6 +2,7 @@
 
 use App\Game\Auth\LoginService;
 use App\Game\Engine\RunLauncher;
+use App\Game\Enums\CharacterActivity;
 use App\Game\Enums\RunMode;
 use App\Game\Enums\RunStatus;
 use App\Game\Exceptions\CharactersBusyException;
@@ -107,6 +108,39 @@ it('releases the character lock when the run ends', function () {
 
     expect($participant->fresh()->status)->toBe(RunStatus::Completed)
         ->and(Cache::lock("character-run:{$character->id}", 5)->get())->toBeTrue();
+});
+
+it('finalizes a run whose worker was killed mid-drive', function () {
+    $character = Character::factory()->for(Rga::factory()->withSession())->create();
+    $participant = RunParticipant::factory()
+        ->for(Run::factory()->state(['status' => RunStatus::Running]))
+        ->for($character)
+        ->create(['status' => RunStatus::Running]);
+
+    // A timeout kills the worker outright, so the engine's own catch block
+    // never runs — only the queue's failed() hook does.
+    Cache::lock("character-run:{$character->id}", 7800)->get();
+
+    makeRunJob($participant)->failed(new RuntimeException('Job has timed out.'));
+
+    expect($participant->fresh()->status)->toBe(RunStatus::Failed)
+        ->and($participant->fresh()->last_activity)->toContain('timed out')
+        ->and($participant->fresh()->run->status)->toBe(RunStatus::Failed)
+        ->and($character->fresh()->status)->not->toBe(CharacterActivity::Running)
+        ->and(Cache::lock("character-run:{$character->id}", 5)->get())->toBeTrue();
+});
+
+it('leaves an already-finished participant alone when the failure arrives late', function () {
+    $character = Character::factory()->for(Rga::factory()->withSession())->create();
+    $participant = RunParticipant::factory()
+        ->for(Run::factory()->state(['status' => RunStatus::Running]))
+        ->for($character)
+        ->create(['status' => RunStatus::Completed, 'last_activity' => 'All done.']);
+
+    makeRunJob($participant)->failed(new RuntimeException('Job has timed out.'));
+
+    expect($participant->fresh()->status)->toBe(RunStatus::Completed)
+        ->and($participant->fresh()->last_activity)->toBe('All done.');
 });
 
 it('re-logs in once after a session collision and parks the participant to resume', function () {

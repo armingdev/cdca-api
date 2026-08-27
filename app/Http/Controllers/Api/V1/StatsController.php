@@ -4,11 +4,11 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Game\Enums\BattleOutcome;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\IndexBattleEventsRequest;
 use App\Http\Resources\BattleEventResource;
 use App\Models\BattleEvent;
 use App\Models\Character;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -18,7 +18,7 @@ class StatsController extends Controller
     /**
      * Recent battle events for a character (newest first, paginated).
      */
-    public function battles(Request $request, Character $character): AnonymousResourceCollection
+    public function battles(IndexBattleEventsRequest $request, Character $character): AnonymousResourceCollection
     {
         Gate::authorize('view', $character);
 

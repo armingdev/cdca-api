@@ -59,11 +59,13 @@ Request:
   "password": "secret1234", "password_confirmation": "secret1234",
   "device_name": "angular-web" }
 ```
-`device_name` is optional (labels the token). `201 Created`:
+`device_name` is optional (labels the token; max 255 chars). `201 Created`:
 ```json
-{ "user": { "id": 1, "name": "Armin", "email": "armin@example.com" },
+{ "user": { "id": 1, "name": "Armin", "email": "armin@example.com",
+            "created_at": "2026-07-16T18:40:00.000000Z" },
   "token": "1|abcdef..." }
 ```
+Those four fields are the whole user payload, here and from `GET /user`.
 
 ### `POST /login`
 Public. Rate-limited (10/min per IP).
@@ -77,7 +79,7 @@ Public. Rate-limited (10/min per IP).
 Auth required. Revokes the **current** token. `200 OK`.
 
 ### `GET /user`
-Auth required. `200 OK` → `{ "user": { ... } }`.
+Auth required. `200 OK` → `{ "user": { id, name, email, created_at } }`.
 
 **Unauthenticated requests to protected routes return `401`.**
 
@@ -89,13 +91,22 @@ Auth required. `200 OK` → `{ "user": { ... } }`.
 - **Collections** are `{ "data": [ ... ] }`. Paginated collections also include
   `links` (`first/last/prev/next`) and `meta` (`current_page`, `last_page`,
   `per_page`, `total`, …). Paginated endpoints accept `?per_page=` and `?page=`.
+  `per_page` must be 1–100; anything outside that range is a `422`. Only lists
+  that grow without bound page (runs, battle events, quests, mob search) —
+  fleet-shaped lists (characters, RGAs, skills, quest and attack lists) return
+  every row.
 - **Timestamps** are ISO-8601 UTC strings (e.g. `2026-07-16T18:40:00.000000Z`)
   or `null`.
 - **Errors:**
   - `401` — missing/invalid token.
   - `403` — authenticated but not your resource.
   - `404` — not found.
-  - `422` — validation failed: `{ "message": "...", "errors": { "field": ["..."] } }`.
+  - `422` — two distinct cases, told apart by whether `errors` is present:
+    - validation failed: `{ "message": "...", "errors": { "field": ["..."] } }`;
+    - **the game refused the action** (dead session, unparseable page, gated
+      room): `{ "message": "..." }` with no `errors`. Every endpoint that talks
+      to the game can return this. The message is written to be shown to the
+      user as-is.
   - `429` — rate limited (auth routes).
 - **Enums** (exact string values):
   - Run `mode`: `mob` · `quest` · `quest-list` · `pvp`
@@ -357,9 +368,10 @@ quest-list → `position`/`quests_completed`/`quests_skipped`. `resume_at` is
 set while a participant is `waiting` (Circ cooldown, pass interval, session
 recovery) — that's when the scheduler re-dispatches it.
 
-### `GET /runs`
+### `GET /runs?per_page=25`
 Your runs, newest first, each with `participants` (and their `character`). This
-is the **fleet dashboard** feed.
+is the **fleet dashboard** feed. Paginated — 25 per page by default, `per_page`
+capped at 100.
 
 ### `GET /runs/{id}`
 One run with live participants. **Poll this** (2–3s) while a run screen is open

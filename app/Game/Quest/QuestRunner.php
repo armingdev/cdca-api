@@ -141,7 +141,7 @@ class QuestRunner
                 ));
 
                 $farm = $this->fulfill($objective, $log, $signal, $onBattle);
-                $wins = $farm?->wins ?? 0;
+                $wins = $farm->wins ?? 0;
                 $this->kills += $wins;
 
                 // Surface an external signal from the nested farm without
@@ -365,7 +365,7 @@ class QuestRunner
             ->pluck('mob_id')
             ->pipe(fn ($ids) => Mob::whereIn('id', $ids)->pluck('name'));
 
-        $seeded = QuestItem::where('name', $itemName)->first()?->source_mobs ?? [];
+        $seeded = QuestItem::where('name', $itemName)->first()->source_mobs ?? [];
 
         return $observed
             ->merge(Mob::whereIn('name', $seeded)->pluck('name'))

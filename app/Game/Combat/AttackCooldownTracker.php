@@ -109,14 +109,15 @@ class AttackCooldownTracker
             return [];
         }
 
-        return AttackCooldown::query()
-            ->where('character_id', $this->character->id)
-            ->whereIn('opponent_player_id', $playerIds)
-            ->blocking()
-            ->pluck('opponent_player_id')
-            ->flip()
-            ->map(fn (): bool => true)
-            ->all();
+        return array_fill_keys(
+            AttackCooldown::query()
+                ->where('character_id', $this->character->id)
+                ->whereIn('opponent_player_id', $playerIds)
+                ->blocking()
+                ->pluck('opponent_player_id')
+                ->all(),
+            true,
+        );
     }
 
     /** Note a successful attack, blocking the target for the window. */
