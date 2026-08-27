@@ -18,6 +18,12 @@ semantics change**.
   manual refresh endpoints exist for both a single character and a whole RGA.
 - Mob (farming) runs accept `run_count` and `attack_interval_seconds`
   ("number of runs" and "attack interval" with pass semantics).
+- **Quest/quest-list runs now wait for mob respawns instead of stopping** when
+  an objective needs more kills or drops than there are live mobs (§4b).
+- **Mob runs now farm indefinitely by default**, waiting out respawns between
+  passes; send `run_count: 1` for a one-shot farm (§4c).
+- **Circumspect-gated runs park the moment the buff lapses** instead of
+  fighting on unbuffed until the pass ends (§4d).
 - New endpoints: pause/resume runs, delete runs, update RGA credentials,
   refresh stats ×2.
 
@@ -104,10 +110,10 @@ Pause → change per-character `cast_on_start` skill selection (`PUT
 
 `POST /runs` with `mode: "mob"` accepts two new optional config fields:
 
-- `run_count` (int ≥ 0, default 0): number of **passes** per character. One
+- `run_count` (int ≥ 0, optional): number of **passes** per character. One
   pass = attack the selected mobs until none are left alive or the rage
-  floor is hit. 0/absent = unbounded (cycles while an interval or
-  `require_circumspect` gives it a reason to; otherwise classic single pass).
+  floor is hit. **`0` means farm forever** — see §4c. Omitting the field
+  entirely is the classic single pass.
 - `attack_interval_seconds` (int 60–86400, optional): wait between passes
   (mob respawn time). Between passes the participant is `waiting` with
   `resume_at` set.
@@ -119,6 +125,70 @@ Interactions worth surfacing in the UI:
   minutes — or the Circumspect recharge when `require_circumspect` is on.
 - The echoed `config` object now always contains `run_count` and
   `attack_interval_seconds` (old runs created before this change lack them).
+
+## 4c. Mob farms run indefinitely by default (2026-08-27)
+
+**BREAKING / semantics change.** A mob run no longer stops when the rooms are
+empty. `run_count` 0 — the default, whether the field is sent as `0` or
+omitted — now means **farm indefinitely**: clear the targets, park `waiting`
+until they respawn, come back and keep killing.
+
+| `run_count` | behavior |
+|---|---|
+| omitted or `0` | **farm indefinitely** (new default) |
+| `N > 0` | N passes, then `completed` (unchanged) |
+
+Previously `0` produced a single pass unless `attack_interval_seconds` or
+`require_circumspect` gave the run a reason to cycle. **A client that wants a
+one-shot farm must now send `run_count: 1`.**
+
+- Between passes the participant is `waiting` with `resume_at`; when the pass
+  ended because the room was cleared, `last_activity` reads "Pass N cleared
+  the targets — waiting for respawns, back at {time}."
+- The wait is `attack_interval_seconds` when set, otherwise 60 seconds.
+- Rage-out no longer ends the farm either: it parks for the rage window (30
+  minutes, or the Circumspect recharge on a gated run) and carries on.
+- An endless farm ends only on `max_kills`, being outmatched, or a manual
+  stop — there is no give-up counter, unlike the quest respawn wait in §4b.
+
+## 4d. Circumspect-gated runs park the moment the buff lapses (2026-08-27)
+
+With `require_circumspect` on, a run previously only re-checked the buff at
+the start of each pass, so a long pass could keep fighting at full rage cost
+after Circumspect had expired. All modes now end the pass the moment the buff
+window closes, park as `waiting` until the skill comes off cooldown, and on
+resume re-cast the run's selected skills (`cast_on_start`) plus Circumspect
+before continuing from persisted progress.
+
+`last_activity` while parked reads "Circumspect expired. Waiting for
+Circumspect — resumes {time}." Nothing changes for runs that do not set
+`require_circumspect`.
+
+## 4b. Quest runs wait for mob respawns (2026-08-27)
+
+**BREAKING / semantics change.** A quest or quest-list run whose current
+objective still needs kills (or item drops) but whose target mobs are *all
+dead right now* no longer ends `stopped` with "Could not make progress on
+objective '…'". It parks as `waiting` with `resume_at` and resumes itself when
+the mobs respawn, repeating until the objective is met. This covers both kill
+objectives ("kill 20" with only 10 mobs spawned) and collect objectives (farm
+the source mobs until every quest item has dropped). Quest lists park on the
+unsettled quest instead of abandoning the rest of the list.
+
+The old `stopped` verdict is kept only for genuinely unfulfillable objectives
+— no known source mob, unmapped giver, dead link — so "stopped on an
+objective" now really does mean the client should intervene.
+
+- New optional config field for `mode: "quest"` and `mode: "quest-list"`:
+  `respawn_wait_seconds` (int 60–86400, default 60) — how long to park before
+  re-checking the target rooms. Echoed in the run's `config`.
+- Participants gain `progress.respawn_waits`: consecutive parks that produced
+  no kills and no completed steps. Reset to 0 (or 1) as soon as a cycle makes
+  progress; after 30 fruitless waits the run stops with "Nothing respawned
+  after 30 waits — giving up."
+- `last_activity` while parked reads "All '{target}' targets are dead —
+  waiting for respawn. Resumes {time}." — render it like any other `waiting`
+  participant.
 
 ## 5. Characters: live activity + stats freshness
 

@@ -50,6 +50,9 @@ class MobRunner
     /** @var array<string, true> mob names smart mode has given up on for this run */
     private array $outmatched = [];
 
+    /** A target was seen dead in a visited room — the pass ran out of live mobs, not out of mobs. */
+    private bool $sawDeadTargets = false;
+
     public function __construct(
         private readonly Character $character,
         private readonly MobRunConfig $config,
@@ -151,6 +154,10 @@ class MobRunner
                 return $this->summary('Pause requested.', RunEndReason::ExternalPause);
             }
 
+            if ($control === RunSignal::CircumspectExpired) {
+                return $this->summary('Circumspect expired.', RunEndReason::CircumspectExpired);
+            }
+
             if ($current->rage < $this->config->stopRage) {
                 $recovered = $this->recoverRage($log);
 
@@ -195,6 +202,11 @@ class MobRunner
                 continue;
             }
 
+            if (! $this->sawDeadTargets && $this->hasDeadTarget($blob)) {
+                $this->sawDeadTargets = true;
+                $log('Targets here are dead — respawn pending.');
+            }
+
             $exhausted[$blob->curRoom] = true;
 
             $plan = $planner->planToNearest(
@@ -224,6 +236,23 @@ class MobRunner
                 $blob = $this->navigator->loadCurrentRoom();
             }
         }
+    }
+
+    /**
+     * A configured target rendered as a corpse in this room: it exists here and
+     * will respawn on the game's timer, which is what separates "cleared the
+     * room" from "this mob does not spawn here". Outmatched-but-alive mobs
+     * deliberately do not count — waiting cannot fix being too weak.
+     */
+    private function hasDeadTarget(RoomBlob $blob): bool
+    {
+        foreach ($blob->mobs as $sighting) {
+            if ($sighting->isDead && in_array($sighting->name, $this->config->mobNames, true)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function liveTarget(RoomBlob $blob): ?MobSighting
@@ -370,6 +399,6 @@ class MobRunner
 
     private function summary(string $reason, RunEndReason $endReason): MobRunSummary
     {
-        return new MobRunSummary($this->wins, $this->losses, $this->errors, $reason, $endReason);
+        return new MobRunSummary($this->wins, $this->losses, $this->errors, $reason, $endReason, $this->sawDeadTargets);
     }
 }

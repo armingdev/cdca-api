@@ -13,4 +13,11 @@ enum RunSignal: string
     case None = 'none';
     case Pause = 'pause';
     case Stop = 'stop';
+
+    /**
+     * Not a user signal: a Circumspect-gated run whose buff has just run out.
+     * The engine ends its pass immediately so the job can park until the skill
+     * comes off cooldown rather than fight on at full rage cost.
+     */
+    case CircumspectExpired = 'circumspect_expired';
 }

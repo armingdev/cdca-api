@@ -96,7 +96,10 @@ it('releases the character lock when the run ends', function () {
 
     $character = Character::factory()->for(Rga::factory()->withSession())->create();
     $participant = RunParticipant::factory()
-        ->for(Run::factory()->state(['status' => RunStatus::Running]))
+        ->for(Run::factory()->state([
+            'status' => RunStatus::Running,
+            'config' => ['mob_names' => ['Kix Harvester'], 'run_count' => 1],
+        ]))
         ->for($character)
         ->create();
 
@@ -173,7 +176,7 @@ it('creates a future-scheduled run as pending and flips it to running at first p
     $run = app(RunLauncher::class)->launch(
         RunMode::Mob,
         collect([$character]),
-        ['mob_names' => ['Kix Harvester']],
+        ['mob_names' => ['Kix Harvester'], 'run_count' => 1],
         startAt: now()->addHours(2),
     );
 

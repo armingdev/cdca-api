@@ -4,10 +4,12 @@ namespace App\Jobs;
 
 use App\Game\Engine\ParticipantOutcome;
 use App\Game\Engine\QuestListRunConfig;
+use App\Game\Engine\QuestListRunSummary;
 use App\Game\Engine\RunEndReason;
 use App\Game\Enums\RunStatus;
 use App\Game\Quest\QuestListRunner;
 use App\Models\Character;
+use App\Models\Run;
 use App\Models\RunParticipant;
 use Closure;
 
@@ -40,9 +42,41 @@ class RunQuestListJob extends RunJob
             },
         );
 
-        if ($summary->endReason === RunEndReason::RageExhausted && $participant->run->require_circumspect) {
+        return $this->outcomeForListEnd($summary, $config, $participant->run, $participant->progress ?? [], $character);
+    }
+
+    /**
+     * Decide what a finished list cycle means for the participant. The parked
+     * position stays on the unsettled quest, so a resume re-enters it and
+     * re-reads its progress from the game.
+     *
+     * @param  array<string, mixed>  $progressIn
+     */
+    public function outcomeForListEnd(
+        QuestListRunSummary $summary,
+        QuestListRunConfig $config,
+        Run $run,
+        array $progressIn,
+        Character $character,
+    ): ParticipantOutcome {
+        if ($summary->endReason === RunEndReason::CircumspectExpired
+            || ($summary->endReason === RunEndReason::RageExhausted && $run->require_circumspect)
+        ) {
             return $this->waitForCircumspect($character, $summary->stopReason, [
                 'position' => $summary->nextPosition,
+                'respawn_waits' => 0,
+            ]);
+        }
+
+        // The current quest's targets are all dead — park the list where it
+        // stands rather than abandoning the remaining quests.
+        if ($summary->endReason === RunEndReason::TargetsDepleted) {
+            $madeProgress = $summary->kills > 0 || $summary->questsCompleted > 0;
+            $waits = $madeProgress ? 1 : (int) ($progressIn['respawn_waits'] ?? 0) + 1;
+
+            return $this->waitForRespawn($summary->stopReason, $config->respawnWaitSeconds, [
+                'position' => $summary->nextPosition,
+                'respawn_waits' => $waits,
             ]);
         }
 
@@ -58,6 +92,7 @@ class RunQuestListJob extends RunJob
 
         return new ParticipantOutcome($status, $summary->stopReason, progress: [
             'position' => $summary->nextPosition,
+            'respawn_waits' => 0,
         ]);
     }
 }

@@ -12,6 +12,7 @@ final readonly class QuestListRunConfig
         public int $stopRage = 2500,
         public bool $levelUp = false,
         public bool $smart = false,
+        public int $respawnWaitSeconds = QuestRunConfig::DEFAULT_RESPAWN_WAIT_SECONDS,
     ) {}
 
     /**
@@ -24,6 +25,7 @@ final readonly class QuestListRunConfig
             stopRage: (int) ($config['stop_rage'] ?? 2500),
             levelUp: (bool) ($config['level_up'] ?? false),
             smart: (bool) ($config['smart'] ?? false),
+            respawnWaitSeconds: (int) ($config['respawn_wait_seconds'] ?? QuestRunConfig::DEFAULT_RESPAWN_WAIT_SECONDS),
         );
     }
 
@@ -37,6 +39,7 @@ final readonly class QuestListRunConfig
             'stop_rage' => $this->stopRage,
             'level_up' => $this->levelUp,
             'smart' => $this->smart,
+            'respawn_wait_seconds' => $this->respawnWaitSeconds,
         ];
     }
 }

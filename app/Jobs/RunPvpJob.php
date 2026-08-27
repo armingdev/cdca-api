@@ -38,6 +38,10 @@ class RunPvpJob extends RunJob
         $summary = PvpRunner::forCharacter($character, $config, $source)
             ->run(log: $log, signal: $signal, onBattle: $onBattle);
 
+        if ($summary->endReason === RunEndReason::CircumspectExpired) {
+            return $this->waitForCircumspect($character, $summary->stopReason);
+        }
+
         $status = match ($summary->endReason) {
             RunEndReason::ExternalStop => RunStatus::Stopped,
             RunEndReason::ExternalPause => RunStatus::Paused,

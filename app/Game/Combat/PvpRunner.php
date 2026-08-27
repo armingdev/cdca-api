@@ -115,6 +115,10 @@ class PvpRunner
                     return $this->summary(false, 'Pause requested.', RunEndReason::ExternalPause);
                 }
 
+                if ($control === RunSignal::CircumspectExpired) {
+                    return $this->summary(false, 'Circumspect expired.', RunEndReason::CircumspectExpired);
+                }
+
                 if ($current->rage < $this->config->stopRage) {
                     return $this->summary(
                         completed: false,

@@ -179,6 +179,9 @@ class RunController extends Controller
         $stopRage = $request->integer('stop_rage', 2500);
         $levelUp = $request->boolean('level_up');
         $smart = $request->boolean('smart');
+        $respawnWaitSeconds = $request->filled('respawn_wait_seconds')
+            ? $request->integer('respawn_wait_seconds')
+            : QuestRunConfig::DEFAULT_RESPAWN_WAIT_SECONDS;
 
         return match ($mode) {
             RunMode::Mob => (new MobRunConfig(
@@ -200,6 +203,7 @@ class RunController extends Controller
                 stopRage: $stopRage,
                 levelUp: $levelUp,
                 smart: $smart,
+                respawnWaitSeconds: $respawnWaitSeconds,
             ))->toArray(),
 
             RunMode::QuestList => (new QuestListRunConfig(
@@ -207,6 +211,7 @@ class RunController extends Controller
                 stopRage: $stopRage,
                 levelUp: $levelUp,
                 smart: $smart,
+                respawnWaitSeconds: $respawnWaitSeconds,
             ))->toArray(),
 
             // All five PvP modes share one config; they differ only in which

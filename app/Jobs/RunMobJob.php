@@ -51,6 +51,14 @@ class RunMobJob extends RunJob
             );
         }
 
+        // The buff lapsed part-way through the pass, so the pass is not done —
+        // park until Circumspect is castable again without counting a cycle.
+        if ($summary->endReason === RunEndReason::CircumspectExpired) {
+            return $this->waitForCircumspect($character, $summary->stopReason, [
+                'kills_done' => (int) ($progress['kills_done'] ?? 0) + $summary->wins,
+            ]);
+        }
+
         return $this->outcomeForPassEnd($summary, $config, $participant->run, $progress, $character);
     }
 
@@ -93,14 +101,9 @@ class RunMobJob extends RunJob
             );
         }
 
-        $cycling = $config->runCount > 0
-            || $config->attackIntervalSeconds !== null
-            || $run->require_circumspect;
-
-        if (! $cycling) {
-            return new ParticipantOutcome(RunStatus::Completed, $summary->stopReason, progress: $progress);
-        }
-
+        // Past this point the farm is unbounded (run_count 0): it always has
+        // another pass to run, so every ending parks rather than completes.
+        // Only max_kills, being outmatched, or a manual stop end it.
         if ($summary->endReason === RunEndReason::RageExhausted) {
             if ($run->require_circumspect) {
                 return $this->waitForCircumspect($character, $summary->stopReason, $progress);
@@ -122,7 +125,9 @@ class RunMobJob extends RunJob
 
         return new ParticipantOutcome(
             RunStatus::Waiting,
-            "Pass {$cyclesDone} complete — next at {$resumeAt->format('Y-m-d H:i')}.",
+            $summary->sawDeadTargets
+                ? "Pass {$cyclesDone} cleared the targets — waiting for respawns, back at {$resumeAt->format('Y-m-d H:i')}."
+                : "Pass {$cyclesDone} complete — next at {$resumeAt->format('Y-m-d H:i')}.",
             $resumeAt,
             $progress,
         );

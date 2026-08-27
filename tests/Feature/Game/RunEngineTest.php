@@ -52,7 +52,11 @@ it('executes a participant run to completion and settles the run status', functi
 
     $character = Character::factory()->for(Rga::factory()->withSession())->create();
     $participant = RunParticipant::factory()
-        ->for(Run::factory()->state(['status' => RunStatus::Running]))
+        ->for(Run::factory()->state([
+            'status' => RunStatus::Running,
+            // A single pass, so the farm settles instead of cycling forever.
+            'config' => ['mob_names' => ['Kix Harvester'], 'run_count' => 1],
+        ]))
         ->for($character)
         ->create();
 
@@ -62,7 +66,7 @@ it('executes a participant run to completion and settles the run status', functi
 
     expect($participant->status)->toBe(RunStatus::Completed)
         ->and($participant->wins)->toBe(1)
-        ->and($participant->last_activity)->toContain('No live targets')
+        ->and($participant->last_activity)->toContain('Reached 1 pass(es)')
         ->and($participant->started_at)->not->toBeNull()
         ->and($participant->finished_at)->not->toBeNull()
         ->and($participant->run->fresh()->status)->toBe(RunStatus::Completed);

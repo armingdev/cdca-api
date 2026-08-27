@@ -106,6 +106,10 @@ class QuestRunner
                 return $this->summary(completed: false, reason: 'Pause requested.', endReason: RunEndReason::ExternalPause);
             }
 
+            if ($control === RunSignal::CircumspectExpired) {
+                return $this->summary(completed: false, reason: 'Circumspect expired.', endReason: RunEndReason::CircumspectExpired);
+            }
+
             $page = $this->questService->viewStep($npcId, $stepId, $sendQuestId ? $this->config->questId : null);
             $sendQuestId = false;
 
@@ -150,6 +154,10 @@ class QuestRunner
                     return $this->summary(completed: false, reason: 'Pause requested.', endReason: RunEndReason::ExternalPause);
                 }
 
+                if ($farm !== null && $farm->endReason === RunEndReason::CircumspectExpired) {
+                    return $this->summary(completed: false, reason: $farm->stopReason, endReason: RunEndReason::CircumspectExpired);
+                }
+
                 if ($farm !== null && $farm->endReason === RunEndReason::RageExhausted) {
                     return $this->summary(completed: false, reason: $farm->stopReason, endReason: RunEndReason::RageExhausted);
                 }
@@ -158,6 +166,23 @@ class QuestRunner
                 // losing fight, so surface the verdict as it stands.
                 if ($farm !== null && $farm->endReason === RunEndReason::Outmatched) {
                     return $this->summary(completed: false, reason: $farm->stopReason, endReason: RunEndReason::Outmatched);
+                }
+
+                // The objective's targets are all corpses right now. They
+                // respawn on the game's timer, so parking beats giving up —
+                // and walking back to the giver first would waste the trip.
+                // Kill and collect objectives share this path: both farm the
+                // same mobs, only the game-side progress metric differs.
+                if ($farm !== null
+                    && $farm->endReason === RunEndReason::Completed
+                    && $wins === 0
+                    && $farm->sawDeadTargets
+                ) {
+                    return $this->summary(
+                        completed: false,
+                        reason: "All '{$objective->target}' targets are dead — waiting for respawn.",
+                        endReason: RunEndReason::TargetsDepleted,
+                    );
                 }
 
                 $this->navigateToNpc();

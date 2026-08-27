@@ -7,9 +7,8 @@ namespace App\Game\Engine;
  *
  * A "pass" (run) is one full sweep: attack the selected mobs until none are
  * left alive or the rage floor is hit. run_count bounds how many passes each
- * character performs (0 = unbounded); attack_interval_seconds is the wait
- * between passes (mob respawn time). Neither set (and no Circumspect gate)
- * means the classic single-pass run.
+ * character performs; 0 (the default) farms indefinitely, parking between
+ * passes to wait out respawns. attack_interval_seconds sets that wait.
  *
  * `smart` is the low-level survival mode: auto-equip the best backpack gear,
  * level up after a loss (levels grant atk/def), and give up on a mob after
@@ -19,6 +18,7 @@ final readonly class MobRunConfig
 {
     /**
      * @param  list<string>  $mobNames
+     * @param  int  $runCount  passes to perform; 0 = farm indefinitely
      */
     public function __construct(
         public array $mobNames,

@@ -326,9 +326,9 @@ Common fields (all modes):
 Mode-specific fields:
 | Mode | Fields |
 |---|---|
-| `mob` | `mobs`: string[] (exact mob names, required); `max_kills`: int (0 = unlimited, counted across passes); `run_count`: int (full passes per character, 0 = unbounded while cycling); `attack_interval_seconds`: int 60–86400 (wait between passes); `drop_junk`: bool |
-| `quest` | `npc`: string (giver name, required); `quest_id`: int (required) |
-| `quest-list` | `quest_list_id`: int (required, must be yours) |
+| `mob` | `mobs`: string[] (exact mob names, required); `max_kills`: int (0 = unlimited, counted across passes); `run_count`: int (full passes per character; 0/absent = farm indefinitely, waiting out respawns — send 1 for a single pass); `attack_interval_seconds`: int 60–86400 (wait between passes); `drop_junk`: bool |
+| `quest` | `npc`: string (giver name, required); `quest_id`: int (required); `respawn_wait_seconds`: int 60–86400 (default 60, wait before retrying an objective whose targets are all dead) |
+| `quest-list` | `quest_list_id`: int (required, must be yours); `respawn_wait_seconds`: int 60–86400 (default 60) |
 | `pvp` | `targets`: string[] (player names, required); `attack_rage`: int 2–50 (default 50); `attacks_per_target`: int (default 1); `message`: string? |
 
 Example (mob mode, fleet of 2, cast skills + Circ gate):

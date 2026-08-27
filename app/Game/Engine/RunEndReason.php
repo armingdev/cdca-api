@@ -22,10 +22,23 @@ enum RunEndReason: string
     case Stuck = 'stuck';
 
     /**
+     * The objective's targets exist but every one of them was dead this pass.
+     * Unlike Stuck this is temporary — they respawn on a timer — so parking
+     * and retrying is productive rather than a dead end.
+     */
+    case TargetsDepleted = 'targets_depleted';
+
+    /**
      * Smart mode gave up on the targets: the same mob won repeatedly even
      * after levelling and re-gearing, so we stop instead of feeding it rage.
      */
     case Outmatched = 'outmatched';
+
+    /**
+     * A Circumspect-gated run whose buff expired mid-pass. Jobs park until the
+     * skill can be recast, then re-cast the run's skills and carry on.
+     */
+    case CircumspectExpired = 'circumspect_expired';
 
     case ExternalStop = 'external_stop';
     case ExternalPause = 'external_pause';
