@@ -110,6 +110,33 @@ abstract class RunJob implements ShouldQueue
         }
     }
 
+    /**
+     * The engine's own catch block cannot run when the worker is killed
+     * outright — a job timeout, an OOM, a hard restart mid-run. Without this
+     * the participant, its character, and the run all stay "Running" forever
+     * and nothing ever re-drives them, while the character-run lock blocks a
+     * restart until its TTL expires two hours later.
+     */
+    public function failed(?Throwable $exception): void
+    {
+        $participant = $this->participant->fresh();
+
+        if ($participant === null || $participant->status->isFinished()) {
+            return;
+        }
+
+        $participant->transition(
+            RunStatus::Failed,
+            Str::limit($exception?->getMessage() ?? 'The worker died before the run finished.', 250),
+        );
+
+        // This job is over either way, so the one-worker-per-character guard has
+        // nothing left to protect — free it now so the run can be restarted.
+        Cache::lock("character-run:{$participant->character_id}")->forceRelease();
+
+        $participant->loadMissing('run')->run->refreshStatus();
+    }
+
     private function drive(RunParticipant $participant, Character $character, LoginService $loginService): void
     {
         $participant->update(['status' => RunStatus::Running, 'started_at' => now()]);
@@ -121,7 +148,9 @@ abstract class RunJob implements ShouldQueue
             $run->update(['status' => RunStatus::Running]);
         }
 
-        $log = fn (string $message) => $participant->update(['last_activity' => Str::limit($message, 250)]);
+        $log = function (string $message) use ($participant): void {
+            $participant->update(['last_activity' => Str::limit($message, 250)]);
+        };
 
         try {
             if (! $character->rga->hasSession()) {

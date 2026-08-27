@@ -1,5 +1,6 @@
 <?php
 
+use App\Game\Exceptions\GameException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -18,5 +19,12 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*'),
+        );
+
+        // Anything the game itself refused is a 422 for the client: the request
+        // was well-formed, the game just said no. Mapped once here so controllers
+        // don't each repeat the same try/catch.
+        $exceptions->render(
+            fn (GameException $exception) => response()->json(['message' => $exception->getMessage()], 422),
         );
     })->create();

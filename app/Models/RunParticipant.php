@@ -98,7 +98,11 @@ class RunParticipant extends Model
 
         $this->update($attributes);
 
-        // The fleet grid's live "status" column mirrors the participant.
-        $this->character?->update(['status' => CharacterActivity::fromRunStatus($status)]);
+        // The fleet grid's live "status" column mirrors the participant. Written
+        // by key rather than through the relation: transition() runs in engine
+        // loops and once per participant in Run::requestStop(), where reading
+        // each character back would be an N+1.
+        Character::whereKey($this->character_id)
+            ->update(['status' => CharacterActivity::fromRunStatus($status)]);
     }
 }

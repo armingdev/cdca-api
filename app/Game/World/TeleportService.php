@@ -362,7 +362,7 @@ class TeleportService
                 'rage_cost' => $rageCost,
                 'cooldown_minutes' => $cooldown,
                 'source' => 'observed',
-                'first_seen_at' => $existing?->first_seen_at ?? now(),
+                'first_seen_at' => $existing->first_seen_at ?? now(),
                 'last_verified_at' => now(),
             ]);
 

@@ -118,7 +118,7 @@ class BackpackService
         // backend parses that identically to the browser's itemids[]=….
         $response = $this->client->post('ajax/backpack_action.php', [
             'action' => $action,
-            'itemids' => array_values($iids),
+            'itemids' => $iids,
             ...$extra,
         ]);
 

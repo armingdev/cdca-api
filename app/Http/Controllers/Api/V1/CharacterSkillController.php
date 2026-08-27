@@ -32,10 +32,20 @@ class CharacterSkillController extends Controller
     {
         Gate::authorize('update', $character);
 
-        $selected = collect($request->validated('skill_ids'))->unique();
+        /** @var list<int> $skillIds */
+        $skillIds = $request->validated('skill_ids');
+        $selected = collect($skillIds)->unique();
 
-        foreach ($selected as $skillId) {
-            $character->skills()->updateOrCreate(['skill_id' => $skillId], ['cast_on_start' => true]);
+        if ($selected->isNotEmpty()) {
+            $character->skills()->upsert(
+                $selected->map(fn (int $skillId) => [
+                    'character_id' => $character->id,
+                    'skill_id' => $skillId,
+                    'cast_on_start' => true,
+                ])->all(),
+                ['character_id', 'skill_id'],
+                ['cast_on_start'],
+            );
         }
 
         $character->skills()->whereNotIn('skill_id', $selected)->update(['cast_on_start' => false]);

@@ -11,6 +11,7 @@ use App\Models\Mob;
 use App\Models\Quest;
 use App\Models\Room;
 use App\Models\RunParticipant;
+use App\Models\Skill;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
@@ -29,22 +30,10 @@ use Tests\TestCase;
 
 pest()->extend(TestCase::class)
     ->use(RefreshDatabase::class)
+    // Nothing in the suite may reach the live game servers: an un-faked request
+    // throws instead of hitting sigil/torax with a real character's session.
+    ->beforeEach(fn () => Http::preventStrayRequests())
     ->in('Feature');
-
-/*
-|--------------------------------------------------------------------------
-| Expectations
-|--------------------------------------------------------------------------
-|
-| When you're writing tests, you often need to check that values meet certain conditions. The
-| "expect()" function gives you access to a set of "expectations" methods that you can use
-| to assert different things. Of course, you may extend the Expectation API at any time.
-|
-*/
-
-expect()->extend('toBeOne', function () {
-    return $this->toBe(1);
-});
 
 /*
 |--------------------------------------------------------------------------
@@ -64,6 +53,23 @@ expect()->extend('toBeOne', function () {
 function gameFixture(string $name): string
 {
     return file_get_contents(__DIR__.'/Fixtures/game/'.$name);
+}
+
+/**
+ * Seed the Circumspect skill row the run engine gates every cycle on. Shared:
+ * a helper used by more than one test file must live here, or it disappears
+ * when the suite is sharded across parallel processes.
+ */
+function seedCircumspect(): Skill
+{
+    return Skill::create([
+        'id' => Skill::CIRCUMSPECT_ID,
+        'name' => 'Circumspect',
+        'school' => 'ferocity',
+        'rage_cost' => 20,
+        'cooldown_minutes' => 720,
+        'duration_minutes' => 60,
+    ]);
 }
 
 /**

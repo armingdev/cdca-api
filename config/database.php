@@ -97,6 +97,19 @@ return [
             'prefix_indexes' => true,
             'search_path' => 'public',
             'sslmode' => env('DB_SSLMODE', 'prefer'),
+
+            // Run jobs hold a connection for up to two hours while the engine
+            // waits on the game, which is long enough for an idle TCP connection
+            // to be dropped silently by a firewall or load balancer. Keepalives
+            // make the driver notice a dead socket instead of hanging on it.
+            'keepalives' => 1,
+            'keepalives_idle' => 60,
+            'keepalives_interval' => 10,
+            'keepalives_count' => 3,
+
+            // RGA passwords and session cookies are written as query bindings.
+            // Keep them out of exception messages and the logs behind them.
+            'mask_bindings_in_exception_messages' => true,
         ],
 
         'sqlsrv' => [

@@ -2,6 +2,75 @@
 
 Notes for API consumers (Angular/mobile clients). Newest first.
 
+## 2026-08-27 — Runs paginate, page sizes are capped, game errors are 422 everywhere
+
+Four client-visible changes. Nothing was renamed or removed from an endpoint's
+URL, and no request field became required.
+
+### 1. `GET /runs` is paginated — action required
+
+It used to return **every** run under `data`. It now returns the first **25**,
+with `links` (`first/last/prev/next`) and `meta` (`current_page`, `last_page`,
+`per_page`, `total`) alongside `data`. Pass `?per_page=` (1–100) and `?page=`.
+
+A client that reads `response.data` still compiles and still works — it just
+silently stops seeing run 26 onwards. **If the runs list is a dashboard feed,
+it needs paging or an explicit `?per_page=100`.**
+
+Run history grows without bound, which is why this list pages. The
+fleet-shaped lists are unchanged and still return every row:
+`GET /characters`, `GET /rgas`, `GET /skills`, `GET /quest-lists`,
+`GET /attack-lists`, `GET /characters/{character}/skills`,
+`GET /characters/{character}/teleports`.
+
+### 2. Out-of-range `per_page` is now a 422, not a silent success
+
+`?per_page=100000` used to be honoured and would try to serialize the whole
+table. It is now a validation error (`per_page` must be 1–100, `page` ≥ 1) on
+`GET /runs`, `GET /runs/{run}/battles`,
+`GET /characters/{character}/battles`, and `GET /world/mobs`. `GET /quests`
+already enforced this and is unchanged.
+
+### 3. The `user` object lost two fields
+
+`POST /register`, `POST /login` and `GET /user` return the user as exactly:
+
+```json
+{ "id": 1, "name": "…", "email": "…", "created_at": "2026-08-27T…Z" }
+```
+
+**Removed:** `email_verified_at` and `updated_at`. They were never documented
+and nothing should depend on them, but check before assuming. The envelope
+(`{ "user": …, "token": … }`) and the token itself are unchanged.
+
+`device_name` on `POST /register` is now validated (`string`, max 255) as it
+already was on `POST /login`. Over-long values are a 422 instead of being
+accepted.
+
+### 4. Game failures are a 422 on every endpoint, not a 500 on most
+
+When the *game server* refuses something — dead session, changed page we can no
+longer parse, a room that won't let the character in — the API now always
+answers `422` with `{"message": "<human-readable reason>"}`. Previously only
+five endpoints did that and the rest surfaced an opaque `500`.
+
+Endpoints that changed from `500` to `422`:
+
+- `POST /characters/{character}/skills/sync`
+- `POST /characters/{character}/skills/{skill}/train`
+- `POST /characters/{character}/cast`
+- `POST /characters/{character}/teleports/sync`
+- `POST /characters/{character}/home-tavern`
+
+Already 422 and unchanged: `POST /rgas/{rga}/login`, `POST /rgas/{rga}/session`,
+`POST /rgas/{rga}/sync-characters`, `POST /characters/{character}/refresh-stats`,
+`POST /characters/{character}/teleports`.
+
+**A 422 now means one of two things** — a validation failure (has `errors`, keyed
+by field) or a game refusal (has only `message`). Branch on the presence of
+`errors`, and surface `message` directly to the user; these strings are written
+to be read.
+
 ## 2026-08-16 — Booted sessions are detected again
 
 Live capture against a genuinely booted session showed the game had changed

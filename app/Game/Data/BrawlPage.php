@@ -40,7 +40,11 @@ final readonly class BrawlPage
         return false;
     }
 
-    /** Standings minus ourselves — the attackable participants. */
+    /**
+     * Standings minus ourselves — the attackable participants.
+     *
+     * @return list<BrawlStanding>
+     */
     public function opponentsFor(int $playerId): array
     {
         return array_values(array_filter(

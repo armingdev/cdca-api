@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Game\Auth\CharacterSyncService;
 use App\Game\Auth\LoginService;
-use App\Game\Exceptions\GameException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\AttachRgaSessionRequest;
 use App\Http\Requests\StoreRgaRequest;
@@ -73,11 +72,7 @@ class RgaController extends Controller
     {
         Gate::authorize('update', $rga);
 
-        try {
-            $loginService->login($rga);
-        } catch (GameException $exception) {
-            return response()->json(['message' => $exception->getMessage()], 422);
-        }
+        $loginService->login($rga);
 
         $this->queueStatsRefresh($rga);
 
@@ -92,16 +87,12 @@ class RgaController extends Controller
     {
         Gate::authorize('update', $rga);
 
-        try {
-            $loginService->attachSession(
-                $rga,
-                $request->validated('rg_sess_id'),
-                $request->validated('token'),
-                $request->validated('cuserid2'),
-            );
-        } catch (GameException $exception) {
-            return response()->json(['message' => $exception->getMessage()], 422);
-        }
+        $loginService->attachSession(
+            $rga,
+            $request->validated('rg_sess_id'),
+            $request->validated('token'),
+            $request->validated('cuserid2'),
+        );
 
         $this->queueStatsRefresh($rga);
 
@@ -126,19 +117,15 @@ class RgaController extends Controller
     /**
      * Discover and upsert all characters on the RGA (both servers).
      */
-    public function syncCharacters(Rga $rga, CharacterSyncService $syncService, LoginService $loginService): AnonymousResourceCollection|JsonResponse
+    public function syncCharacters(Rga $rga, CharacterSyncService $syncService, LoginService $loginService): AnonymousResourceCollection
     {
         Gate::authorize('update', $rga);
 
-        try {
-            if (! $rga->hasSession()) {
-                $loginService->login($rga);
-            }
-
-            $characters = $syncService->sync($rga);
-        } catch (GameException $exception) {
-            return response()->json(['message' => $exception->getMessage()], 422);
+        if (! $rga->hasSession()) {
+            $loginService->login($rga);
         }
+
+        $characters = $syncService->sync($rga);
 
         $this->queueStatsRefresh($rga);
 

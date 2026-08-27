@@ -37,6 +37,18 @@ it('searches mobs by name', function () {
         ->assertJsonPath('data.0.name', 'Kix Harvester');
 });
 
+it('caps how many rows a client can demand per page', function () {
+    $character = Character::factory()->for($this->rga)->create();
+
+    $this->getJson('/api/v1/world/mobs?per_page=5000')
+        ->assertUnprocessable()
+        ->assertJsonValidationErrorFor('per_page');
+
+    $this->getJson("/api/v1/characters/{$character->id}/battles?per_page=5000")
+        ->assertUnprocessable()
+        ->assertJsonValidationErrorFor('per_page');
+});
+
 it('returns a character\'s aggregate battle stats', function () {
     $character = Character::factory()->for($this->rga)->create();
     $mob = Mob::factory()->create(['name' => 'Kix Harvester']);

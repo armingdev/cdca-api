@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Game\Combat\StatsService;
-use App\Game\Exceptions\GameException;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\CharacterResource;
 use App\Models\Character;
@@ -41,15 +40,11 @@ class CharacterController extends Controller
     {
         Gate::authorize('update', $character);
 
-        if (! $character->rga->hasSession()) {
+        if (! $character->loadMissing('rga')->rga->hasSession()) {
             return response()->json(['message' => 'No active session — log the RGA in first.'], 422);
         }
 
-        try {
-            StatsService::forCharacter($character)->refresh();
-        } catch (GameException $exception) {
-            return response()->json(['message' => $exception->getMessage()], 422);
-        }
+        StatsService::forCharacter($character)->refresh();
 
         return CharacterResource::make($character->fresh());
     }

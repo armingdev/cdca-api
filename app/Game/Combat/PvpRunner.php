@@ -33,7 +33,6 @@ class PvpRunner
     private int $skippedOnCooldown = 0;
 
     public function __construct(
-        private readonly Character $character,
         private readonly PvpRunConfig $config,
         private readonly PvpTargetSource $source,
         private readonly PvpAttackService $attacker,
@@ -44,7 +43,6 @@ class PvpRunner
     public static function forCharacter(Character $character, PvpRunConfig $config, PvpTargetSource $source): self
     {
         return new self(
-            $character,
             $config,
             $source,
             PvpAttackService::forCharacter($character),

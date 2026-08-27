@@ -22,6 +22,7 @@ class RunsRestartDueCommand extends Command
             ->where('status', RunStatus::Completed)
             ->whereNotNull('last_started_at')
             ->whereRaw('last_started_at + make_interval(mins => restart_every_minutes) <= now()')
+            ->with('participants')
             ->get();
 
         foreach ($due as $run) {

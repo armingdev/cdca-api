@@ -19,6 +19,7 @@ class CharacterPolicy
 
     private function owns(User $user, Character $character): bool
     {
-        return $character->rga->user_id === $user->id;
+        // Route-model-bound characters arrive without their RGA loaded.
+        return $character->loadMissing('rga')->rga?->user_id === $user->id;
     }
 }

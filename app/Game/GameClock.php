@@ -36,7 +36,7 @@ final class GameClock
             return null;
         }
 
-        return $parsed === false ? null : $parsed->utc();
+        return $parsed?->utc();
     }
 
     /** Interpret a unix timestamp emitted by the game (already absolute). */

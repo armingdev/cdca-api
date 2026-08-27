@@ -133,7 +133,7 @@ class GameClient
 
     private function cookieJar(): CookieJar
     {
-        $cookies = $this->rga?->cookies ?? [];
+        $cookies = $this->rga->cookies ?? [];
 
         if ($this->character !== null) {
             $cookies['ow_userid'] = (string) $this->character->suid;

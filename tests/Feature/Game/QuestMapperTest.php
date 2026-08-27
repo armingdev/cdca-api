@@ -35,6 +35,8 @@ it('maps a range of quest ids into quests and steps', function () {
         ->and($quest->total_exp)->toBe(8_000_000)
         ->and($quest->steps()->count())->toBe(9);
 
+    $quest->load('steps.conditions');
+
     $kill = $quest->steps[1]->conditions;
 
     expect($kill)->toHaveCount(1)

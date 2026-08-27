@@ -2,22 +2,28 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
-use Illuminate\Database\Eloquent\Attributes\Fillable;
-use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
-#[Fillable(['name', 'email', 'password'])]
-#[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, Notifiable;
+
+    protected $fillable = [
+        'name',
+        'email',
+        'password',
+    ];
+
+    protected $hidden = [
+        'password',
+        'remember_token',
+    ];
 
     /**
      * Get the attributes that should be cast.
@@ -49,9 +55,6 @@ class User extends Authenticatable
     }
 
     /**
-     * @return HasMany<QuestList, $this>
-     */
-    /**
      * @return HasMany<AttackList, $this>
      */
     public function attackLists(): HasMany
@@ -59,6 +62,9 @@ class User extends Authenticatable
         return $this->hasMany(AttackList::class);
     }
 
+    /**
+     * @return HasMany<QuestList, $this>
+     */
     public function questLists(): HasMany
     {
         return $this->hasMany(QuestList::class);

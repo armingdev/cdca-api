@@ -47,7 +47,7 @@ class ItemRolloverParser
 
         $lines = array_filter(array_map(
             fn (string $div): string => trim($this->toText($div)),
-            $divs[1] ?? [],
+            $divs[1],
         ));
 
         return $lines === [] ? null : implode(' ', $lines);
@@ -95,7 +95,7 @@ class ItemRolloverParser
 
         foreach ($matches as $match) {
             $label = strtolower(trim(preg_replace('/\s+/', ' ', $match[3])));
-            $value = (int) str_replace(',', '', $match[1]) + (int) str_replace(',', '', $match[2] ?? '');
+            $value = (int) str_replace(',', '', $match[1]) + (int) str_replace(',', '', $match[2]);
 
             $stats[$label] = ($stats[$label] ?? 0) + $value;
         }
