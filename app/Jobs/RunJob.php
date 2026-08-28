@@ -9,6 +9,7 @@ use App\Game\Enums\CharacterActivity;
 use App\Game\Enums\RunSignal;
 use App\Game\Enums\RunStatus;
 use App\Game\Exceptions\SessionCollisionException;
+use App\Game\GameClock;
 use App\Game\Skills\CircumspectGate;
 use App\Game\Skills\SkillCaster;
 use App\Game\Skills\SkillSyncService;
@@ -51,6 +52,13 @@ abstract class RunJob implements ShouldQueue
      * moved). Generous on purpose — waiting is the point.
      */
     protected const int MAX_BARREN_RESPAWN_WAITS = 30;
+
+    /**
+     * Hourly rage ticks a participant may wait through before we accept the
+     * character simply cannot afford its targets. A day of waiting is plenty:
+     * beyond that the run needs different targets, not more patience.
+     */
+    protected const int MAX_RAGE_WAITS = 24;
 
     public int $timeout = 7200;
 
@@ -299,6 +307,45 @@ abstract class RunJob implements ShouldQueue
             $resumeAt,
             $progress,
         );
+    }
+
+    /**
+     * The rage cycle: the character cannot pay for its next target and no
+     * setting can lower the game's price, so park until the game's hourly rage
+     * tick and try again. Shared by every mode — the wait is a property of the
+     * game clock, not of what the run is doing.
+     *
+     * @param  array<string, mixed>  $progress  must already carry the incremented 'rage_waits'
+     */
+    protected function waitForRage(string $reason, array $progress): ParticipantOutcome
+    {
+        if ((int) ($progress['rage_waits'] ?? 0) > self::MAX_RAGE_WAITS) {
+            return new ParticipantOutcome(
+                RunStatus::Stopped,
+                rtrim($reason, '.').'. Still short after '.self::MAX_RAGE_WAITS.' rage ticks — giving up.',
+                progress: $progress,
+            );
+        }
+
+        $resumeAt = GameClock::nextRageTickAt();
+
+        return new ParticipantOutcome(
+            RunStatus::Waiting,
+            rtrim($reason, '.').". Waiting for rage — resumes {$resumeAt->format('Y-m-d H:i')}.",
+            $resumeAt,
+            $progress,
+        );
+    }
+
+    /**
+     * The rage-wait tally for the next cycle: a cycle that got anything done
+     * starts it over, so only a run of fruitless waits ever gives up.
+     *
+     * @param  array<string, mixed>  $progressIn
+     */
+    protected function rageWaits(array $progressIn, bool $madeProgress): int
+    {
+        return $madeProgress ? 1 : (int) ($progressIn['rage_waits'] ?? 0) + 1;
     }
 
     /**

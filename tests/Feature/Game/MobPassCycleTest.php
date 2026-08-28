@@ -11,6 +11,7 @@ use App\Models\Character;
 use App\Models\Rga;
 use App\Models\Run;
 use App\Models\RunParticipant;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 
@@ -30,7 +31,7 @@ function passEndOutcome(
     array $progress = [],
     bool $requireCircumspect = false,
     int $wins = 1,
-    bool $sawDeadTargets = false,
+    bool $targetsRespawnPending = false,
 ): ParticipantOutcome {
     $config = MobRunConfig::fromArray(array_merge(['mob_names' => ['Kix Harvester']], $configOverrides));
     $run = Run::factory()->state([
@@ -47,7 +48,7 @@ function passEndOutcome(
         errors: 0,
         stopReason: $endReason === RunEndReason::RageExhausted ? 'Rage below the 2500 floor.' : 'No live targets remain in any known room.',
         endReason: $endReason,
-        sawDeadTargets: $sawDeadTargets,
+        targetsRespawnPending: $targetsRespawnPending,
     );
 
     return new RunMobJob($participant, (string) Str::uuid())
@@ -58,8 +59,8 @@ it('farms on by default rather than stopping when the world is empty', function 
     $this->freezeTime();
 
     // No run_count at all and an explicit 0 both mean "keep farming".
-    $implicit = passEndOutcome(RunEndReason::Completed, sawDeadTargets: true);
-    $explicit = passEndOutcome(RunEndReason::Completed, ['run_count' => 0], sawDeadTargets: true);
+    $implicit = passEndOutcome(RunEndReason::Completed, targetsRespawnPending: true);
+    $explicit = passEndOutcome(RunEndReason::Completed, ['run_count' => 0], targetsRespawnPending: true);
 
     expect($implicit->status)->toBe(RunStatus::Waiting)
         ->and($implicit->resumeAt->timestamp)->toBe(now()->addSeconds(60)->timestamp)
@@ -73,6 +74,28 @@ it('waits for rage on an endless farm instead of ending it', function () {
 
     expect($ragedOut->status)->toBe(RunStatus::Waiting)
         ->and($ragedOut->reason)->toContain('Rage depleted');
+});
+
+it('parks an endless farm on the game clock when the target is priced out of reach', function () {
+    $this->travelTo('2026-08-27 12:40:00');
+
+    $outcome = passEndOutcome(RunEndReason::RageInsufficient, wins: 0);
+
+    // The game's price, not our floor: only the hourly tick can change it, so
+    // the fixed half-hour rage nap would be a coin flip.
+    expect($outcome->status)->toBe(RunStatus::Waiting)
+        ->and($outcome->resumeAt->toDateTimeString())->toBe('2026-08-27 13:00:30')
+        ->and($outcome->progress)->toMatchArray(['rage_waits' => 1]);
+});
+
+it('waits on the circ recharge instead of the rage tick when the run is gated', function () {
+    seedCircumspect();
+    Http::fake(['*skills_info.php*' => Http::response(fakeSkillInfoHtml())]);
+
+    $outcome = passEndOutcome(RunEndReason::RageInsufficient, requireCircumspect: true, wins: 0);
+
+    expect($outcome->status)->toBe(RunStatus::Waiting)
+        ->and($outcome->reason)->toContain('Waiting for Circumspect');
 });
 
 it('does a single pass when run_count is 1', function () {

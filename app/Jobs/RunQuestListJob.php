@@ -60,7 +60,10 @@ class RunQuestListJob extends RunJob
         Character $character,
     ): ParticipantOutcome {
         if ($summary->endReason === RunEndReason::CircumspectExpired
-            || ($summary->endReason === RunEndReason::RageExhausted && $run->require_circumspect)
+            || ($run->require_circumspect && in_array($summary->endReason, [
+                RunEndReason::RageExhausted,
+                RunEndReason::RageInsufficient,
+            ], true))
         ) {
             return $this->waitForCircumspect($character, $summary->stopReason, [
                 'position' => $summary->nextPosition,
@@ -77,6 +80,20 @@ class RunQuestListJob extends RunJob
             return $this->waitForRespawn($summary->stopReason, $config->respawnWaitSeconds, [
                 'position' => $summary->nextPosition,
                 'respawn_waits' => $waits,
+            ]);
+        }
+
+        // Rage the character cannot rebuild by playing: park the list where it
+        // stands until the game's hourly tick tops it up.
+        if ($summary->endReason === RunEndReason::RageInsufficient
+            || $summary->endReason === RunEndReason::RageExhausted
+        ) {
+            $madeProgress = $summary->kills > 0 || $summary->questsCompleted > 0;
+
+            return $this->waitForRage($summary->stopReason, [
+                'position' => $summary->nextPosition,
+                'rage_waits' => $this->rageWaits($progressIn, $madeProgress),
+                'respawn_waits' => 0,
             ]);
         }
 

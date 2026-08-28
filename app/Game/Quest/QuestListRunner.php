@@ -8,7 +8,9 @@ use App\Game\Engine\QuestRunConfig;
 use App\Game\Engine\RunEndReason;
 use App\Game\Enums\RunSignal;
 use App\Game\Exceptions\GameException;
+use App\Game\Exceptions\LoginFailedException;
 use App\Game\Exceptions\QuestNotAvailableException;
+use App\Game\Exceptions\SessionCollisionException;
 use App\Models\BattleEvent;
 use App\Models\Character;
 use App\Models\QuestList;
@@ -16,13 +18,18 @@ use App\Models\QuestListItem;
 use Closure;
 
 /**
- * Runs a named quest list in order: for each quest, run it via QuestRunner;
- * a quest that is no longer available at its giver (already completed) is
- * skipped; a quest that gets stuck (rage floor, unfulfillable objective)
- * stops the whole list. When every item is processed, the list is complete.
- * A start position lets a paused or rage-parked participant resume mid-list;
- * the settle callback reports each processed item so the caller can persist
- * that position.
+ * Runs a named quest list in order: for each quest, run it via QuestRunner.
+ *
+ * A quest the list cannot finish is skipped, not fatal — already completed,
+ * giver unknown or unreachable, objective unfulfillable, or wanting an item
+ * the game only sells. One bad entry at position 3 must never cost the
+ * remaining thirty-seven. Only a whole-list condition ends the run: a stop or
+ * pause, a lapsed Circumspect buff, or rage the character cannot rebuild
+ * without waiting — and the last three park rather than stop.
+ *
+ * A start position lets a paused or parked participant resume mid-list; the
+ * settle callback reports each processed item so the caller can persist that
+ * position.
  */
 class QuestListRunner
 {
@@ -120,11 +127,10 @@ class QuestListRunner
         $quest = $item->quest;
 
         if ($quest->giver === null) {
-            return $this->summary(
-                completed: false,
-                reason: "Stopped on {$item->displayName()}: quest {$quest->game_quest_id} has no known giver.",
-                endReason: RunEndReason::Stuck,
-            );
+            $this->skipped++;
+            $log("No known giver — skipping {$item->displayName()}.");
+
+            return null;
         }
 
         $log("→ {$item->displayName()} (quest {$quest->game_quest_id} via {$quest->giver}).");
@@ -136,6 +142,7 @@ class QuestListRunner
             levelUp: $this->config->levelUp,
             smart: $this->config->smart,
             respawnWaitSeconds: $this->config->respawnWaitSeconds,
+            skipShardQuests: $this->config->skipShardQuests,
         );
 
         try {
@@ -144,6 +151,17 @@ class QuestListRunner
         } catch (QuestNotAvailableException) {
             $this->skipped++;
             $log("Already completed — skipping {$item->displayName()}.");
+
+            return null;
+        } catch (SessionCollisionException|LoginFailedException $exception) {
+            // Session-level failures are the job's to recover from, not a
+            // property of this quest — never swallow them into a skip.
+            throw $exception;
+        } catch (GameException $exception) {
+            // An unreachable giver or an unmapped room is this quest's problem,
+            // not the list's — the remaining quests are still runnable.
+            $this->skipped++;
+            $log("Skipping {$item->displayName()}: {$exception->getMessage()}");
 
             return null;
         }
@@ -162,10 +180,26 @@ class QuestListRunner
             return $this->summary(completed: false, reason: $summary->stopReason, endReason: RunEndReason::CircumspectExpired);
         }
 
+        // Nothing the list can do about this quest, and everything it can do
+        // about the next one: skip rather than take the whole list down.
+        if ($summary->endReason === RunEndReason::RequiresPurchasedItem
+            || $summary->endReason === RunEndReason::Stuck
+            || $summary->endReason === RunEndReason::Outmatched
+        ) {
+            $this->skipped++;
+            $log("Skipping {$item->displayName()}: {$summary->stopReason}");
+
+            return null;
+        }
+
         if (! $summary->completed) {
-            // A depleted quest parks the list rather than ending it, so the
-            // wrapper must not read "Stopped".
-            $verb = $summary->endReason === RunEndReason::TargetsDepleted ? 'Waiting' : 'Stopped';
+            // A parked quest resumes where it stands, so the wrapper must not
+            // read "Stopped".
+            $verb = in_array($summary->endReason, [
+                RunEndReason::TargetsDepleted,
+                RunEndReason::RageInsufficient,
+                RunEndReason::RageExhausted,
+            ], true) ? 'Waiting' : 'Stopped';
 
             return $this->summary(
                 completed: false,

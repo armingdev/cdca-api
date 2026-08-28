@@ -34,6 +34,9 @@ class MobRunner
     /** Smart mode: losses in a row to one mob before we accept we cannot beat it. */
     private const int MAX_CONSECUTIVE_LOSSES = 3;
 
+    /** Refused attacks in a row on one mob before we stop offering it rage. */
+    private const int MAX_CONSECUTIVE_ATTACK_FAILURES = 5;
+
     private int $wins = 0;
 
     private int $losses = 0;
@@ -50,8 +53,24 @@ class MobRunner
     /** @var array<string, true> mob names smart mode has given up on for this run */
     private array $outmatched = [];
 
-    /** A target was seen dead in a visited room — the pass ran out of live mobs, not out of mobs. */
+    /**
+     * Rooms the targets are known to spawn in that this pass actually stood
+     * in. Reaching one and finding nothing alive is the respawn signal — see
+     * targetsRespawnPending().
+     */
+    private int $spawnRoomsVisited = 0;
+
+    /** A target rendered as a corpse in a visited room. */
     private bool $sawDeadTargets = false;
+
+    /** @var array<string, int> mob name => consecutive failed attacks this pass */
+    private array $attackFailures = [];
+
+    /** @var array<string, true> mob names whose attacks keep failing — skipped for this pass */
+    private array $unattackable = [];
+
+    /** @var array<string, array{cost: int, held: int}> mob name => the price it refused us at */
+    private array $unaffordable = [];
 
     public function __construct(
         private readonly MobRunConfig $config,
@@ -172,6 +191,23 @@ class MobRunner
 
             $sighting = $this->liveTarget($blob);
 
+            if ($sighting !== null && ! $this->canAfford($sighting, $current)) {
+                $current = $this->recoverRageFor($sighting, $current, $log);
+
+                if (! $this->canAfford($sighting, $current)) {
+                    $this->markUnaffordable($sighting, $current, $log);
+
+                    // Every configured target is priced out of reach, so the
+                    // rest of the sweep could only rediscover that one room at
+                    // a time. Park now and let the hourly tick fix it.
+                    if ($this->allTargetsUnaffordable()) {
+                        return $this->summary($this->rageShortfallReason(), RunEndReason::RageInsufficient);
+                    }
+
+                    continue;
+                }
+            }
+
             if ($sighting !== null) {
                 $event = $this->attacker->attack($sighting);
                 $this->tally($event, $sighting, $log);
@@ -182,6 +218,13 @@ class MobRunner
                 if ($event->outcome === BattleOutcome::Win) {
                     $this->consecutiveLosses = 0;
                     $this->lossStreakMob = null;
+                }
+
+                if ($this->trackAttackFailures($event, $sighting, $log)) {
+                    return $this->summary(
+                        "Every target refused the attack — last was {$sighting->name}.",
+                        RunEndReason::Stuck,
+                    );
                 }
 
                 if ($event->outcome === BattleOutcome::Loss && $this->config->smart) {
@@ -200,6 +243,10 @@ class MobRunner
                 continue;
             }
 
+            if ($targetRooms->contains($blob->curRoom)) {
+                $this->spawnRoomsVisited++;
+            }
+
             if (! $this->sawDeadTargets && $this->hasDeadTarget($blob)) {
                 $this->sawDeadTargets = true;
                 $log('Targets here are dead — respawn pending.');
@@ -214,6 +261,13 @@ class MobRunner
             );
 
             if ($plan === null) {
+                // A cheaper target may have carried the sweep to its end while
+                // a pricier one was skipped all along; that pass did not run
+                // out of mobs, it ran out of rage.
+                if ($this->unaffordable !== []) {
+                    return $this->summary($this->rageShortfallReason(), RunEndReason::RageInsufficient);
+                }
+
                 return $this->summary('No live targets remain in any known room.', RunEndReason::Completed);
             }
 
@@ -259,7 +313,11 @@ class MobRunner
     private function liveTarget(RoomBlob $blob): ?MobSighting
     {
         foreach ($blob->mobs as $sighting) {
-            if ($sighting->isDead || isset($this->outmatched[$sighting->name])) {
+            if ($sighting->isDead
+                || isset($this->outmatched[$sighting->name])
+                || isset($this->unattackable[$sighting->name])
+                || isset($this->unaffordable[$sighting->name])
+            ) {
                 continue;
             }
 
@@ -269,6 +327,149 @@ class MobRunner
         }
 
         return null;
+    }
+
+    /**
+     * The game prices each attack itself and refuses — with a 200 and an empty
+     * body, so there is nothing to parse — when the character cannot pay. The
+     * price rides in every room render, so the check is free and belongs here
+     * rather than in a retry loop around a request that will never succeed.
+     *
+     * A zero cost means the room blob did not carry one; attacking and reading
+     * the refusal is better than refusing to attack on missing data.
+     */
+    private function canAfford(MobSighting $sighting, UserStats $current): bool
+    {
+        return $sighting->rageCost <= 0 || $current->rage >= $sighting->rageCost;
+    }
+
+    /**
+     * Levelling refills rage, so a run allowed to level can pay its way out of
+     * a shortfall. Returns the stats to keep deciding with — unchanged when no
+     * level was available.
+     *
+     * @param  Closure(string): void  $log
+     */
+    private function recoverRageFor(MobSighting $sighting, UserStats $current, Closure $log): UserStats
+    {
+        $recovered = $this->recoverRage($log);
+
+        if ($recovered === null) {
+            return $current;
+        }
+
+        $log("Leveled to cover {$sighting->name}'s rage cost.");
+
+        return $this->stats->refresh();
+    }
+
+    /**
+     * Remember what a target cost when we could not pay it, and stop offering
+     * it rage for the rest of the pass.
+     *
+     * @param  Closure(string): void  $log
+     */
+    private function markUnaffordable(MobSighting $sighting, UserStats $current, Closure $log): void
+    {
+        if (isset($this->unaffordable[$sighting->name])) {
+            return;
+        }
+
+        $this->unaffordable[$sighting->name] = ['cost' => $sighting->rageCost, 'held' => $current->rage];
+
+        $log(sprintf(
+            '%s costs %s rage and the character holds %s — skipping it this pass.',
+            $sighting->name,
+            number_format($sighting->rageCost),
+            number_format($current->rage),
+        ));
+    }
+
+    private function allTargetsUnaffordable(): bool
+    {
+        foreach ($this->config->mobNames as $name) {
+            if (! isset($this->unaffordable[$name])) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /** The cheapest target we could not pay for, named with its price. */
+    private function rageShortfallReason(): string
+    {
+        $cheapest = collect($this->unaffordable)->sortBy('cost');
+
+        return sprintf(
+            '%s costs %s rage and the character holds %s.',
+            (string) $cheapest->keys()->first(),
+            number_format((int) $cheapest->first()['cost']),
+            number_format((int) $cheapest->first()['held']),
+        );
+    }
+
+    /** How much rage the cheapest unaffordable target was short by. */
+    private function rageShortfall(): ?int
+    {
+        $cheapest = collect($this->unaffordable)->sortBy('cost')->first();
+
+        return $cheapest !== null ? max(0, $cheapest['cost'] - $cheapest['held']) : null;
+    }
+
+    /**
+     * A refused attack costs no rage and leaves the mob standing, so the loop
+     * would otherwise re-read the room and re-attack forever — the shape of
+     * every "spamming failed requests" report. A mob that refuses
+     * MAX_CONSECUTIVE_ATTACK_FAILURES times in a row is dropped for the rest
+     * of the pass; the streak resets the moment any attack lands.
+     *
+     * Returns true when nothing attackable is left, so the caller can end the
+     * pass instead of wandering between rooms it can do nothing with.
+     *
+     * @param  Closure(string): void  $log
+     */
+    private function trackAttackFailures(BattleEvent $event, MobSighting $sighting, Closure $log): bool
+    {
+        if ($event->outcome !== BattleOutcome::Failed) {
+            $this->attackFailures[$sighting->name] = 0;
+
+            return false;
+        }
+
+        $failures = ($this->attackFailures[$sighting->name] ?? 0) + 1;
+        $this->attackFailures[$sighting->name] = $failures;
+
+        if ($failures < self::MAX_CONSECUTIVE_ATTACK_FAILURES) {
+            return false;
+        }
+
+        $this->unattackable[$sighting->name] = true;
+        $log("Skipping {$sighting->name} — {$failures} attacks in a row were refused.");
+
+        foreach ($this->config->mobNames as $name) {
+            if (! isset($this->unattackable[$name])) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Whether the pass ended because the targets are on their respawn timer
+     * rather than because there is no way to reach them.
+     *
+     * Standing in a room the world database says a target spawns in and
+     * finding none of them alive *is* the respawn signal. The corpse flag is
+     * kept as a corroborating fast path, but it cannot be the only evidence:
+     * it depends on the game rendering a killed mob at all, which we have
+     * never verified, and when it does not the whole pass reads as "stuck" and
+     * a perfectly resumable quest stops for good.
+     */
+    private function targetsRespawnPending(): bool
+    {
+        return $this->sawDeadTargets || $this->spawnRoomsVisited > 0;
     }
 
     /**
@@ -400,6 +601,14 @@ class MobRunner
 
     private function summary(string $reason, RunEndReason $endReason): MobRunSummary
     {
-        return new MobRunSummary($this->wins, $this->losses, $this->errors, $reason, $endReason, $this->sawDeadTargets);
+        return new MobRunSummary(
+            $this->wins,
+            $this->losses,
+            $this->errors,
+            $reason,
+            $endReason,
+            $this->targetsRespawnPending(),
+            $this->rageShortfall(),
+        );
     }
 }

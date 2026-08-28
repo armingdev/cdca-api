@@ -51,7 +51,10 @@ class RunQuestJob extends RunJob
         // until it can be recast, then pick the quest back up from the game's
         // own record of progress.
         if ($summary->endReason === RunEndReason::CircumspectExpired
-            || ($summary->endReason === RunEndReason::RageExhausted && $run->require_circumspect)
+            || ($run->require_circumspect && in_array($summary->endReason, [
+                RunEndReason::RageExhausted,
+                RunEndReason::RageInsufficient,
+            ], true))
         ) {
             return $this->waitForCircumspect($character, $summary->stopReason, ['respawn_waits' => 0]);
         }
@@ -68,10 +71,26 @@ class RunQuestJob extends RunJob
             ]);
         }
 
+        // The game's own price for the next target: no setting can lower it,
+        // so park for the hourly rage tick instead of ending the run. A run
+        // gated on Circumspect keys off that clock instead (handled above).
+        if ($summary->endReason === RunEndReason::RageInsufficient
+            || $summary->endReason === RunEndReason::RageExhausted
+        ) {
+            $madeProgress = $summary->kills > 0 || $summary->stepsCompleted > 0;
+
+            return $this->waitForRage($summary->stopReason, [
+                'rage_waits' => $this->rageWaits($progressIn, $madeProgress),
+                'respawn_waits' => 0,
+            ]);
+        }
+
         $status = match ($summary->endReason) {
             RunEndReason::ExternalStop => RunStatus::Stopped,
             RunEndReason::ExternalPause => RunStatus::Paused,
             RunEndReason::Completed => RunStatus::Completed,
+            // Nothing to farm and nothing to wait for — the game sells it.
+            RunEndReason::RequiresPurchasedItem => RunStatus::Stopped,
             // Terminal by design: parking would only burn the same rage on the
             // same unwinnable fight later.
             RunEndReason::Outmatched => RunStatus::Stopped,

@@ -62,6 +62,23 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Quests
+    |--------------------------------------------------------------------------
+    |
+    | Some quest steps ask for an item the game only sells for real money, so
+    | no amount of farming can satisfy them — the seeded source mobs for a
+    | Quest Shard are end-game bosses that never drop one. Runs skip these
+    | steps by default (skip_shard_quests); the names below are what "a
+    | purchased item" means. Matching is case-insensitive and exact.
+    |
+    */
+
+    'quest' => [
+        'purchased_items' => ['Quest Shard'],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Brawls
     |--------------------------------------------------------------------------
     |

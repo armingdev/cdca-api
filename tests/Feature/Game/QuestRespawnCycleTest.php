@@ -31,6 +31,7 @@ function questEndOutcome(
     array $progress = [],
     int $kills = 0,
     int $stepsCompleted = 0,
+    bool $requireCircumspect = false,
 ): ParticipantOutcome {
     $config = QuestRunConfig::fromArray(array_merge(
         ['npc_name' => 'Stella', 'quest_id' => 742],
@@ -40,6 +41,7 @@ function questEndOutcome(
         'mode' => RunMode::Quest,
         'config' => $config->toArray(),
         'status' => RunStatus::Running,
+        'require_circumspect' => $requireCircumspect,
     ])->create();
     $character = Character::factory()->for(Rga::factory()->withSession())->create();
     $participant = RunParticipant::factory()->for($run)->for($character)->create();
@@ -155,6 +157,72 @@ it('parks a quest and a quest list until Circumspect can be recast', function ()
         ->and($quest->progress)->toMatchArray(['respawn_waits' => 0])
         ->and($list->status)->toBe(RunStatus::Waiting)
         ->and($list->progress)->toMatchArray(['position' => 3]);
+});
+
+it('parks a quest until the next game-clock rage tick when it cannot afford its target', function () {
+    // 12:40 UTC, so the tick the run is waiting for is 13:00 — the game's
+    // clock is a whole-hour offset, which is what makes this a UTC boundary.
+    $this->travelTo('2026-08-27 12:40:00');
+
+    $outcome = questEndOutcome(RunEndReason::RageInsufficient);
+
+    expect($outcome->status)->toBe(RunStatus::Waiting)
+        ->and($outcome->resumeAt->toDateTimeString())->toBe('2026-08-27 13:00:30')
+        ->and($outcome->reason)->toContain('Waiting for rage')
+        ->and($outcome->progress)->toMatchArray(['rage_waits' => 1]);
+});
+
+it('parks a quest that hits its own rage floor rather than stopping the run', function () {
+    $this->travelTo('2026-08-27 12:40:00');
+
+    $outcome = questEndOutcome(RunEndReason::RageExhausted);
+
+    expect($outcome->status)->toBe(RunStatus::Waiting)
+        ->and($outcome->resumeAt->toDateTimeString())->toBe('2026-08-27 13:00:30');
+});
+
+it('counts rage waits and gives up once a day of ticks has passed', function () {
+    $this->travelTo('2026-08-27 12:40:00');
+
+    $fresh = questEndOutcome(RunEndReason::RageInsufficient, progress: ['rage_waits' => 4]);
+    $earned = questEndOutcome(RunEndReason::RageInsufficient, progress: ['rage_waits' => 4], kills: 3);
+    $exhausted = questEndOutcome(RunEndReason::RageInsufficient, progress: ['rage_waits' => 24]);
+
+    expect($fresh->progress)->toMatchArray(['rage_waits' => 5])
+        ->and($earned->progress)->toMatchArray(['rage_waits' => 1])
+        ->and($exhausted->status)->toBe(RunStatus::Stopped)
+        ->and($exhausted->reason)->toContain('Still short after 24 rage ticks');
+});
+
+it('waits for Circumspect rather than the rage tick on a gated run', function () {
+    seedCircumspect();
+    Http::fake(['*skills_info.php*' => Http::response(fakeSkillInfoHtml())]);
+
+    $outcome = questEndOutcome(
+        RunEndReason::RageInsufficient,
+        configOverrides: [],
+        requireCircumspect: true,
+    );
+
+    expect($outcome->status)->toBe(RunStatus::Waiting)
+        ->and($outcome->reason)->toContain('Waiting for Circumspect');
+});
+
+it('stops a quest wanting an item the game only sells', function () {
+    $outcome = questEndOutcome(RunEndReason::RequiresPurchasedItem);
+
+    expect($outcome->status)->toBe(RunStatus::Stopped)
+        ->and($outcome->resumeAt)->toBeNull();
+});
+
+it('parks a quest list on its position when it cannot afford its target', function () {
+    $this->travelTo('2026-08-27 12:40:00');
+
+    $outcome = questListEndOutcome(RunEndReason::RageInsufficient, progress: ['position' => 3]);
+
+    expect($outcome->status)->toBe(RunStatus::Waiting)
+        ->and($outcome->resumeAt->toDateTimeString())->toBe('2026-08-27 13:00:30')
+        ->and($outcome->progress)->toMatchArray(['position' => 3, 'rage_waits' => 1]);
 });
 
 it('keeps a stuck quest terminal rather than waiting on it', function () {

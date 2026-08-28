@@ -2,6 +2,66 @@
 
 Notes for API consumers (Angular/mobile clients). Newest first.
 
+## 2026-08-28 — Quest runs park instead of stopping, and skip Quest Shard steps
+
+Four client-visible changes from live-run reports. One new request field;
+nothing renamed or removed.
+
+### 1. `POST /api/v1/runs` — new optional field `skip_shard_quests`
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `skip_shard_quests` | boolean, **default `true`** | Quest and quest-list modes. Skip any step wanting an item the game only sells (currently `Quest Shard`). Send `false` to attempt them anyway. |
+
+**The default is a behaviour change.** A shard step used to be treated as
+ordinary work: the run farmed the item's seeded source mobs (end-game bosses
+that never drop it), got nowhere, and in quest-list mode stopped the entire
+list — one run halted at position 38 of 40. Such a quest is now counted in
+`quests_skipped` and the list carries on. Add a checkbox bound to this field;
+leaving it unsent keeps the new, safer behaviour.
+
+The known purchased-item names live in `config/outwar.quest.purchased_items`,
+so a newly discovered one is a config change, not a deploy.
+
+### 2. A quest list no longer dies on one bad quest
+
+Only a whole-list condition ends a quest-list run now: a stop, a pause, a
+lapsed Circumspect buff, or rage that has to be waited out. A quest that is
+unfulfillable, has no known giver, cannot be reached, or ends up outmatched is
+counted in `quests_skipped` and the list moves on. Expect `quests_skipped` to
+be larger than before and `status` to reach `completed` on lists that used to
+report `stopped`.
+
+### 3. Running out of rage parks the run instead of ending it
+
+Two distinct cases, both of which used to leave a participant `stopped`:
+
+- **The mob costs more than the character holds.** The game prices each attack
+  itself and refuses with an empty 200; the engine used to re-send that attack
+  indefinitely (one run logged 38 consecutive failures). It now reads the
+  price from the room and parks before attacking.
+- **The configured `stop_rage` floor was hit** in quest or quest-list mode.
+
+Both park as `status: "waiting"` with `resume_at` set to just after the next
+game-clock hour, when rage regenerates — unless the run has
+`require_circumspect`, in which case it waits for the Circumspect recharge and
+recasts, as before. A participant that stays short for 24 consecutive ticks
+stops with an explicit reason.
+
+`last_activity` gains the phrasings `"Waiting for rage — resumes {time}"` and
+`"Still short after 24 rage ticks — giving up."`.
+
+### 4. Cleared quest targets park for respawn again
+
+A quest whose targets were all killed reported *"Could not make progress on
+objective '{mob}'"* and stopped, instead of waiting out the respawn timer. It
+depended on the game rendering a killed mob as a corpse, which it does not
+appear to do. Such a run now parks (`waiting`, `respawn_waits` in `progress`)
+and resumes on `respawn_wait_seconds`, as documented.
+
+Parking is unchanged mechanically: the participant goes to `waiting` with
+`resume_at`, and the scheduled `outwar:runs-resume-due` re-drives it.
+
 ## 2026-08-27 — Runs paginate, page sizes are capped, game errors are 422 everywhere
 
 Four client-visible changes. Nothing was renamed or removed from an endpoint's

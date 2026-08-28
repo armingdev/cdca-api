@@ -104,6 +104,20 @@ class RunMobJob extends RunJob
         // Past this point the farm is unbounded (run_count 0): it always has
         // another pass to run, so every ending parks rather than completes.
         // Only max_kills, being outmatched, or a manual stop end it.
+
+        // The game priced the next target above what the character holds, so
+        // only its hourly rage tick can change the answer — a fixed half-hour
+        // nap would just as likely land before it as after.
+        if ($summary->endReason === RunEndReason::RageInsufficient) {
+            if ($run->require_circumspect) {
+                return $this->waitForCircumspect($character, $summary->stopReason, $progress);
+            }
+
+            return $this->waitForRage($summary->stopReason, array_merge($progress, [
+                'rage_waits' => $this->rageWaits($progressIn, $summary->wins > 0),
+            ]));
+        }
+
         if ($summary->endReason === RunEndReason::RageExhausted) {
             if ($run->require_circumspect) {
                 return $this->waitForCircumspect($character, $summary->stopReason, $progress);
@@ -125,7 +139,7 @@ class RunMobJob extends RunJob
 
         return new ParticipantOutcome(
             RunStatus::Waiting,
-            $summary->sawDeadTargets
+            $summary->targetsRespawnPending
                 ? "Pass {$cyclesDone} cleared the targets — waiting for respawns, back at {$resumeAt->format('Y-m-d H:i')}."
                 : "Pass {$cyclesDone} complete — next at {$resumeAt->format('Y-m-d H:i')}.",
             $resumeAt,

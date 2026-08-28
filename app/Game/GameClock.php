@@ -18,6 +18,9 @@ final class GameClock
 {
     public const string OFFSET = '-05:00';
 
+    /** Grace added to the hour boundary before we trust the tick to have landed. */
+    private const int RAGE_TICK_BUFFER_SECONDS = 30;
+
     /**
      * Parse a game-rendered timestamp (e.g. attack log `8/22/2026 3:50am`)
      * into a UTC instant.
@@ -49,5 +52,23 @@ final class GameClock
     public static function now(): CarbonImmutable
     {
         return CarbonImmutable::now(self::OFFSET);
+    }
+
+    /**
+     * When rage next regenerates: the game tops characters up on the hour of
+     * its own clock. The offset is a whole number of hours, so a game-clock
+     * hour boundary is also a UTC one — the conversion is a no-op, and writing
+     * it this way keeps the assumption visible if the offset ever changes.
+     *
+     * The buffer absorbs clock skew; waking a second early would burn a whole
+     * cycle rediscovering that the rage has not landed yet.
+     */
+    public static function nextRageTickAt(?CarbonImmutable $from = null): CarbonImmutable
+    {
+        return ($from?->setTimezone(self::OFFSET) ?? self::now())
+            ->addHour()
+            ->startOfHour()
+            ->addSeconds(self::RAGE_TICK_BUFFER_SECONDS)
+            ->utc();
     }
 }
