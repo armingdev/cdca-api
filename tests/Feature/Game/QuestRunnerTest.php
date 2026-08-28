@@ -7,6 +7,7 @@ use App\Game\Quest\QuestRunner;
 use App\Models\Character;
 use App\Models\QuestItem;
 use App\Models\Rga;
+use Illuminate\Support\Facades\Http;
 
 // The stateful fake quest world (fakeQuestWorld / seedQuestWorld) lives in tests/Pest.php.
 beforeEach(function () {
@@ -140,6 +141,100 @@ it('parks a kill objective for respawn when the world runs out of live targets',
         ->and($summary->endReason)->toBe(RunEndReason::TargetsDepleted)
         ->and($summary->kills)->toBe(2)
         ->and($summary->stopReason)->toBe("All 'Street Crawler' targets are dead — waiting for respawn.");
+});
+
+it('parks for respawn when a cleared spawn room renders no target at all', function () {
+    $character = Character::factory()->for(Rga::factory()->withSession())->create();
+
+    // The corpse flag is the assumption that broke in production: the live
+    // game dropped the entry outright, and the pass read as "stuck".
+    fakeQuestWorld(liveMobs: 2, clearedRendersCorpse: false);
+
+    $summary = QuestRunner::forCharacter($character, new QuestRunConfig(
+        npcName: 'Stella',
+        questId: 742,
+    ))->run();
+
+    expect($summary->completed)->toBeFalse()
+        ->and($summary->endReason)->toBe(RunEndReason::TargetsDepleted)
+        ->and($summary->kills)->toBe(2)
+        ->and($summary->stopReason)->toBe("All 'Street Crawler' targets are dead — waiting for respawn.");
+});
+
+it('parks instead of attacking when the target costs more rage than the character holds', function () {
+    $character = Character::factory()->for(Rga::factory()->withSession())->create();
+
+    fakeQuestWorld(rage: 1000, mobRage: 2000);
+
+    $summary = QuestRunner::forCharacter($character, new QuestRunConfig(
+        npcName: 'Stella',
+        questId: 742,
+        stopRage: 0,
+    ))->run();
+
+    expect($summary->completed)->toBeFalse()
+        ->and($summary->endReason)->toBe(RunEndReason::RageInsufficient)
+        ->and($summary->kills)->toBe(0)
+        ->and($summary->stopReason)->toBe('Street Crawler costs 2,000 rage and the character holds 1,000.');
+
+    Http::assertNotSent(fn ($request) => str_contains($request->url(), 'somethingelse.php'));
+});
+
+it('gives up on a target whose attacks the game keeps refusing', function () {
+    $character = Character::factory()->for(Rga::factory()->withSession())->create();
+
+    // A refusal costs no rage and leaves the mob standing, so without a
+    // circuit breaker the loop re-attacks the same encounter forever.
+    fakeQuestWorld(attacksRefused: true);
+
+    $summary = QuestRunner::forCharacter($character, new QuestRunConfig(
+        npcName: 'Stella',
+        questId: 742,
+    ))->run();
+
+    expect($summary->endReason)->toBe(RunEndReason::Stuck)
+        ->and($summary->kills)->toBe(0);
+
+    $attacks = collect(Http::recorded())
+        ->filter(fn (array $pair) => str_contains($pair[0]->url(), 'somethingelse.php'))
+        ->count();
+
+    expect($attacks)->toBe(5);
+});
+
+it('skips a step wanting a purchased item instead of farming for it', function () {
+    $character = Character::factory()->for(Rga::factory()->withSession())->create();
+
+    seedCollectQuestWorld();
+    fakeCollectQuestWorld(objectiveItem: 'Quest Shard');
+
+    $summary = QuestRunner::forCharacter($character, new QuestRunConfig(
+        npcName: 'Rune Master',
+        questId: 1449,
+    ))->run();
+
+    expect($summary->completed)->toBeFalse()
+        ->and($summary->endReason)->toBe(RunEndReason::RequiresPurchasedItem)
+        ->and($summary->stopReason)->toBe("Quest 1449 needs 'Quest Shard', which the game only sells.");
+
+    Http::assertNotSent(fn ($request) => str_contains($request->url(), 'somethingelse.php'));
+});
+
+it('farms a purchased item like any other when the skip option is off', function () {
+    $character = Character::factory()->for(Rga::factory()->withSession())->create();
+
+    seedCollectQuestWorld();
+    QuestItem::factory()->create(['name' => 'Quest Shard', 'source_mobs' => ['Holy Elemental Keeper']]);
+    fakeCollectQuestWorld(objectiveItem: 'Quest Shard', liveKills: 1, drops: false);
+
+    $summary = QuestRunner::forCharacter($character, new QuestRunConfig(
+        npcName: 'Rune Master',
+        questId: 1449,
+        skipShardQuests: false,
+    ))->run();
+
+    expect($summary->endReason)->not->toBe(RunEndReason::RequiresPurchasedItem)
+        ->and($summary->kills)->toBe(1);
 });
 
 it('parks a collect objective for respawn when the source mobs are all dead', function () {

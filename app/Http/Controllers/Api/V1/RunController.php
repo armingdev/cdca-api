@@ -191,6 +191,7 @@ class RunController extends Controller
         $respawnWaitSeconds = $request->filled('respawn_wait_seconds')
             ? $request->integer('respawn_wait_seconds')
             : QuestRunConfig::DEFAULT_RESPAWN_WAIT_SECONDS;
+        $skipShardQuests = $request->boolean('skip_shard_quests', QuestRunConfig::DEFAULT_SKIP_SHARD_QUESTS);
 
         return match ($mode) {
             RunMode::Mob => (new MobRunConfig(
@@ -213,6 +214,7 @@ class RunController extends Controller
                 levelUp: $levelUp,
                 smart: $smart,
                 respawnWaitSeconds: $respawnWaitSeconds,
+                skipShardQuests: $skipShardQuests,
             ))->toArray(),
 
             RunMode::QuestList => (new QuestListRunConfig(
@@ -221,6 +223,7 @@ class RunController extends Controller
                 levelUp: $levelUp,
                 smart: $smart,
                 respawnWaitSeconds: $respawnWaitSeconds,
+                skipShardQuests: $skipShardQuests,
             ))->toArray(),
 
             // All five PvP modes share one config; they differ only in which

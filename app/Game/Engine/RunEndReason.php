@@ -18,11 +18,18 @@ enum RunEndReason: string
     /** Rage fell below the stop floor and could not be recovered. */
     case RageExhausted = 'rage_exhausted';
 
+    /**
+     * The next target costs more rage than the character holds. Distinct from
+     * RageExhausted (a configured floor): this one is the game's own price, so
+     * no setting can lower it and the only cure is the hourly rage tick.
+     */
+    case RageInsufficient = 'rage_insufficient';
+
     /** No way to make progress: unfulfillable objective, unmapped giver, dead link. */
     case Stuck = 'stuck';
 
     /**
-     * The objective's targets exist but every one of them was dead this pass.
+     * The pass reached the targets' spawn rooms and found none of them alive.
      * Unlike Stuck this is temporary — they respawn on a timer — so parking
      * and retrying is productive rather than a dead end.
      */
@@ -39,6 +46,13 @@ enum RunEndReason: string
      * skill can be recast, then re-cast the run's skills and carry on.
      */
     case CircumspectExpired = 'circumspect_expired';
+
+    /**
+     * The quest wants an item the game only sells (a Quest Shard), so no
+     * amount of farming can satisfy it. Skippable rather than stuck: the rest
+     * of a list is still perfectly runnable.
+     */
+    case RequiresPurchasedItem = 'requires_purchased_item';
 
     case ExternalStop = 'external_stop';
     case ExternalPause = 'external_pause';

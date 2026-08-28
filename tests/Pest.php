@@ -389,10 +389,17 @@ function seedQuestCatalog(): array
     ];
 }
 
-function questMobJson(string $name, int $mobId, int $spawnId, string $hash, int $level, bool $isDead = false): array
-{
+function questMobJson(
+    string $name,
+    int $mobId,
+    int $spawnId,
+    string $hash,
+    int $level,
+    bool $isDead = false,
+    int $rageCost = 100,
+): array {
     return [
-        'name' => $name, 'level' => (string) $level, 'rage' => '100', 'h' => $hash,
+        'name' => $name, 'level' => (string) $level, 'rage' => (string) $rageCost, 'h' => $hash,
         'encid' => 'ENC'.$spawnId, 'mobId' => (string) $mobId, 'spawnId' => (string) $spawnId,
         'isDead' => $isDead, 'type' => 0, 'canForm' => false,
     ];
@@ -410,19 +417,39 @@ function questMobJson(string $name, int $mobId, int $spawnId, string $hash, int 
  * succeeds (each raising the reported level) — enough to exercise smart mode's
  * "level up to the quest's required level" gate.
  *
- * $liveMobs caps how many Street Crawlers can be killed before the room
- * renders a corpse instead — the world running dry mid-objective. Raising it
- * through the returned setter is a respawn.
+ * $liveMobs caps how many Street Crawlers can be killed before the room runs
+ * dry mid-objective. Raising it through the returned setter is a respawn.
+ *
+ * $clearedRendersCorpse picks how a cleared spawn room is rendered. True keeps
+ * the mob with isDead — the shape of the one room blob we ever captured. False
+ * drops the entry entirely, which is what the live game did in the runs that
+ * reported "could not make progress" on a mob that was merely on its timer.
+ *
+ * $mobRage is the price the game puts on each Street Crawler, and
+ * $attacksRefused makes somethingelse.php answer 200 with an empty body, the
+ * refusal that carries no reason to parse.
  */
-function fakeQuestWorld(int $rage = 50000, int $level = 20, int $levelUps = 0, int $liveMobs = PHP_INT_MAX): Closure
-{
+function fakeQuestWorld(
+    int $rage = 50000,
+    int $level = 20,
+    int $levelUps = 0,
+    int $liveMobs = PHP_INT_MAX,
+    bool $clearedRendersCorpse = true,
+    int $mobRage = 100,
+    bool $attacksRefused = false,
+): Closure {
     $position = 1;
     $killed = 0;
 
-    $roomBlob = function (int $roomId) use (&$killed, &$liveMobs): string {
+    $roomBlob = function (int $roomId) use (&$killed, &$liveMobs, $clearedRendersCorpse, $mobRage): string {
+        $cleared = $killed >= $liveMobs;
+        $crawler = $cleared && ! $clearedRendersCorpse
+            ? []
+            : [questMobJson('Street Crawler', 4000, 5000, 'x', level: 20, isDead: $cleared, rageCost: $mobRage)];
+
         $mobs = match ($roomId) {
             1 => [questMobJson('Stella', 59293, 888, 'npchash', level: 10)],
-            2 => [questMobJson('Street Crawler', 4000, 5000, 'x', level: 20, isDead: $killed >= $liveMobs)],
+            2 => $crawler,
             default => [],
         };
 
@@ -433,7 +460,7 @@ function fakeQuestWorld(int $rage = 50000, int $level = 20, int $levelUps = 0, i
         ]);
     };
 
-    Http::fake(function ($request) use (&$position, &$killed, &$level, &$levelUps, $roomBlob, &$rage) {
+    Http::fake(function ($request) use (&$position, &$killed, &$level, &$levelUps, $roomBlob, &$rage, $attacksRefused) {
         $url = $request->url();
 
         if (str_contains($url, 'userstats.php')) {
@@ -474,6 +501,10 @@ function fakeQuestWorld(int $rage = 50000, int $level = 20, int $levelUps = 0, i
         }
 
         if (str_contains($url, 'somethingelse.php')) {
+            if ($attacksRefused) {
+                return Http::response('');
+            }
+
             $killed++;
 
             return Http::response('', 302, ['Location' => 'https://sigil.outwar.com/attack/900/']);
@@ -528,7 +559,7 @@ function seedCollectQuestWorld(): void
  * "{Item}: n/m" (no "killed" suffix) and the finish link appears only once
  * the item has been collected.
  */
-function collectStepHtml(int $collected): string
+function collectStepHtml(int $collected, string $item = 'Holy Elemental Crystal'): string
 {
     $state = $collected >= 1 ? 'complete' : 'incomplete';
     $finish = $collected >= 1
@@ -539,9 +570,9 @@ function collectStepHtml(int $collected): string
         <div class="mob-dialog-container">
           <h2 class="mob-name">Rune Master</h2>
           <span class="badge">Primal Elemental Rune</span>
-          <p class="mob-description">Bring me a Holy Elemental Crystal.</p>
+          <p class="mob-description">Bring me a {$item}.</p>
           <div class="quest-objective {$state}">
-            <strong>Holy Elemental Crystal:</strong> {$collected}/1
+            <strong>{$item}:</strong> {$collected}/1
           </div>
           {$finish}
           <a href="mob.php?id=60001&h=npchash&userspawn=" class="btn">Go Back</a>
@@ -562,8 +593,13 @@ function collectStepHtml(int $collected): string
  * 0 makes kills yield no crystal, so the pool can be exhausted without the
  * objective completing. The returned setter raises the pool (a respawn).
  */
-function fakeCollectQuestWorld(int $rage = 50000, bool $helper = true, int $liveKills = PHP_INT_MAX, bool $drops = true): Closure
-{
+function fakeCollectQuestWorld(
+    int $rage = 50000,
+    bool $helper = true,
+    int $liveKills = PHP_INT_MAX,
+    bool $drops = true,
+    string $objectiveItem = 'Holy Elemental Crystal',
+): Closure {
     $position = 1;
     $dropped = 0;
     $kills = 0;
@@ -584,7 +620,7 @@ function fakeCollectQuestWorld(int $rage = 50000, bool $helper = true, int $live
         ]);
     };
 
-    Http::fake(function ($request) use (&$position, &$dropped, &$kills, &$helpOn, $roomBlob, $rage, $helper, $drops) {
+    Http::fake(function ($request) use (&$position, &$dropped, &$kills, &$helpOn, $roomBlob, $rage, $helper, $drops, $objectiveItem) {
         $url = $request->url();
 
         if (str_contains($url, 'userstats.php')) {
@@ -612,7 +648,7 @@ function fakeCollectQuestWorld(int $rage = 50000, bool $helper = true, int $live
                 return Http::response(gameFixture('quest/mob_talk_step_finish.html'));
             }
 
-            return Http::response(collectStepHtml(min($dropped, 1)));
+            return Http::response(collectStepHtml(min($dropped, 1), $objectiveItem));
         }
 
         if (str_contains($url, 'mob.php')) {

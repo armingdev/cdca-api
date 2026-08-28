@@ -52,6 +52,7 @@ class QuestRunner
         private readonly Navigator $navigator,
         private readonly RoomGraph $graph,
         private readonly StatsService $stats,
+        private readonly PurchasedQuestItems $purchasedItems,
         private readonly ?TeleportService $teleports = null,
     ) {}
 
@@ -64,6 +65,7 @@ class QuestRunner
             Navigator::forCharacter($character),
             RoomGraph::fromDatabase(),
             StatsService::forCharacter($character),
+            app(PurchasedQuestItems::class),
             TeleportService::forCharacter($character),
         );
     }
@@ -140,6 +142,14 @@ class QuestRunner
                     $objective->type->value,
                 ));
 
+                if ($this->config->skipShardQuests && $this->purchasedItems->matches($objective->target)) {
+                    return $this->summary(
+                        completed: false,
+                        reason: "Quest {$this->config->questId} needs '{$objective->target}', which the game only sells.",
+                        endReason: RunEndReason::RequiresPurchasedItem,
+                    );
+                }
+
                 $farm = $this->fulfill($objective, $log, $signal, $onBattle);
                 $wins = $farm->wins ?? 0;
                 $this->kills += $wins;
@@ -162,21 +172,27 @@ class QuestRunner
                     return $this->summary(completed: false, reason: $farm->stopReason, endReason: RunEndReason::RageExhausted);
                 }
 
+                // The game's own price for the target, not a floor we chose —
+                // only the hourly rage tick can change it, so the job parks.
+                if ($farm !== null && $farm->endReason === RunEndReason::RageInsufficient) {
+                    return $this->summary(completed: false, reason: $farm->stopReason, endReason: RunEndReason::RageInsufficient);
+                }
+
                 // Walking back to the giver would only re-enter the same
                 // losing fight, so surface the verdict as it stands.
                 if ($farm !== null && $farm->endReason === RunEndReason::Outmatched) {
                     return $this->summary(completed: false, reason: $farm->stopReason, endReason: RunEndReason::Outmatched);
                 }
 
-                // The objective's targets are all corpses right now. They
-                // respawn on the game's timer, so parking beats giving up —
-                // and walking back to the giver first would waste the trip.
-                // Kill and collect objectives share this path: both farm the
-                // same mobs, only the game-side progress metric differs.
+                // The farm reached the target's spawn rooms and found nothing
+                // alive. They respawn on the game's timer, so parking beats
+                // giving up — and walking back to the giver first would waste
+                // the trip. Kill and collect objectives share this path: both
+                // farm the same mobs, only the game-side metric differs.
                 if ($farm !== null
                     && $farm->endReason === RunEndReason::Completed
                     && $wins === 0
-                    && $farm->sawDeadTargets
+                    && $farm->targetsRespawnPending
                 ) {
                     return $this->summary(
                         completed: false,

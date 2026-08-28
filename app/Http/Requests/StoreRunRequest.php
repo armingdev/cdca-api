@@ -46,6 +46,9 @@ class StoreRunRequest extends FormRequest
             // quest + quest-list: pause before re-checking rooms whose targets were all dead
             'respawn_wait_seconds' => ['sometimes', 'nullable', 'integer', 'min:60', 'max:86400'],
 
+            // quest + quest-list: skip steps wanting an item the game only sells
+            'skip_shard_quests' => ['sometimes', 'boolean'],
+
             // quest-list mode
             'quest_list_id' => ['required_if:mode,quest-list', 'integer', 'exists:quest_lists,id'],
 

@@ -75,7 +75,7 @@ it('counts kills from earlier cycles against max_kills when resuming', function 
         ->and($participant->progress['kills_done'])->toBe(4);
 });
 
-it('reports quest rage-out as stopped, not failed', function () {
+it('parks a quest rage-out for the next rage tick rather than failing it', function () {
     Mob::factory()->create(['name' => 'Stella'])->rooms()->attach(1, ['last_seen_at' => now()]);
     Mob::factory()->create(['name' => 'Street Crawler'])->rooms()->attach(2, ['last_seen_at' => now()]);
     fakeQuestWorld(rage: 100);
@@ -92,9 +92,13 @@ it('reports quest rage-out as stopped, not failed', function () {
 
     makeRunJob($participant)->handle(app(LoginService::class));
 
-    expect($participant->fresh()->status)->toBe(RunStatus::Stopped)
+    // Rage comes back on the game's hourly tick, so running out is a pause in
+    // the work, not the end of it — and never a failure.
+    expect($participant->fresh()->status)->toBe(RunStatus::Waiting)
         ->and($participant->fresh()->last_activity)->toContain('Rage below')
-        ->and($participant->run->fresh()->status)->toBe(RunStatus::Stopped);
+        ->and($participant->fresh()->last_activity)->toContain('Waiting for rage')
+        ->and($participant->fresh()->resume_at)->not->toBeNull()
+        ->and($participant->run->fresh()->status)->toBe(RunStatus::Waiting);
 });
 
 it('ignores a job delivery whose dispatch token was superseded', function () {

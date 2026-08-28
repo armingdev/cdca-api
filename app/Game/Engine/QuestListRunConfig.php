@@ -13,6 +13,7 @@ final readonly class QuestListRunConfig
         public bool $levelUp = false,
         public bool $smart = false,
         public int $respawnWaitSeconds = QuestRunConfig::DEFAULT_RESPAWN_WAIT_SECONDS,
+        public bool $skipShardQuests = QuestRunConfig::DEFAULT_SKIP_SHARD_QUESTS,
     ) {}
 
     /**
@@ -26,6 +27,7 @@ final readonly class QuestListRunConfig
             levelUp: (bool) ($config['level_up'] ?? false),
             smart: (bool) ($config['smart'] ?? false),
             respawnWaitSeconds: (int) ($config['respawn_wait_seconds'] ?? QuestRunConfig::DEFAULT_RESPAWN_WAIT_SECONDS),
+            skipShardQuests: (bool) ($config['skip_shard_quests'] ?? QuestRunConfig::DEFAULT_SKIP_SHARD_QUESTS),
         );
     }
 
@@ -40,6 +42,7 @@ final readonly class QuestListRunConfig
             'level_up' => $this->levelUp,
             'smart' => $this->smart,
             'respawn_wait_seconds' => $this->respawnWaitSeconds,
+            'skip_shard_quests' => $this->skipShardQuests,
         ];
     }
 }
