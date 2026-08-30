@@ -126,6 +126,7 @@ class RgaController extends Controller
         }
 
         $characters = $syncService->sync($rga);
+        $rga->update(['characters_synced_at' => now()]);
 
         $this->queueStatsRefresh($rga);
 

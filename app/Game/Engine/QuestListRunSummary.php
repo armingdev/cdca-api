@@ -12,5 +12,7 @@ final readonly class QuestListRunSummary
         public string $stopReason,
         public RunEndReason $endReason,
         public int $nextPosition = 0,
+        /** Parked retries spent so far on the quest at $nextPosition. */
+        public int $questRetries = 0,
     ) {}
 }

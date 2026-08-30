@@ -79,6 +79,36 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Background Sync
+    |--------------------------------------------------------------------------
+    |
+    | Signing in to CDCA queues a character-list read per connected RGA. A
+    | roster barely changes, so repeat logins within this window reuse the
+    | last one rather than sweeping both game servers again.
+    |
+    */
+
+    'sync' => [
+        'characters_debounce_minutes' => env('OUTWAR_CHARACTERS_SYNC_DEBOUNCE_MINUTES', 360),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Run Log
+    |--------------------------------------------------------------------------
+    |
+    | The durable per-run decision journal (run_events). It answers "which
+    | quests did it skip, and why" long after last_activity has moved on, but
+    | it is append-only, so a retention window keeps the table bounded.
+    |
+    */
+
+    'run_events' => [
+        'retention_days' => env('OUTWAR_RUN_EVENTS_RETENTION_DAYS', 30),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Brawls
     |--------------------------------------------------------------------------
     |

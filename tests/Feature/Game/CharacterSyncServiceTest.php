@@ -9,18 +9,6 @@ beforeEach(function () {
     config(['outwar.http.throttle_min_ms' => 0, 'outwar.http.throttle_max_ms' => 0]);
 });
 
-function sigilAccountsHtml(int $level = 85): string
-{
-    return <<<HTML
-    <table><tr>
-      <td><font color="#FFFF00"><b>RealLinuXX</b></font></td>
-      <td><font color="#FFFFFF"><b>{$level}</b></font></td>
-      <td><font color="#999999"><b>Collective 2</b></font></td>
-      <td><a href="http://sigil.outwar.com/world.php?suid=2403&serverid=1"><b>PLAY!</b></a></td>
-    </tr></table>
-    HTML;
-}
-
 it('discovers characters on both servers and upserts them', function () {
     $rga = Rga::factory()->withSession()->create();
 

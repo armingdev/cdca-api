@@ -52,11 +52,18 @@ it('casts one skill via the cast command', function () {
 
 it('casts the on-start set via the cast command', function () {
     $character = Character::factory()->for(Rga::factory()->withSession())->create();
-    CharacterSkill::create(['character_id' => $character->id, 'skill_id' => 4, 'cast_on_start' => true]);
+    CharacterSkill::create([
+        'character_id' => $character->id,
+        'skill_id' => 4,
+        'cast_on_start' => true,
+        'trained_level' => 1,
+    ]);
 
-    Http::fake(['*cast_skills.php*' => Http::response('Status: You just cast Stealth')]);
+    // The set now reads the character's live skill state before deciding, so
+    // the command touches the tabs, each skill's info page, and userstats.
+    fakeSkillWorld();
 
     $this->artisan('outwar:cast', ['character' => $character->name, '--on-start' => true])
         ->assertSuccessful()
-        ->expectsOutputToContain('Cast 1 cast-on-start');
+        ->expectsOutputToContain('Cast 1 of the selected');
 });

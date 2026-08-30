@@ -54,6 +54,15 @@ enum RunEndReason: string
      */
     case RequiresPurchasedItem = 'requires_purchased_item';
 
+    /**
+     * Something went wrong that is not a property of the quest: a page that
+     * would not parse, an NPC not standing in its room this minute, a
+     * momentarily unreachable path. Temporary — park and retry the same quest
+     * a bounded number of times, because reading these as "skip" silently
+     * dropped quests the character could perfectly well have completed.
+     */
+    case TransientError = 'transient_error';
+
     case ExternalStop = 'external_stop';
     case ExternalPause = 'external_pause';
 }

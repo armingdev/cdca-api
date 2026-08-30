@@ -6,15 +6,20 @@ use App\Game\Engine\QuestListRunConfig;
 use App\Game\Engine\QuestListRunSummary;
 use App\Game\Engine\QuestRunConfig;
 use App\Game\Engine\RunEndReason;
+use App\Game\Engine\RunEventRecorder;
+use App\Game\Enums\RunEventType;
 use App\Game\Enums\RunSignal;
 use App\Game\Exceptions\GameException;
 use App\Game\Exceptions\LoginFailedException;
+use App\Game\Exceptions\ParseException;
 use App\Game\Exceptions\QuestNotAvailableException;
 use App\Game\Exceptions\SessionCollisionException;
+use App\Game\Exceptions\TransientGameException;
 use App\Models\BattleEvent;
 use App\Models\Character;
 use App\Models\QuestList;
 use App\Models\QuestListItem;
+use App\Models\RunEvent;
 use Closure;
 
 /**
@@ -33,6 +38,14 @@ use Closure;
  */
 class QuestListRunner
 {
+    /**
+     * Parked retries one quest may cost the list before it is written off. A
+     * page that would not parse, or an NPC not standing in its room this
+     * minute, used to read as "skip this quest" — permanently, for the whole
+     * run. Two retries separate a blip from a real dead end.
+     */
+    public const int MAX_QUEST_RETRIES = 2;
+
     private int $completed = 0;
 
     private int $skipped = 0;
@@ -42,30 +55,53 @@ class QuestListRunner
     /** The list position the next cycle should start from. */
     private int $nextPosition = 0;
 
+    /** Parked retries already spent on the quest at $nextPosition. */
+    private int $questRetries = 0;
+
+    private ?RunEventRecorder $events = null;
+
+    private ?int $runId = null;
+
+    /** Quest ids this character has already settled, skipped without walking. */
+    /** @var list<int> */
+    private array $skippableQuestIds = [];
+
     public function __construct(
         private readonly Character $character,
         private readonly QuestListRunConfig $config,
+        private readonly QuestProgressLedger $ledger,
     ) {}
 
     public static function forCharacter(Character $character, QuestListRunConfig $config): self
     {
-        return new self($character, $config);
+        return new self($character, $config, app(QuestProgressLedger::class));
     }
 
     /**
      * @param  Closure(string): void|null  $log
      * @param  Closure(): RunSignal|null  $signal
      * @param  Closure(BattleEvent): void|null  $onBattle
+     * @param  Closure(): void|null  $ensureBuffs  just-in-time buff top-up, forwarded to each quest
      * @param  int  $startPosition  skip list items below this position (resume support)
      * @param  Closure(int, int, int): void|null  $onQuestSettled  (nextPosition, completed, skipped) after each settled item
+     * @param  RunEventRecorder|null  $events  durable log for skip/complete decisions
+     * @param  int  $questRetries  parked retries already spent on the quest at $startPosition
+     * @param  int|null  $runId  provenance for anything written to the progress ledger
      */
     public function run(
         ?Closure $log = null,
         ?Closure $signal = null,
         ?Closure $onBattle = null,
+        ?Closure $ensureBuffs = null,
         int $startPosition = 0,
         ?Closure $onQuestSettled = null,
+        ?RunEventRecorder $events = null,
+        int $questRetries = 0,
+        ?int $runId = null,
     ): QuestListRunSummary {
+        $this->questRetries = $questRetries;
+        $this->events = $events;
+        $this->runId = $runId;
         $log ??= fn (string $message) => null;
 
         $list = QuestList::with('items.quest')->find($this->config->questListId);
@@ -77,12 +113,30 @@ class QuestListRunner
         $items = $list->items->where('position', '>=', $startPosition)->values();
         $this->nextPosition = $startPosition;
 
+        // Read once, before walking anywhere: what this character has already
+        // settled with the game. Re-deriving it by visiting all 200 givers is
+        // exactly the cost this avoids.
+        $this->skippableQuestIds = $this->ledger->skippableQuestIds(
+            $this->character,
+            $items->pluck('quest_id'),
+        );
+
         $log(sprintf(
             "Running quest list '%s' (%d quest(s)%s).",
             $list->name,
             $items->count(),
             $startPosition > 0 ? ", resuming from position {$startPosition}" : '',
         ));
+
+        if ($this->skippableQuestIds !== []) {
+            $recorded = count($this->skippableQuestIds);
+            $log("Skipping {$recorded} quest(s) already recorded for this character.");
+            $events?->record(
+                RunEventType::QuestSkipped,
+                "Skipping {$recorded} quest(s) already recorded for this character.",
+                ['reason' => 'recorded', 'count' => $recorded, 'quest_ids' => $this->skippableQuestIds],
+            );
+        }
 
         foreach ($items as $item) {
             $this->nextPosition = $item->position;
@@ -101,7 +155,7 @@ class QuestListRunner
                 return $this->summary(completed: false, reason: 'Circumspect expired.', endReason: RunEndReason::CircumspectExpired);
             }
 
-            $outcome = $this->runQuest($item, $log, $signal, $onBattle);
+            $outcome = $this->runQuest($item, $log, $signal, $onBattle, $ensureBuffs);
 
             if ($outcome !== null) {
                 return $outcome;
@@ -121,14 +175,29 @@ class QuestListRunner
      * @param  Closure(string): void  $log
      * @param  Closure(): RunSignal|null  $signal
      * @param  Closure(BattleEvent): void|null  $onBattle
+     * @param  Closure(): void|null  $ensureBuffs
      */
-    private function runQuest(QuestListItem $item, Closure $log, ?Closure $signal, ?Closure $onBattle): ?QuestListRunSummary
-    {
+    private function runQuest(
+        QuestListItem $item,
+        Closure $log,
+        ?Closure $signal,
+        ?Closure $onBattle,
+        ?Closure $ensureBuffs = null,
+    ): ?QuestListRunSummary {
         $quest = $item->quest;
+
+        if (in_array($quest?->id, $this->skippableQuestIds, true)) {
+            // Already settled for this character — the summary event above
+            // covers the whole batch, so this one stays silent.
+            $this->skipped++;
+
+            return null;
+        }
 
         if ($quest->giver === null) {
             $this->skipped++;
             $log("No known giver — skipping {$item->displayName()}.");
+            $this->recordSkip($item, 'no_giver', 'No known giver.');
 
             return null;
         }
@@ -147,21 +216,34 @@ class QuestListRunner
 
         try {
             $summary = QuestRunner::forCharacter($this->character, $questConfig)
-                ->run(log: $log, signal: $signal, onBattle: $onBattle);
+                ->run(log: $log, signal: $signal, onBattle: $onBattle, ensureBuffs: $ensureBuffs, events: $this->events);
         } catch (QuestNotAvailableException) {
             $this->skipped++;
             $log("Already completed — skipping {$item->displayName()}.");
+            $this->recordSkip($item, 'not_available', 'The giver does not offer this quest.');
+            // Remember it, so the next run does not walk here to be told the
+            // same thing. Clearable, because the giver is equally silent about
+            // a quest whose prerequisites are simply not met yet.
+            $this->ledger->recordUnavailable($this->character, $quest, $this->runId);
 
             return null;
         } catch (SessionCollisionException|LoginFailedException $exception) {
             // Session-level failures are the job's to recover from, not a
             // property of this quest — never swallow them into a skip.
             throw $exception;
+        } catch (TransientGameException|ParseException $exception) {
+            // A page that would not parse, or an NPC that happens not to be
+            // standing in its room, says nothing about whether this character
+            // can do the quest. Park and come back to it; only a quest that
+            // fails this way repeatedly is written off.
+            return $this->retryOrSkip($item, $exception->getMessage(), $log);
         } catch (GameException $exception) {
-            // An unreachable giver or an unmapped room is this quest's problem,
-            // not the list's — the remaining quests are still runnable.
+            // An unmapped giver or a world with no path to it is a real
+            // property of this quest, and waiting will not change it — but the
+            // remaining quests are still perfectly runnable.
             $this->skipped++;
             $log("Skipping {$item->displayName()}: {$exception->getMessage()}");
+            $this->recordSkip($item, 'unreachable', $exception->getMessage());
 
             return null;
         }
@@ -188,6 +270,7 @@ class QuestListRunner
         ) {
             $this->skipped++;
             $log("Skipping {$item->displayName()}: {$summary->stopReason}");
+            $this->recordSkip($item, $summary->endReason->value, $summary->stopReason);
 
             return null;
         }
@@ -209,8 +292,67 @@ class QuestListRunner
         }
 
         $this->completed++;
+        $this->questRetries = 0;
+        $this->ledger->recordCompleted($this->character, $quest, $this->runId);
+
+        $this->events?->record(RunEventType::QuestCompleted, "Completed {$item->displayName()}.", [
+            'quest_id' => $quest->game_quest_id,
+            'position' => $item->position,
+        ]);
 
         return null;
+    }
+
+    /**
+     * A failure that is not the quest's fault: park the list on this item so
+     * the same quest is retried, until the retry budget runs out.
+     *
+     * @param  Closure(string): void  $log
+     */
+    private function retryOrSkip(QuestListItem $item, string $message, Closure $log): ?QuestListRunSummary
+    {
+        if ($this->questRetries >= self::MAX_QUEST_RETRIES) {
+            $attempts = $this->questRetries;
+            $this->skipped++;
+            $this->questRetries = 0;
+            $log("Skipping {$item->displayName()} after {$attempts} retries: {$message}");
+            $this->recordSkip($item, 'transient_exhausted', $message);
+
+            return null;
+        }
+
+        $this->questRetries++;
+
+        $this->events?->record(
+            RunEventType::QuestRetryScheduled,
+            "Retrying {$item->displayName()} (attempt {$this->questRetries}): {$message}",
+            [
+                'quest_id' => $item->quest->game_quest_id,
+                'position' => $item->position,
+                'attempt' => $this->questRetries,
+            ],
+            RunEvent::LEVEL_WARNING,
+        );
+
+        return $this->summary(
+            completed: false,
+            reason: "Paused on {$item->displayName()}: {$message}",
+            endReason: RunEndReason::TransientError,
+        );
+    }
+
+    private function recordSkip(QuestListItem $item, string $reason, string $message): void
+    {
+        $this->events?->record(
+            RunEventType::QuestSkipped,
+            "Skipped {$item->displayName()}: {$message}",
+            [
+                'quest_id' => $item->quest?->game_quest_id,
+                'position' => $item->position,
+                'reason' => $reason,
+            ],
+            RunEvent::LEVEL_WARNING,
+        );
     }
 
     private function summary(bool $completed, string $reason, RunEndReason $endReason): QuestListRunSummary
@@ -223,6 +365,7 @@ class QuestListRunner
             stopReason: $reason,
             endReason: $endReason,
             nextPosition: $this->nextPosition,
+            questRetries: $this->questRetries,
         );
     }
 }

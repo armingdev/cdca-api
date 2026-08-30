@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\LoginRequest;
 use App\Http\Requests\RegisterRequest;
 use App\Http\Resources\UserResource;
+use App\Jobs\SyncRgaCharactersJob;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -31,6 +32,13 @@ class AuthController extends Controller
         }
 
         $token = $user->createToken($request->validated('device_name') ?? 'api')->plainTextToken;
+
+        // Signing in should find the fleet already current. The job does all
+        // the guarding (it skips a sessionless account rather than logging it
+        // in, and debounces repeat logins), so this stays a plain dispatch.
+        foreach ($user->rgas as $rga) {
+            SyncRgaCharactersJob::dispatch($rga);
+        }
 
         return response()->json(['user' => UserResource::make($user), 'token' => $token]);
     }

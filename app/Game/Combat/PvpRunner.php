@@ -55,9 +55,14 @@ class PvpRunner
      * @param  Closure(string): void|null  $log
      * @param  Closure(): RunSignal|null  $signal
      * @param  Closure(BattleEvent): void|null  $onBattle
+     * @param  Closure(): void|null  $ensureBuffs  just-in-time buff top-up, called before each attack
      */
-    public function run(?Closure $log = null, ?Closure $signal = null, ?Closure $onBattle = null): PvpRunSummary
-    {
+    public function run(
+        ?Closure $log = null,
+        ?Closure $signal = null,
+        ?Closure $onBattle = null,
+        ?Closure $ensureBuffs = null,
+    ): PvpRunSummary {
         $log ??= fn (string $message) => null;
 
         // The game's own log is the only cooldown record that survives a
@@ -138,6 +143,11 @@ class PvpRunner
                 if ($ready === null) {
                     break;
                 }
+
+                // Only once an attackable target is in hand: a pass where every
+                // target is on cooldown — the ordinary state of a recurring run
+                // — returns above without spending a single buff.
+                $ensureBuffs?->__invoke();
 
                 $event = $this->attacker->attack($ready, $this->config->message);
                 $this->attacks++;

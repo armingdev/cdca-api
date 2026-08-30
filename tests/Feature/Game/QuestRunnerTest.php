@@ -5,6 +5,8 @@ use App\Game\Engine\RunEndReason;
 use App\Game\Exceptions\GameException;
 use App\Game\Quest\QuestRunner;
 use App\Models\Character;
+use App\Models\Mob;
+use App\Models\Quest;
 use App\Models\QuestItem;
 use App\Models\Rga;
 use Illuminate\Support\Facades\Http;
@@ -122,7 +124,7 @@ it('stops with a clear reason when a collect item has no known source and no hel
     });
 
     expect($summary->completed)->toBeFalse()
-        ->and($summary->stopReason)->toBe("Could not make progress on objective 'Holy Elemental Crystal'.")
+        ->and($summary->stopReason)->toContain('No known way to fulfill any objective')
         ->and(collect($log)->contains(fn ($l) => str_contains($l, 'No known way to fulfill')))->toBeTrue();
 });
 
@@ -273,4 +275,67 @@ it('drives the whole flow through the outwar:quest command', function () {
     ])
         ->assertSuccessful()
         ->expectsOutputToContain('Quest complete');
+});
+
+it('farms every objective of a multi-objective step, not just the first', function () {
+    // A step wanting 5 Street Crawlers AND 3 Alley Rats. Only the first entry
+    // was ever inspected, so the second mob was never hunted and the quest was
+    // written off as stuck after the first had been farmed at full rage cost.
+    seedMultiObjectiveQuestWorld();
+    fakeMultiObjectiveQuestWorld();
+
+    $character = Character::factory()->for(Rga::factory()->withSession())->create();
+
+    $summary = QuestRunner::forCharacter($character, new QuestRunConfig(
+        npcName: 'Stella',
+        questId: 742,
+    ))->run();
+
+    expect($summary->completed)->toBeTrue()
+        ->and($summary->endReason)->toBe(RunEndReason::Completed)
+        ->and($summary->kills)->toBe(8);
+
+    // Both rooms were actually fought in.
+    $attacked = collect(Http::recorded())
+        ->map(fn (array $pair) => $pair[0]->url())
+        ->filter(fn (string $url) => str_contains($url, 'somethingelse.php'));
+
+    expect($attacked)->toHaveCount(8);
+});
+
+it('does not condemn a whole quest because one objective has no farmable source', function () {
+    // Crawlers are farmable, Alley Rats are not mapped at all. The quest still
+    // makes real progress instead of being skipped outright.
+    seedMultiObjectiveQuestWorld();
+    Mob::where('name', 'Alley Rat')->delete();
+    fakeMultiObjectiveQuestWorld(ratsFarmable: false);
+
+    $character = Character::factory()->for(Rga::factory()->withSession())->create();
+
+    $summary = QuestRunner::forCharacter($character, new QuestRunConfig(
+        npcName: 'Stella',
+        questId: 742,
+    ))->run();
+
+    expect($summary->kills)->toBe(5)
+        ->and($summary->completed)->toBeFalse()
+        ->and($summary->endReason)->toBe(RunEndReason::Stuck);
+});
+
+it('finishes every step of a multi-step quest instead of stopping at the first turn-in', function () {
+    // The intermediate turn-in page carries no onward mob_talk link, which used
+    // to read as "quest complete" and abandon the remaining steps.
+    fakeMultiStepQuestWorld();
+    Quest::factory()->create(['game_quest_id' => 742, 'name' => 'Street Crawler', 'giver' => 'Stella', 'steps_count' => 2]);
+
+    $character = Character::factory()->for(Rga::factory()->withSession())->create();
+
+    $summary = QuestRunner::forCharacter($character, new QuestRunConfig(
+        npcName: 'Stella',
+        questId: 742,
+    ))->run();
+
+    expect($summary->completed)->toBeTrue()
+        ->and($summary->stepsCompleted)->toBe(2)
+        ->and($summary->endReason)->toBe(RunEndReason::Completed);
 });

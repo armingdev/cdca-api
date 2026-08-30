@@ -57,6 +57,27 @@ it('casts a skill for a character', function () {
         ->assertJsonPath('message', 'Cast Stealth.');
 });
 
+it('reports the whole selected set per skill when casting it now', function () {
+    $character = Character::factory()->for($this->rga)->create();
+    Skill::create(['id' => 4, 'name' => 'Stealth', 'school' => 'class', 'rage_cost' => 10, 'cooldown_minutes' => 60, 'duration_minutes' => 60]);
+    Skill::create(['id' => 7, 'name' => 'On Guard', 'school' => 'class', 'rage_cost' => 10, 'cooldown_minutes' => 60, 'duration_minutes' => 60]);
+
+    CharacterSkill::create(['character_id' => $character->id, 'skill_id' => 4, 'cast_on_start' => true, 'trained_level' => 1]);
+    // Selected but never trained: the reason it did not go off is the answer
+    // the player needs, and a bare count could not carry it.
+    CharacterSkill::create(['character_id' => $character->id, 'skill_id' => 7, 'cast_on_start' => true, 'trained_level' => 0, 'synced_at' => now()]);
+
+    fakeSkillWorld();
+
+    $this->postJson("/api/v1/characters/{$character->id}/cast", ['on_start' => true])
+        ->assertOk()
+        ->assertJsonPath('message', 'Cast 1 skill(s).')
+        ->assertJsonPath('cast.0.name', 'Stealth')
+        ->assertJsonPath('skipped.0.name', 'On Guard')
+        ->assertJsonPath('skipped.0.reason', 'untrained')
+        ->assertJsonPath('failed', []);
+});
+
 it('syncs a character\'s skills from the game', function () {
     $character = Character::factory()->for($this->rga)->create();
     (new SkillSeeder)->run();

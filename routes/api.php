@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\V1\AttackListController;
 use App\Http\Controllers\Api\V1\AttackListTargetController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CharacterController;
+use App\Http\Controllers\Api\V1\CharacterQuestProgressController;
 use App\Http\Controllers\Api\V1\CharacterSkillController;
 use App\Http\Controllers\Api\V1\CharacterTeleportController;
 use App\Http\Controllers\Api\V1\QuestController;
@@ -48,6 +49,11 @@ Route::prefix('v1')->group(function () {
         Route::post('characters/{character}/teleports', [CharacterTeleportController::class, 'store']);
         Route::post('characters/{character}/home-tavern', [CharacterTeleportController::class, 'setHomeTavern']);
 
+        // Per-character quest memory: what runs will skip, and how to forget it.
+        Route::get('characters/{character}/quest-progress', [CharacterQuestProgressController::class, 'index']);
+        Route::delete('characters/{character}/quest-progress', [CharacterQuestProgressController::class, 'destroy']);
+        Route::delete('rgas/{rga}/quest-progress', [CharacterQuestProgressController::class, 'destroyForRga']);
+
         Route::get('characters/{character}/battles', [StatsController::class, 'battles']);
         Route::get('characters/{character}/stats', [StatsController::class, 'summary']);
 
@@ -78,5 +84,6 @@ Route::prefix('v1')->group(function () {
         Route::post('runs/{run}/pause', [RunController::class, 'pause']);
         Route::post('runs/{run}/resume', [RunController::class, 'resume']);
         Route::get('runs/{run}/battles', [RunController::class, 'battles']);
+        Route::get('runs/{run}/events', [RunController::class, 'events']);
     });
 });

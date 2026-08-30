@@ -10,11 +10,18 @@ use App\Game\Enums\SkillSchool;
  */
 final readonly class SkillSyncResult
 {
+    /**
+     * @param  list<string>  $unreadableLevels  skills whose level parenthetical the page
+     *                                          rendered in a shape we do not recognise; their
+     *                                          stored levels were left untouched rather than
+     *                                          zeroed, which would have made them uncastable
+     */
     public function __construct(
         public int $rowsSynced,
         public int $skillsDiscovered,
         public ?int $skillPoints,
         public ?SkillSchool $school,
         public int $activeBuffs,
+        public array $unreadableLevels = [],
     ) {}
 }

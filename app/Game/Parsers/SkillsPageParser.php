@@ -69,7 +69,13 @@ class SkillsPageParser
      * The parenthetical after a skill name: "1+8" (trained+bonus), "1"
      * (trained only), or "Unlock at 80" (character-level-gated).
      *
-     * @return array{int, int, ?int}
+     * Anything else yields null levels rather than zeros. Reporting an
+     * unreadable heading as "0 trained" makes the skill uncastable, and
+     * because the row still stamps synced_at that verdict sticks — a
+     * selected skill would then be skipped forever without ever issuing a
+     * request. Null lets the caller keep whatever it already knew.
+     *
+     * @return array{?int, ?int, ?int}
      */
     private function parseLevels(string $parenthetical): array
     {
@@ -85,7 +91,7 @@ class SkillsPageParser
             return [0, 0, (int) $m[1]];
         }
 
-        return [0, 0, null];
+        return [null, null, null];
     }
 
     private function parseSkillPoints(string $body): ?int

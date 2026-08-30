@@ -10,10 +10,11 @@ use App\Models\Skill;
 use Closure;
 
 /**
- * Casts skills for one character and tracks per-skill cooldown/buff windows so
- * the engine knows when a skill can be re-cast and whether a buff (e.g.
- * Circumspect) is currently active. Backs "cast all selected skills on start"
- * and "run only when Circumspect active".
+ * Casts a single skill for one character and answers the Circumspect gate.
+ *
+ * Casting the whole selected set lives in BuffEnsurer, which owns the
+ * syncing, ordering, and rage budgeting that a reliable pass needs; this
+ * class stays the one place a cast is actually issued and recorded.
  */
 class SkillCaster
 {
@@ -29,8 +30,8 @@ class SkillCaster
     }
 
     /**
-     * Cast one skill now. Records last_cast_at on success. Returns whether the
-     * game confirmed the cast.
+     * Cast one skill now. Records last_cast_at only when the game confirmed
+     * *this* skill by name. Returns whether the cast went off.
      */
     public function cast(Skill $skill): bool
     {
@@ -39,64 +40,21 @@ class SkillCaster
             'cast' => 'Cast Skill',
         ]);
 
-        if (! $this->parser->castSucceeded($response->body())) {
+        if (! $this->parser->castSucceededFor($response->body(), $skill->name)) {
             return false;
         }
 
+        // The server windows we hold describe the state *before* this cast;
+        // clearing them re-arms the local estimate (see CharacterSkill).
         $this->stateFor($skill)->update([
             'last_cast_at' => now(),
             'recharge_until' => null,
+            'recharge_synced_at' => null,
             'buff_until' => null,
+            'buff_synced_at' => null,
         ]);
 
         return true;
-    }
-
-    /**
-     * Cast every skill the character selected for run-start that is not
-     * already an active buff and is off cooldown.
-     *
-     * @param  Closure(string): void|null  $log
-     * @return int number of skills successfully cast
-     */
-    public function castOnStart(?Closure $log = null): int
-    {
-        $log ??= fn (string $message) => null;
-        $cast = 0;
-
-        $selected = CharacterSkill::with('skill')
-            ->where('character_id', $this->character->id)
-            ->where('cast_on_start', true)
-            ->get();
-
-        foreach ($selected as $state) {
-            if ($state->synced_at !== null && ! $state->isCastable()) {
-                $log("{$state->skill->name} not trained — skipping.");
-
-                continue;
-            }
-
-            if ($state->isBuffActive()) {
-                $log("{$state->skill->name} already active — skipping.");
-
-                continue;
-            }
-
-            if ($state->isOnCooldown()) {
-                $log("{$state->skill->name} on cooldown — skipping.");
-
-                continue;
-            }
-
-            if ($this->cast($state->skill)) {
-                $cast++;
-                $log("Cast {$state->skill->name}.");
-            } else {
-                $log("Failed to cast {$state->skill->name} (rage, cooldown, or not learned).");
-            }
-        }
-
-        return $cast;
     }
 
     public function isCircumspectActive(): bool

@@ -243,11 +243,13 @@ it('cuts an endless farm short the moment the Circumspect buff lapses mid-pass',
         }
 
         if (str_contains($url, 'skills_info.php')) {
-            return Http::response(fakeSkillInfoHtml());
+            return Http::response(fakeSkillInfoHtml((int) $request['id']));
         }
 
         if (str_contains($url, 'cast_skills.php')) {
-            return Http::response('Status: You just cast a skill');
+            return Http::response($request->method() === 'POST'
+                ? fakeCastConfirmationHtml((int) $request['castskillid'])
+                : fakeSkillsPageHtml());
         }
 
         if (str_contains($url, 'somethingelse.php')) {

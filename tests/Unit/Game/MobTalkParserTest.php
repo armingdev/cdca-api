@@ -77,3 +77,54 @@ it('classifies a collect objective (no "killed" suffix)', function () {
 it('throws on a page that is not a mob_talk step', function () {
     new MobTalkParser()->parse('<html><body>Some other page</body></html>');
 })->throws(ParseException::class);
+
+it('parses every objective of a multi-objective kill step', function () {
+    $page = (new MobTalkParser)->parse(gameFixture('quest/mob_talk_multi_objective_incomplete.html'));
+
+    expect($page->objectives)->toHaveCount(2)
+        ->and($page->unmetObjectives())->toHaveCount(2)
+        ->and($page->objectives[0]->target)->toBe('Street Crawler')
+        ->and($page->objectives[0]->required)->toBe(5)
+        ->and($page->objectives[1]->target)->toBe('Alley Rat')
+        ->and($page->objectives[1]->required)->toBe(3)
+        ->and($page->canAdvance())->toBeFalse();
+});
+
+it('leaves the second objective unmet once the first is done', function () {
+    $page = (new MobTalkParser)->parse(gameFixture('quest/mob_talk_multi_objective_one_complete.html'));
+
+    expect($page->objectives)->toHaveCount(2)
+        ->and($page->unmetObjectives())->toHaveCount(1)
+        ->and($page->unmetObjectives()[0]->target)->toBe('Alley Rat');
+});
+
+it('reports no unmet objectives when every counter is full', function () {
+    $page = (new MobTalkParser)->parse(gameFixture('quest/mob_talk_multi_objective_all_complete.html'));
+
+    expect($page->objectives)->toHaveCount(2)
+        ->and($page->unmetObjectives())->toBe([])
+        ->and($page->canAdvance())->toBeFalse();
+});
+
+it('reads a talk row without an n/m counter as an objective, not a hole', function () {
+    // A null in this list used to reach a typed closure and raise a TypeError,
+    // which no GameException handler catches — taking the whole run down.
+    $page = (new MobTalkParser)->parse(gameFixture('quest/mob_talk_mixed_talk_row.html'));
+
+    expect($page->objectives)->toHaveCount(2)
+        ->and($page->objectives[0]->type)->toBe(QuestObjectiveType::Kill)
+        ->and($page->objectives[1]->type)->toBe(QuestObjectiveType::Talk)
+        ->and($page->objectives[1]->target)->toBe('Speak to the Watch Captain')
+        ->and($page->unmetObjectives())->toHaveCount(2);
+});
+
+it('picks the onward link belonging to the quest being run', function () {
+    $page = (new MobTalkParser)->parse(gameFixture('quest/mob_talk_turn_in_foreign_link.html'));
+
+    expect($page->continueLinks)->toHaveCount(2)
+        // First in page order belongs to a different quest; following it would
+        // abandon the quest in hand.
+        ->and($page->continueLink())->toContain('questid=888')
+        ->and($page->continueLinkFor(742))->toContain('stepid=4002')
+        ->and($page->continueLinkFor(999))->toBeNull();
+});

@@ -7,6 +7,7 @@ use App\Jobs\RunMobJob;
 use App\Jobs\RunPvpJob;
 use App\Jobs\RunQuestJob;
 use App\Jobs\RunQuestListJob;
+use App\Models\CharacterSkill;
 use App\Models\Mob;
 use App\Models\Quest;
 use App\Models\Room;
@@ -92,15 +93,141 @@ function makeRunJob(RunParticipant $participant): RunJob
     };
 }
 
-/**
- * Minimal valid skills_info.php page (Circumspect-shaped, not recharging) so
- * pre-run skill syncs in the fake worlds parse instead of throwing; cooldown
- * windows then derive from local last_cast_at bookkeeping.
- */
-function fakeSkillInfoHtml(): string
+/** One accounts.php row in the captured shape (name/level/crew font cells + PLAY! link). */
+function sigilAccountsHtml(int $level = 85): string
 {
-    return '<div><h5>Circumspect - Level 1</h5>Reduces the rage cost of fighting.</div>'
-        .'<b>Rage Cost:</b><br> 20 <b>Cooldown:</b><br> 720 mins <b>Duration:</b><br> 60 mins';
+    return <<<HTML
+    <table><tr>
+      <td><font color="#FFFF00"><b>RealLinuXX</b></font></td>
+      <td><font color="#FFFFFF"><b>{$level}</b></font></td>
+      <td><font color="#999999"><b>Collective 2</b></font></td>
+      <td><a href="http://sigil.outwar.com/world.php?suid=2403&serverid=1"><b>PLAY!</b></a></td>
+    </tr></table>
+    HTML;
+}
+
+/** A catalog skill with explicit cooldown/duration/rage, for skill tests. */
+function makeSkill(int $id, string $name, int $cooldown, int $duration, int $rage = 10): Skill
+{
+    return Skill::create([
+        'id' => $id, 'name' => $name, 'school' => 'class',
+        'rage_cost' => $rage, 'cooldown_minutes' => $cooldown, 'duration_minutes' => $duration,
+    ]);
+}
+
+/**
+ * A faithful skills-only fake: the five cast_skills.php tabs (with a Current
+ * Effects panel built from real cast times), per-skill skills_info.php pages
+ * carrying the game's recharge line, and userstats.php for the rage budget.
+ */
+function fakeSkillWorld(int $rage = 5000): void
+{
+    Http::fake(function ($request) use ($rage) {
+        $url = $request->url();
+
+        if (str_contains($url, 'userstats.php')) {
+            return Http::response(json_encode([
+                'exp' => '1,000', 'rage' => number_format($rage), 'level' => '60', 'width' => 0,
+            ]));
+        }
+
+        if (str_contains($url, 'skills_info.php')) {
+            return Http::response(fakeSkillInfoHtml((int) $request['id']));
+        }
+
+        if (str_contains($url, 'cast_skills.php')) {
+            return Http::response($request->method() === 'POST'
+                ? fakeCastConfirmationHtml((int) $request['castskillid'])
+                : fakeSkillsPageHtml());
+        }
+
+        return Http::response('<html></html>');
+    });
+}
+
+/**
+ * A skills_info.php page for one skill, carrying the game's authoritative
+ * "recharging, {n} minutes remaining" line whenever the skill's own cast
+ * bookkeeping says it is still on cooldown.
+ *
+ * Reporting a skill as ready is a statement, not a blank: the engine trusts
+ * it over its local estimate, so a fixture that never mentions recharging
+ * tells every test that every cooldown has elapsed.
+ *
+ * Defaults to Circumspect's shape when the id is unknown.
+ */
+function fakeSkillInfoHtml(?int $skillId = null): string
+{
+    $skill = $skillId !== null ? Skill::find($skillId) : null;
+    $name = $skill?->name ?? 'Circumspect';
+    $cooldown = $skill?->cooldown_minutes ?? 720;
+    $duration = $skill?->duration_minutes ?? 60;
+    $rage = $skill?->rage_cost ?? 20;
+
+    $recharging = '';
+
+    if ($skill !== null) {
+        $state = CharacterSkill::where('skill_id', $skill->id)->first();
+        $endsAt = $state?->last_cast_at?->addMinutes($state->current_cooldown_minutes ?? $cooldown ?? 0);
+
+        if ($endsAt !== null && $endsAt->isFuture()) {
+            $minutes = (int) ceil(now()->diffInMinutes($endsAt, true));
+            $recharging = " This skill is recharging. {$minutes} minutes remaining.";
+        }
+    }
+
+    return "<div><h5>{$name} - Level 1</h5>Reduces the rage cost of fighting.</div>"
+        ."<b>Rage Cost:</b><br> {$rage} <b>Cooldown:</b><br> {$cooldown} mins <b>Duration:</b><br> {$duration} mins"
+        .$recharging;
+}
+
+/**
+ * A cast_skills.php tab whose Current Effects panel reflects what is actually
+ * buffed, derived from each skill's own cast bookkeeping rather than from our
+ * sync stamps.
+ *
+ * Fidelity matters here: an empty panel is not "no information", it is the
+ * game stating that nothing is active, and the engine now (correctly) trusts
+ * that over its local estimate. A fake that always returned an empty page
+ * would tell every test that every buff had lapsed.
+ */
+function fakeSkillsPageHtml(): string
+{
+    $entries = '';
+
+    foreach (CharacterSkill::with('skill')->get() as $state) {
+        // The cast time is the game's own ground truth for the window. Reading
+        // back buff_until would feed our derived column into the fake that
+        // sets it, and rounding would then nudge the expiry forward on every
+        // sync — a buff that can never lapse.
+        $endsAt = $state->last_cast_at !== null
+            ? $state->last_cast_at->addMinutes($state->current_duration_minutes ?? $state->skill?->duration_minutes ?? 0)
+            : $state->buff_until;
+
+        if ($endsAt === null || $endsAt->isPast()) {
+            continue;
+        }
+
+        $minutes = max(1, (int) floor(now()->diffInMinutes($endsAt, true)));
+        $level = max(1, $state->trained_level + $state->bonus_level);
+
+        $entries .= "<a onmouseover=\"popup(event,'<b>Level {$level} {$state->skill->name}</b>"
+            ."<br>{$minutes} mins left<br>Cast By Tester'\">effect</a>";
+    }
+
+    return '<html><body><b>Skill:</b></td><td>0</td>'.$entries.'</body></html>';
+}
+
+/**
+ * The game's confirmation for the skill actually requested. The engine now
+ * name-matches it, because a stale status line from an earlier cast used to
+ * be read as success and then blocked the retry.
+ */
+function fakeCastConfirmationHtml(?int $skillId): string
+{
+    $name = $skillId !== null ? Skill::find($skillId)?->name : null;
+
+    return 'Status: You just cast '.($name ?? 'a skill').'.';
 }
 
 /**
@@ -155,11 +282,13 @@ function fakeCombatWorld(int $rage = 5000): Closure
         }
 
         if (str_contains($url, 'skills_info.php')) {
-            return Http::response(fakeSkillInfoHtml());
+            return Http::response(fakeSkillInfoHtml((int) $request['id']));
         }
 
         if (str_contains($url, 'cast_skills.php')) {
-            return Http::response('Status: You just cast a skill');
+            return Http::response($request->method() === 'POST'
+                ? fakeCastConfirmationHtml((int) $request['castskillid'])
+                : fakeSkillsPageHtml());
         }
 
         if (str_contains($url, 'somethingelse.php')) {
@@ -254,7 +383,7 @@ function fakeLosingWorld(int $rage = 50000, int $levelUps = 0): void
         }
 
         if (str_contains($url, 'skills_info.php')) {
-            return Http::response(fakeSkillInfoHtml());
+            return Http::response(fakeSkillInfoHtml((int) $request['id']));
         }
 
         if (str_contains($url, 'somethingelse.php')) {
@@ -318,7 +447,7 @@ function fakeLosingQuestWorld(int $rage = 50000): void
         }
 
         if (str_contains($url, 'skills_info.php')) {
-            return Http::response(fakeSkillInfoHtml());
+            return Http::response(fakeSkillInfoHtml((int) $request['id']));
         }
 
         if (str_contains($url, 'mob_talk.php')) {
@@ -373,6 +502,205 @@ function seedQuestWorld(): void
     Room::factory()->create(['id' => 2, 'west' => 1]);
     Mob::factory()->create(['name' => 'Stella'])->rooms()->attach(1, ['last_seen_at' => now()]);
     Mob::factory()->create(['name' => 'Street Crawler'])->rooms()->attach(2, ['last_seen_at' => now()]);
+}
+
+/**
+ * DB side of the multi-objective quest world, on top of seedQuestWorld():
+ * room 1 (Stella) –E– room 2 (Street Crawler) –E– room 3 (Alley Rat), so a
+ * single step can demand kills of two different mobs in two different places.
+ */
+function seedMultiObjectiveQuestWorld(): void
+{
+    // Extends seedQuestWorld(): room 3 and its Alley Rat, reached east of the
+    // Street Crawler room.
+    Room::whereKey(2)->update(['east' => 3]);
+    Room::factory()->create(['id' => 3, 'west' => 2]);
+    Mob::factory()->create(['name' => 'Alley Rat'])->rooms()->attach(3, ['last_seen_at' => now()]);
+}
+
+/**
+ * A quest whose single step wants 5 Street Crawlers *and* 3 Alley Rats, served
+ * from the captured multi-objective fixtures and keyed on two independent kill
+ * counters. The step only offers its finish link once both are satisfied.
+ *
+ * @param  bool  $ratsFarmable  false leaves the Alley Rat unmapped, the case where one
+ *                              objective of a step simply cannot be worked
+ */
+function fakeMultiObjectiveQuestWorld(int $rage = 50000, bool $ratsFarmable = true): void
+{
+    $position = 1;
+    $crawlers = 0;
+    $rats = 0;
+
+    $roomBlob = function (int $roomId) use (&$crawlers, &$rats): string {
+        $mobs = match ($roomId) {
+            1 => [questMobJson('Stella', 59293, 888, 'npchash', level: 10)],
+            2 => [questMobJson('Street Crawler', 4000, 5000, 'x', level: 20, isDead: $crawlers >= 5)],
+            3 => [questMobJson('Alley Rat', 4100, 5100, 'y', level: 20, isDead: $rats >= 3)],
+            default => [],
+        };
+
+        return json_encode([
+            'error' => '', 'curRoom' => (string) $roomId, 'name' => "Room {$roomId}",
+            'north' => '0',
+            'east' => $roomId === 1 ? '2' : ($roomId === 2 ? '3' : '0'),
+            'south' => '0',
+            'west' => $roomId === 2 ? '1' : ($roomId === 3 ? '2' : '0'),
+            'roomDetailsNew' => $mobs, 'doorsData' => null,
+        ]);
+    };
+
+    Http::fake(function ($request) use (&$position, &$crawlers, &$rats, $roomBlob, $rage, $ratsFarmable) {
+        $url = $request->url();
+
+        if (str_contains($url, 'userstats.php')) {
+            return Http::response(json_encode([
+                'exp' => '1,000', 'rage' => number_format($rage), 'level' => '20', 'width' => 0,
+            ]));
+        }
+
+        if (str_contains($url, 'skills_info.php')) {
+            return Http::response(fakeSkillInfoHtml((int) $request['id']));
+        }
+
+        if (str_contains($url, 'cast_skills.php')) {
+            return Http::response($request->method() === 'POST'
+                ? fakeCastConfirmationHtml((int) $request['castskillid'])
+                : fakeSkillsPageHtml());
+        }
+
+        if (str_contains($url, 'mob_talk.php')) {
+            if (str_contains($url, 'finish=1')) {
+                return Http::response(gameFixture('quest/mob_talk_step_finish.html'));
+            }
+
+            // Both objectives met is the only state that earns a finish link.
+            if ($crawlers >= 5 && ($rats >= 3 || ! $ratsFarmable)) {
+                return Http::response(gameFixture($ratsFarmable
+                    ? 'quest/mob_talk_kill_complete.html'
+                    : 'quest/mob_talk_multi_objective_all_complete.html'));
+            }
+
+            return Http::response(gameFixture($crawlers >= 5
+                ? 'quest/mob_talk_multi_objective_one_complete.html'
+                : 'quest/mob_talk_multi_objective_incomplete.html'));
+        }
+
+        if (str_contains($url, 'mob.php')) {
+            return Http::response('<div><a href="mob_talk.php?id=59293&stepid=3378&userspawn=&questid=742">Street Crawler</a></div>');
+        }
+
+        if (str_contains($url, 'somethingelse.php')) {
+            $position === 3 ? $rats++ : $crawlers++;
+
+            return Http::response('', 302, ['Location' => 'https://sigil.outwar.com/attack/900/']);
+        }
+
+        if (str_contains($url, 'attack/900')) {
+            return Http::response('var battle_result = "Hero has gained 500 experience!"; var defender_name = "Street Crawler";');
+        }
+
+        if (str_contains($url, 'ajax_changeroomb.php')) {
+            $query = [];
+            parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
+            $position = (int) $query['room'] ?: $position;
+
+            return Http::response($roomBlob($position));
+        }
+
+        return Http::response('<html>world</html>');
+    });
+}
+
+/**
+ * A two-step quest whose *intermediate* turn-in page carries no onward link —
+ * the shape that made the runner declare the whole quest complete after step
+ * one. The giver keeps offering the quest until both steps are turned in.
+ */
+function fakeMultiStepQuestWorld(int $rage = 50000): void
+{
+    $position = 1;
+    $killed = 0;
+    $stepsFinished = 0;
+
+    $roomBlob = function (int $roomId) use (&$killed): string {
+        $mobs = match ($roomId) {
+            1 => [questMobJson('Stella', 59293, 888, 'npchash', level: 10)],
+            2 => [questMobJson('Street Crawler', 4000, 5000, 'x', level: 20, isDead: $killed >= 5)],
+            default => [],
+        };
+
+        return json_encode([
+            'error' => '', 'curRoom' => (string) $roomId, 'name' => "Room {$roomId}",
+            'north' => '0', 'east' => $roomId === 1 ? '2' : '0', 'south' => '0', 'west' => $roomId === 2 ? '1' : '0',
+            'roomDetailsNew' => $mobs, 'doorsData' => null,
+        ]);
+    };
+
+    Http::fake(function ($request) use (&$position, &$killed, &$stepsFinished, $roomBlob, $rage) {
+        $url = $request->url();
+
+        if (str_contains($url, 'userstats.php')) {
+            return Http::response(json_encode([
+                'exp' => '1,000', 'rage' => number_format($rage), 'level' => '20', 'width' => 0,
+            ]));
+        }
+
+        if (str_contains($url, 'skills_info.php')) {
+            return Http::response(fakeSkillInfoHtml((int) $request['id']));
+        }
+
+        if (str_contains($url, 'cast_skills.php')) {
+            return Http::response($request->method() === 'POST'
+                ? fakeCastConfirmationHtml((int) $request['castskillid'])
+                : fakeSkillsPageHtml());
+        }
+
+        if (str_contains($url, 'mob_talk.php')) {
+            if (str_contains($url, 'finish=1')) {
+                $stepsFinished++;
+
+                // No mob_talk link on the way out, for either step.
+                return Http::response(gameFixture('quest/mob_talk_step_finish.html'));
+            }
+
+            // Step two is a talk-only step: finishable the moment it is opened.
+            return Http::response(gameFixture($stepsFinished >= 1 || $killed >= 5
+                ? 'quest/mob_talk_kill_complete.html'
+                : 'quest/mob_talk_kill_incomplete.html'));
+        }
+
+        if (str_contains($url, 'mob.php')) {
+            // The giver stops offering the quest only once both steps are in.
+            if ($stepsFinished >= 2) {
+                return Http::response('<div>Nothing for you today.</div>');
+            }
+
+            $stepId = $stepsFinished === 0 ? 3378 : 3379;
+
+            return Http::response("<div><a href=\"mob_talk.php?id=59293&stepid={$stepId}&userspawn=&questid=742\">Street Crawler</a></div>");
+        }
+
+        if (str_contains($url, 'somethingelse.php')) {
+            $killed++;
+
+            return Http::response('', 302, ['Location' => 'https://sigil.outwar.com/attack/900/']);
+        }
+
+        if (str_contains($url, 'attack/900')) {
+            return Http::response('var battle_result = "Hero has gained 500 experience!"; var defender_name = "Street Crawler";');
+        }
+
+        if (str_contains($url, 'ajax_changeroomb.php')) {
+            $query = [];
+            parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
+            $position = (int) $query['room'] ?: $position;
+
+            return Http::response($roomBlob($position));
+        }
+
+        return Http::response('<html>world</html>');
+    });
 }
 
 /**
@@ -479,11 +807,13 @@ function fakeQuestWorld(
         }
 
         if (str_contains($url, 'skills_info.php')) {
-            return Http::response(fakeSkillInfoHtml());
+            return Http::response(fakeSkillInfoHtml((int) $request['id']));
         }
 
-        if (str_contains($url, 'cast_skills.php') && $request->method() === 'POST') {
-            return Http::response('Status: You just cast a skill');
+        if (str_contains($url, 'cast_skills.php')) {
+            return Http::response($request->method() === 'POST'
+                ? fakeCastConfirmationHtml((int) $request['castskillid'])
+                : fakeSkillsPageHtml());
         }
 
         if (str_contains($url, 'mob_talk.php')) {

@@ -6,6 +6,7 @@ use App\Game\Engine\ParticipantOutcome;
 use App\Game\Engine\QuestListRunConfig;
 use App\Game\Engine\QuestListRunSummary;
 use App\Game\Engine\RunEndReason;
+use App\Game\Engine\RunEventRecorder;
 use App\Game\Enums\RunStatus;
 use App\Game\Quest\QuestListRunner;
 use App\Models\Character;
@@ -18,11 +19,19 @@ use Closure;
  */
 class RunQuestListJob extends RunJob
 {
+    /**
+     * How long to wait before re-entering a quest that failed for a reason
+     * that was not about the quest. Long enough for a wandering NPC to come
+     * home, short enough that a 200-quest list barely notices.
+     */
+    private const int TRANSIENT_RETRY_SECONDS = 300;
+
     protected function runEngine(
         Character $character,
         RunParticipant $participant,
         Closure $log,
         Closure $signal,
+        Closure $ensureBuffs,
         Closure $onBattle,
     ): ParticipantOutcome {
         $config = QuestListRunConfig::fromArray($participant->run->config);
@@ -32,14 +41,21 @@ class RunQuestListJob extends RunJob
             log: $log,
             signal: $signal,
             onBattle: $onBattle,
+            ensureBuffs: $ensureBuffs,
             startPosition: $startPosition,
             onQuestSettled: function (int $nextPosition, int $completed, int $skipped) use ($participant): void {
                 $participant->update(['progress' => array_merge($participant->progress ?? [], [
                     'position' => $nextPosition,
                     'quests_completed' => $completed,
                     'quests_skipped' => $skipped,
+                    // Settling an item clears the retry budget: it belongs to
+                    // the quest that was stuck, not to the list.
+                    'quest_retries' => 0,
                 ])]);
             },
+            events: new RunEventRecorder($participant),
+            questRetries: (int) ($participant->progress['quest_retries'] ?? 0),
+            runId: $participant->run_id,
         );
 
         return $this->outcomeForListEnd($summary, $config, $participant->run, $participant->progress ?? [], $character);
@@ -69,6 +85,24 @@ class RunQuestListJob extends RunJob
                 'position' => $summary->nextPosition,
                 'respawn_waits' => 0,
             ]);
+        }
+
+        // A blip rather than a verdict on the quest: park briefly on the same
+        // item so the next cycle re-enters it. The retry budget rides along in
+        // progress, and QuestListRunner writes the quest off once it is spent.
+        if ($summary->endReason === RunEndReason::TransientError) {
+            $resumeAt = now()->addSeconds(self::TRANSIENT_RETRY_SECONDS);
+
+            return new ParticipantOutcome(
+                RunStatus::Waiting,
+                rtrim($summary->stopReason, '.').". Retrying at {$resumeAt->format('Y-m-d H:i')}.",
+                $resumeAt,
+                [
+                    'position' => $summary->nextPosition,
+                    'quest_retries' => $summary->questRetries,
+                    'respawn_waits' => 0,
+                ],
+            );
         }
 
         // The current quest's targets are all dead — park the list where it
