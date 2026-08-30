@@ -31,6 +31,7 @@ class RunMobJob extends RunJob
         RunParticipant $participant,
         Closure $log,
         Closure $signal,
+        Closure $ensureBuffs,
         Closure $onBattle,
     ): ParticipantOutcome {
         $config = MobRunConfig::fromArray($participant->run->config);
@@ -40,6 +41,7 @@ class RunMobJob extends RunJob
             log: $log,
             signal: $signal,
             onBattle: $onBattle,
+            ensureBuffs: $ensureBuffs,
             killsAlreadyDone: (int) ($progress['kills_done'] ?? 0),
         );
 

@@ -11,14 +11,6 @@ beforeEach(function () {
     config(['outwar.http.throttle_min_ms' => 0, 'outwar.http.throttle_max_ms' => 0]);
 });
 
-function makeSkill(int $id, string $name, int $cooldown, int $duration, int $rage = 10): Skill
-{
-    return Skill::create([
-        'id' => $id, 'name' => $name, 'school' => 'class',
-        'rage_cost' => $rage, 'cooldown_minutes' => $cooldown, 'duration_minutes' => $duration,
-    ]);
-}
-
 it('casts a skill, confirms it, and records last_cast_at', function () {
     $character = Character::factory()->for(Rga::factory()->withSession())->create();
     $skill = makeSkill(4, 'Stealth', 60, 60);
@@ -46,44 +38,6 @@ it('does not record a cast the game rejected', function () {
         ->and(CharacterSkill::count())->toBe(0);
 });
 
-it('casts only the selected skills that are neither active nor on cooldown', function () {
-    $character = Character::factory()->for(Rga::factory()->withSession())->create();
-
-    $stealth = makeSkill(4, 'Stealth', 60, 60);      // castable
-    $boost = makeSkill(9, 'Boost', 120, 60);         // active buff → skip
-    $onGuard = makeSkill(7, 'On Guard', 300, 60);    // buff expired but on cooldown → skip
-
-    CharacterSkill::create(['character_id' => $character->id, 'skill_id' => $stealth->id, 'cast_on_start' => true]);
-    CharacterSkill::create(['character_id' => $character->id, 'skill_id' => $boost->id, 'cast_on_start' => true, 'last_cast_at' => now()]);
-    CharacterSkill::create(['character_id' => $character->id, 'skill_id' => $onGuard->id, 'cast_on_start' => true, 'last_cast_at' => now()->subMinutes(70)]);
-
-    Http::fake(['*cast_skills.php*' => Http::response('Status: You just cast Stealth')]);
-
-    $cast = SkillCaster::forCharacter($character)->castOnStart();
-
-    expect($cast)->toBe(1);
-
-    Http::assertSentCount(1);
-    Http::assertSent(fn ($request) => $request['castskillid'] == 4);
-});
-
-it('prefers the server-read recharge window over the computed cooldown', function () {
-    $character = Character::factory()->for(Rga::factory()->withSession())->create();
-    $stealth = makeSkill(4, 'Stealth', 60, 60);
-
-    // Computed cooldown expired long ago, but the server says still recharging.
-    CharacterSkill::create([
-        'character_id' => $character->id, 'skill_id' => $stealth->id, 'cast_on_start' => true,
-        'last_cast_at' => now()->subMinutes(500), 'recharge_until' => now()->addMinutes(30),
-        'synced_at' => now(),
-    ]);
-
-    Http::fake(['*cast_skills.php*' => Http::response('Status: You just cast Stealth')]);
-
-    expect(SkillCaster::forCharacter($character)->castOnStart())->toBe(0);
-    Http::assertNothingSent();
-});
-
 it('clears server-read windows when a cast succeeds', function () {
     $character = Character::factory()->for(Rga::factory()->withSession())->create();
     $stealth = makeSkill(4, 'Stealth', 60, 60);
@@ -103,22 +57,6 @@ it('clears server-read windows when a cast succeeds', function () {
     expect($state->recharge_until)->toBeNull()
         ->and($state->buff_until)->toBeNull()
         ->and($state->last_cast_at)->not->toBeNull();
-});
-
-it('skips synced untrained skills on cast-on-start', function () {
-    $character = Character::factory()->for(Rga::factory()->withSession())->create();
-    $stealth = makeSkill(4, 'Stealth', 60, 60);
-
-    // Synced and known-untrained → uncastable, skip without a request.
-    CharacterSkill::create([
-        'character_id' => $character->id, 'skill_id' => $stealth->id, 'cast_on_start' => true,
-        'trained_level' => 0, 'bonus_level' => 8, 'synced_at' => now(),
-    ]);
-
-    Http::fake(['*cast_skills.php*' => Http::response('Status: You just cast Stealth')]);
-
-    expect(SkillCaster::forCharacter($character)->castOnStart())->toBe(0);
-    Http::assertNothingSent();
 });
 
 it('reflects the Circumspect buff window', function () {

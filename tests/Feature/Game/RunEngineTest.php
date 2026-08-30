@@ -252,7 +252,7 @@ it('executes a quest-list job end to end and completes the run', function () {
         ->and($participant->run->fresh()->status)->toBe(RunStatus::Completed);
 });
 
-it('casts on-start skills before the run when cast_on_start is set', function () {
+it('casts the selected skills just before the attack, not at pickup', function () {
     fakeCombatWorld(); // handles cast_skills.php too
 
     $character = Character::factory()->for(Rga::factory()->withSession())->create();
@@ -272,6 +272,23 @@ it('casts on-start skills before the run when cast_on_start is set', function ()
 
     expect($participant->fresh()->status)->toBe(RunStatus::Completed)
         ->and(CharacterSkill::where('character_id', $character->id)->where('skill_id', 4)->value('last_cast_at'))->not->toBeNull();
+
+    // The buff's duration must be spent fighting, not walking: the cast has to
+    // land after the character has found a live target, and before the blow.
+    $order = collect(Http::recorded())
+        ->map(fn (array $pair) => $pair[0])
+        ->filter(fn ($request) => (str_contains($request->url(), 'cast_skills.php') && $request->method() === 'POST')
+            || str_contains($request->url(), 'ajax_changeroomb.php')
+            || str_contains($request->url(), 'somethingelse.php'))
+        ->map(fn ($request) => match (true) {
+            str_contains($request->url(), 'cast_skills.php') => 'cast',
+            str_contains($request->url(), 'somethingelse.php') => 'attack',
+            default => 'move',
+        })
+        ->values();
+
+    expect($order->first())->toBe('move')
+        ->and($order->search('cast'))->toBeLessThan($order->search('attack'));
 });
 
 it('parks the run waiting for Circumspect when it is required but on cooldown', function () {

@@ -47,15 +47,17 @@ class SkillSyncService
     {
         $rowsSynced = 0;
         $discovered = 0;
+        $unreadable = [];
         $firstPage = null;
 
         foreach (SkillSchool::cases() as $school) {
             $page = $this->fetchTab($school);
             $firstPage ??= $page;
 
-            [$synced, $found] = $this->persistRows($page, $school);
+            [$synced, $found, $unreadableNames] = $this->persistRows($page, $school);
             $rowsSynced += $synced;
             $discovered += $found;
+            $unreadable = array_merge($unreadable, $unreadableNames);
         }
 
         if ($firstPage->skillPoints !== null) {
@@ -72,6 +74,7 @@ class SkillSyncService
             skillPoints: $firstPage->skillPoints,
             school: $this->character->school,
             activeBuffs: $activeBuffs,
+            unreadableLevels: $unreadable,
         );
     }
 
@@ -92,6 +95,9 @@ class SkillSyncService
                 'recharge_until' => $info->rechargingMinutesRemaining !== null
                     ? now()->addMinutes($info->rechargingMinutesRemaining)
                     : null,
+                // Stamped even when the page carried no recharging notice —
+                // "the game says it is ready" is a reading, not an absence.
+                'recharge_synced_at' => now(),
                 'synced_at' => now(),
             ],
         );
@@ -198,12 +204,13 @@ class SkillSyncService
      * Persist one tab's rows: per-character levels, catalog upserts for
      * unknown skills (Misc discovery), and skill metadata.
      *
-     * @return array{int, int} [rows synced, skills discovered]
+     * @return array{int, int, list<string>} [rows synced, skills discovered, unreadable level headings]
      */
     private function persistRows(SkillsPage $page, SkillSchool $school): array
     {
         $synced = 0;
         $discovered = 0;
+        $unreadable = [];
 
         foreach ($page->rows as $row) {
             $skill = Skill::find($row->id);
@@ -215,24 +222,31 @@ class SkillSyncService
 
             $metadata = ['unlock_level' => $row->unlockLevel ?? $skill->unlock_level];
 
-            if ($school !== SkillSchool::Misc && $row->trainedLevel >= 1 && ! $row->trainable && $row->unlockLevel === null) {
+            if ($school !== SkillSchool::Misc && $row->isCastable() && ! $row->trainable && $row->unlockLevel === null) {
                 $metadata['single_level'] = true;
             }
 
             $skill->update($metadata);
 
+            // An unreadable heading leaves the stored levels alone: guessing
+            // zero would mark a trained skill uncastable for good.
+            $attributes = ['synced_at' => now()];
+
+            if ($row->hasKnownLevels()) {
+                $attributes['trained_level'] = $row->trainedLevel;
+                $attributes['bonus_level'] = $row->bonusLevel;
+            } else {
+                $unreadable[] = $row->name;
+            }
+
             CharacterSkill::updateOrCreate(
                 ['character_id' => $this->character->id, 'skill_id' => $row->id],
-                [
-                    'trained_level' => $row->trainedLevel,
-                    'bonus_level' => $row->bonusLevel,
-                    'synced_at' => now(),
-                ],
+                $attributes,
             );
             $synced++;
         }
 
-        return [$synced, $discovered];
+        return [$synced, $discovered, $unreadable];
     }
 
     /**
@@ -274,7 +288,12 @@ class SkillSyncService
         foreach ($this->character->skills()->with('skill')->get() as $state) {
             $minutes = $minutesByName[$state->skill->name] ?? null;
 
-            $state->update(['buff_until' => $minutes !== null ? now()->addMinutes($minutes) : null]);
+            $state->update([
+                'buff_until' => $minutes !== null ? now()->addMinutes($minutes) : null,
+                // A skill absent from the panel is confirmed inactive, which
+                // is exactly what the local estimate must not override.
+                'buff_synced_at' => now(),
+            ]);
 
             if ($minutes !== null) {
                 $active++;

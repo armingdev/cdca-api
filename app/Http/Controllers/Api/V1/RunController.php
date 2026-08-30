@@ -13,15 +13,18 @@ use App\Game\Enums\RunStatus;
 use App\Game\Exceptions\CharactersBusyException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\IndexBattleEventsRequest;
+use App\Http\Requests\IndexRunEventsRequest;
 use App\Http\Requests\IndexRunsRequest;
 use App\Http\Requests\StoreRunRequest;
 use App\Http\Resources\BattleEventResource;
+use App\Http\Resources\RunEventResource;
 use App\Http\Resources\RunResource;
 use App\Models\AttackList;
 use App\Models\BattleEvent;
 use App\Models\Character;
 use App\Models\QuestList;
 use App\Models\Run;
+use App\Models\RunEvent;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Carbon;
@@ -178,6 +181,30 @@ class RunController extends Controller
             ->paginate($request->integer('per_page', 50));
 
         return BattleEventResource::collection($events);
+    }
+
+    /**
+     * The run's durable decision log (newest first, paginated). Unlike the
+     * participant's last_activity one-liner this survives the next message,
+     * so a finished run can still say which quests it skipped and why.
+     */
+    public function events(IndexRunEventsRequest $request, Run $run): AnonymousResourceCollection
+    {
+        Gate::authorize('view', $run);
+
+        $events = RunEvent::query()
+            ->where('run_id', $run->id)
+            ->when($request->filled('participant_id'), fn ($query) => $query->where('run_participant_id', $request->integer('participant_id')))
+            ->when($request->filled('character_id'), fn ($query) => $query->where('character_id', $request->integer('character_id')))
+            ->when($request->filled('type'), fn ($query) => $query->where('type', $request->validated('type')))
+            ->when($request->filled('level'), fn ($query) => $query->where('level', $request->validated('level')))
+            ->when($request->filled('after_id'), fn ($query) => $query->where('id', '>', $request->integer('after_id')))
+            ->with('character:id,name')
+            ->orderByDesc('id')
+            ->paginate($request->integer('per_page', 50))
+            ->withQueryString();
+
+        return RunEventResource::collection($events);
     }
 
     /**

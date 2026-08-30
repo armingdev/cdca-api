@@ -25,6 +25,7 @@ class Rga extends Model
         'security_answer',
         'status',
         'last_login_at',
+        'characters_synced_at',
     ];
 
     protected $hidden = [
@@ -43,6 +44,7 @@ class Rga extends Model
             'cookies' => 'encrypted:array',
             'security_answer' => 'encrypted',
             'last_login_at' => 'datetime',
+            'characters_synced_at' => 'datetime',
         ];
     }
 

@@ -6,9 +6,12 @@ use App\Game\Engine\ParticipantOutcome;
 use App\Game\Engine\QuestRunConfig;
 use App\Game\Engine\QuestRunSummary;
 use App\Game\Engine\RunEndReason;
+use App\Game\Engine\RunEventRecorder;
 use App\Game\Enums\RunStatus;
+use App\Game\Quest\QuestProgressLedger;
 use App\Game\Quest\QuestRunner;
 use App\Models\Character;
+use App\Models\Quest;
 use App\Models\Run;
 use App\Models\RunParticipant;
 use Closure;
@@ -23,12 +26,31 @@ class RunQuestJob extends RunJob
         RunParticipant $participant,
         Closure $log,
         Closure $signal,
+        Closure $ensureBuffs,
         Closure $onBattle,
     ): ParticipantOutcome {
         $config = QuestRunConfig::fromArray($participant->run->config);
 
         $summary = QuestRunner::forCharacter($character, $config)
-            ->run(log: $log, signal: $signal, onBattle: $onBattle);
+            ->run(
+                log: $log,
+                signal: $signal,
+                onBattle: $onBattle,
+                ensureBuffs: $ensureBuffs,
+                events: new RunEventRecorder($participant),
+            );
+
+        // Single-quest mode records a completion too, so a later list run that
+        // contains this quest walks straight past it. It deliberately does not
+        // record "unavailable": the player pointed a run at one quest, and a
+        // visible failure is the honest answer there.
+        if ($summary->completed) {
+            $quest = Quest::where('game_quest_id', $config->questId)->first();
+
+            if ($quest !== null) {
+                app(QuestProgressLedger::class)->recordCompleted($character, $quest, $participant->run_id);
+            }
+        }
 
         return $this->outcomeForQuestEnd($summary, $config, $participant->run, $participant->progress ?? [], $character);
     }

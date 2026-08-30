@@ -4,19 +4,21 @@ namespace App\Jobs;
 
 use App\Game\Auth\LoginService;
 use App\Game\Engine\ParticipantOutcome;
+use App\Game\Engine\RunEventRecorder;
 use App\Game\Enums\BattleOutcome;
 use App\Game\Enums\CharacterActivity;
+use App\Game\Enums\RunEventType;
 use App\Game\Enums\RunSignal;
 use App\Game\Enums\RunStatus;
 use App\Game\Exceptions\SessionCollisionException;
 use App\Game\GameClock;
+use App\Game\Skills\BuffEnsurer;
 use App\Game\Skills\CircumspectGate;
-use App\Game\Skills\SkillCaster;
-use App\Game\Skills\SkillSyncService;
 use App\Models\BattleEvent;
 use App\Models\Character;
 use App\Models\CharacterSkill;
 use App\Models\Run;
+use App\Models\RunEvent;
 use App\Models\RunParticipant;
 use App\Models\Skill;
 use Carbon\CarbonInterface;
@@ -133,9 +135,15 @@ abstract class RunJob implements ShouldQueue
             return;
         }
 
-        $participant->transition(
-            RunStatus::Failed,
-            Str::limit($exception?->getMessage() ?? 'The worker died before the run finished.', 250),
+        $message = $exception?->getMessage() ?? 'The worker died before the run finished.';
+
+        $participant->transition(RunStatus::Failed, Str::limit($message, 250));
+
+        (new RunEventRecorder($participant))->record(
+            RunEventType::Failed,
+            $message,
+            array_filter(['exception' => $exception === null ? null : $exception::class]),
+            RunEvent::LEVEL_ERROR,
         );
 
         // This job is over either way, so the one-worker-per-character guard has
@@ -156,16 +164,17 @@ abstract class RunJob implements ShouldQueue
             $run->update(['status' => RunStatus::Running]);
         }
 
-        $log = function (string $message) use ($participant): void {
-            $participant->update(['last_activity' => Str::limit($message, 250)]);
-        };
+        $recorder = new RunEventRecorder($participant);
+        $log = $recorder->logger();
 
         try {
             if (! $character->rga->hasSession()) {
                 $loginService->login($character->rga);
             }
 
-            if (! $this->applySkillOptions($character, $participant, $log)) {
+            $ensurer = BuffEnsurer::forCharacter($character);
+
+            if (! $this->passesCircumspectGate($run, $ensurer, $log, $recorder)) {
                 $resumeAt = app(CircumspectGate::class)->resumeAtFor($character);
                 $participant->transition(
                     RunStatus::Waiting,
@@ -180,7 +189,8 @@ abstract class RunJob implements ShouldQueue
                 $character,
                 $participant,
                 log: $log,
-                signal: $this->signalClosure($participant, $this->circumspectExpiryFor($character, $run)),
+                signal: $this->signalClosure($participant, $this->circumspectExpiryFor($character, $run), $character),
+                ensureBuffs: $this->ensureBuffsClosure($run, $ensurer, $log, $recorder),
                 onBattle: function (BattleEvent $event) use ($participant): void {
                     match ($event->outcome) {
                         BattleOutcome::Win => $participant->increment('wins'),
@@ -200,15 +210,52 @@ abstract class RunJob implements ShouldQueue
                 // A clean engine return proves the session works again.
                 array_merge($outcome->progress ?? [], ['relogin_attempts' => 0]),
             );
+
+            $this->recordOutcome($recorder, $outcome);
         } catch (SessionCollisionException) {
             $this->recoverSession($participant, $character, $loginService);
         } catch (Throwable $exception) {
             $participant->transition(RunStatus::Failed, $exception->getMessage());
+            $recorder->record(
+                RunEventType::Failed,
+                $exception->getMessage(),
+                ['exception' => $exception::class],
+                RunEvent::LEVEL_ERROR,
+            );
 
             throw $exception;
         } finally {
             $participant->run->refreshStatus();
         }
+    }
+
+    /**
+     * File the cycle's end in the durable log: a park (Waiting) and a stop
+     * read very differently when someone asks why a run went quiet hours
+     * later, and last_activity keeps only whichever came last.
+     */
+    private function recordOutcome(RunEventRecorder $recorder, ParticipantOutcome $outcome): void
+    {
+        $type = match ($outcome->status) {
+            RunStatus::Waiting => RunEventType::Parked,
+            RunStatus::Failed => RunEventType::Failed,
+            RunStatus::Stopped, RunStatus::Completed => RunEventType::Stopped,
+            default => null,
+        };
+
+        if ($type === null) {
+            return;
+        }
+
+        $recorder->record(
+            $type,
+            $outcome->reason,
+            array_filter([
+                'status' => $outcome->status->value,
+                'resume_at' => $outcome->resumeAt?->toIso8601String(),
+            ]),
+            $outcome->status === RunStatus::Failed ? RunEvent::LEVEL_ERROR : RunEvent::LEVEL_INFO,
+        );
     }
 
     /**
@@ -359,6 +406,11 @@ abstract class RunJob implements ShouldQueue
             return null;
         }
 
+        return $this->readCircumspectExpiry($character);
+    }
+
+    private function readCircumspectExpiry(Character $character): ?CarbonInterface
+    {
         return CharacterSkill::with('skill')
             ->where('character_id', $character->id)
             ->where('skill_id', Skill::CIRCUMSPECT_ID)
@@ -374,11 +426,14 @@ abstract class RunJob implements ShouldQueue
      *
      * @return Closure(): RunSignal
      */
-    private function signalClosure(RunParticipant $participant, ?CarbonInterface $circumspectExpiresAt = null): Closure
-    {
+    private function signalClosure(
+        RunParticipant $participant,
+        ?CarbonInterface $circumspectExpiresAt = null,
+        ?Character $character = null,
+    ): Closure {
         $calls = 0;
 
-        return function () use ($participant, &$calls, $circumspectExpiresAt): RunSignal {
+        return function () use ($participant, &$calls, &$circumspectExpiresAt, $character): RunSignal {
             $calls++;
 
             $signal = $participant->run->currentSignal();
@@ -388,6 +443,17 @@ abstract class RunJob implements ShouldQueue
             }
 
             if ($circumspectExpiresAt !== null && $circumspectExpiresAt->isPast()) {
+                // The snapshot is only the fast path. Just-in-time casting can
+                // have renewed Circumspect since pickup, and ending the pass on
+                // a stale window would park a run whose buff is actually up.
+                $fresh = $character !== null ? $this->readCircumspectExpiry($character) : null;
+
+                if ($fresh !== null && $fresh->isFuture()) {
+                    $circumspectExpiresAt = $fresh;
+
+                    return RunSignal::None;
+                }
+
                 return RunSignal::CircumspectExpired;
             }
 
@@ -404,68 +470,43 @@ abstract class RunJob implements ShouldQueue
     }
 
     /**
-     * Cast-on-start and Circumspect gating — cross-cutting, run-level, applied
-     * before any mode engine. Returns false only when the run requires
-     * Circumspect and it could not be made active (the run is gated off).
+     * The one thing that still has to happen before the engine starts: a run
+     * gated on Circumspect cannot fight without it, so the gate is settled at
+     * pickup. Ensuring it brings the rest of the selected set up with it —
+     * that is what makes a Circumspect resume restore *all* the buffs, not
+     * just the one it was waiting for.
+     *
+     * Everything else waits for combat; see ensureBuffsClosure().
      *
      * @param  Closure(string): void  $log
      */
-    private function applySkillOptions(Character $character, RunParticipant $participant, Closure $log): bool
+    private function passesCircumspectGate(Run $run, BuffEnsurer $ensurer, Closure $log, RunEventRecorder $recorder): bool
     {
-        $run = $participant->run;
-
-        if (! $run->cast_on_start && ! $run->require_circumspect) {
+        if (! $run->require_circumspect) {
             return true;
         }
 
-        $this->preSyncSkills($character, $run->cast_on_start, $run->require_circumspect, $log);
-
-        $caster = SkillCaster::forCharacter($character);
-
-        if ($run->cast_on_start) {
-            $caster->castOnStart($log);
-        }
-
-        if ($run->require_circumspect) {
-            return $caster->ensureCircumspect($log);
-        }
-
-        return true;
+        return $ensurer->ensure(includeCircumspect: true, log: $log, events: $recorder)->circumspectActive;
     }
 
     /**
-     * Full pre-sync before casting: refresh trained levels, skill points, and
-     * active buffs from the game (5 requests), then read the authoritative
-     * recharge for each selected skill that is not already buff-active (one
-     * request each), so cast decisions never rely on stale local cooldowns.
+     * The engines' just-in-time buff hook, invoked immediately before combat
+     * rather than at pickup so a buff's duration is spent fighting instead of
+     * walking. Idempotent and self-throttling, so an engine may call it before
+     * every attack; that is also what re-casts anything that lapses mid-run.
+     *
+     * @param  Closure(string): void  $log
+     * @return Closure(): void
      */
-    private function preSyncSkills(Character $character, bool $castOnStart, bool $requireCircumspect, Closure $log): void
+    private function ensureBuffsClosure(Run $run, BuffEnsurer $ensurer, Closure $log, RunEventRecorder $recorder): Closure
     {
-        $sync = SkillSyncService::forCharacter($character);
-
-        $log('Syncing skills with the game…');
-        $sync->sync();
-
-        $states = $character->skills()
-            ->with('skill')
-            ->where(function ($query) use ($castOnStart, $requireCircumspect) {
-                $query->when($castOnStart, fn ($q) => $q->orWhere('cast_on_start', true))
-                    ->when($requireCircumspect, fn ($q) => $q->orWhere('skill_id', Skill::CIRCUMSPECT_ID));
-            })
-            ->get();
-
-        $refreshed = 0;
-
-        foreach ($states as $state) {
-            if ($state->isBuffActive() || ! $state->isCastable()) {
-                continue;
-            }
-
-            $sync->refreshSkillInfo($state->skill);
-            $refreshed++;
+        if (! $run->cast_on_start && ! $run->require_circumspect) {
+            return function (): void {};
         }
 
-        $log("Skills synced ({$refreshed} recharge check(s)).");
+        return function () use ($run, $ensurer, $log, $recorder): void {
+            $ensurer->ensure(includeCircumspect: $run->require_circumspect, log: $log, events: $recorder);
+        };
     }
 
     /**
@@ -473,6 +514,7 @@ abstract class RunJob implements ShouldQueue
      *
      * @param  Closure(string): void  $log
      * @param  Closure(): RunSignal  $signal
+     * @param  Closure(): void  $ensureBuffs  call immediately before combat
      * @param  Closure(BattleEvent): void  $onBattle
      */
     abstract protected function runEngine(
@@ -480,6 +522,7 @@ abstract class RunJob implements ShouldQueue
         RunParticipant $participant,
         Closure $log,
         Closure $signal,
+        Closure $ensureBuffs,
         Closure $onBattle,
     ): ParticipantOutcome;
 }

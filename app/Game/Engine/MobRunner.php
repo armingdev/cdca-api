@@ -99,6 +99,7 @@ class MobRunner
      * @param  Closure(string): void|null  $log
      * @param  Closure(): RunSignal|null  $signal  external control signal, polled every iteration
      * @param  Closure(BattleEvent): void|null  $onBattle
+     * @param  Closure(): void|null  $ensureBuffs  just-in-time buff top-up, called before each attack
      * @param  int  $killsAlreadyDone  kills from earlier cycles, so max_kills spans pauses/waits
      *
      * @throws GameException when the targets have no mapped rooms
@@ -107,13 +108,14 @@ class MobRunner
         ?Closure $log = null,
         ?Closure $signal = null,
         ?Closure $onBattle = null,
+        ?Closure $ensureBuffs = null,
         int $killsAlreadyDone = 0,
     ): MobRunSummary {
         $log ??= fn (string $message) => null;
         $this->winsBaseline = max(0, $killsAlreadyDone);
 
         try {
-            return $this->loop($log, $signal, $onBattle);
+            return $this->loop($log, $signal, $onBattle, $ensureBuffs);
         } finally {
             $this->dropJunk($log);
         }
@@ -123,8 +125,9 @@ class MobRunner
      * @param  Closure(string): void  $log
      * @param  Closure(): RunSignal|null  $signal
      * @param  Closure(BattleEvent): void|null  $onBattle
+     * @param  Closure(): void|null  $ensureBuffs
      */
-    private function loop(Closure $log, ?Closure $signal, ?Closure $onBattle): MobRunSummary
+    private function loop(Closure $log, ?Closure $signal, ?Closure $onBattle, ?Closure $ensureBuffs = null): MobRunSummary
     {
         $targetRooms = Mob::whereIn('name', $this->config->mobNames)
             ->with('rooms:id')
@@ -209,6 +212,13 @@ class MobRunner
             }
 
             if ($sighting !== null) {
+                // A live, affordable target is in front of us: this is the
+                // moment the buffs are worth spending, not the walk that got
+                // us here. The hook is self-throttling, so calling it before
+                // every attack costs nothing once the buffs are up — and it
+                // re-casts whatever lapsed since the last one.
+                $ensureBuffs?->__invoke();
+
                 $event = $this->attacker->attack($sighting);
                 $this->tally($event, $sighting, $log);
                 $onBattle?->__invoke($event);

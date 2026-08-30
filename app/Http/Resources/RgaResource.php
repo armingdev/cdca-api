@@ -25,6 +25,9 @@ class RgaResource extends JsonResource
             'characters_count' => $this->whenCounted('characters'),
             'characters' => CharacterResource::collection($this->whenLoaded('characters')),
             'last_login_at' => $this->last_login_at,
+            // Lets the client tell whether the roster it is showing came from
+            // the background sync that runs after a CDCA login.
+            'characters_synced_at' => $this->characters_synced_at,
             'created_at' => $this->created_at,
         ];
     }

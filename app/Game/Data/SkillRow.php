@@ -8,19 +8,23 @@ namespace App\Game\Data;
  */
 final readonly class SkillRow
 {
+    /**
+     * @param  ?int  $trainedLevel  null when the parenthetical was missing or in a
+     *                              shape we do not recognise — "unknown", never "zero"
+     */
     public function __construct(
         public int $id,
         public string $name,
         public string $description,
-        public int $trainedLevel,
-        public int $bonusLevel,
+        public ?int $trainedLevel,
+        public ?int $bonusLevel,
         public ?int $unlockLevel,
         public bool $trainable,
     ) {}
 
     public function effectiveLevel(): int
     {
-        return $this->trainedLevel + $this->bonusLevel;
+        return ($this->trainedLevel ?? 0) + ($this->bonusLevel ?? 0);
     }
 
     /**
@@ -28,6 +32,14 @@ final readonly class SkillRow
      */
     public function isCastable(): bool
     {
-        return $this->trainedLevel >= 1;
+        return ($this->trainedLevel ?? 0) >= 1;
+    }
+
+    /**
+     * Whether the page told us this skill's levels at all.
+     */
+    public function hasKnownLevels(): bool
+    {
+        return $this->trainedLevel !== null;
     }
 }

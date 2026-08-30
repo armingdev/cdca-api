@@ -12,6 +12,7 @@ final readonly class QuestStepPage
 {
     /**
      * @param  list<QuestObjective>  $objectives
+     * @param  list<string>  $continueLinks  every non-finish mob_talk link, in page order
      * @param  list<string>  $rewards
      */
     public function __construct(
@@ -20,7 +21,7 @@ final readonly class QuestStepPage
         public string $dialog,
         public array $objectives,
         public ?string $finishLink,
-        public ?string $continueLink,
+        public array $continueLinks,
         public ?int $npcId,
         public ?int $stepId,
         public array $rewards,
@@ -46,5 +47,32 @@ final readonly class QuestStepPage
     public function unmetObjectives(): array
     {
         return array_values(array_filter($this->objectives, fn (QuestObjective $o) => ! $o->complete));
+    }
+
+    /**
+     * The first continue link, for callers that do not care which quest it
+     * belongs to. Prefer continueLinkFor() when running a specific quest.
+     */
+    public function continueLink(): ?string
+    {
+        return $this->continueLinks[0] ?? null;
+    }
+
+    /**
+     * The continue link belonging to a given quest, when the page names one.
+     * An NPC offering several quests renders a link each; following the wrong
+     * one silently abandons the quest in hand.
+     */
+    public function continueLinkFor(int $questId): ?string
+    {
+        foreach ($this->continueLinks as $href) {
+            parse_str((string) parse_url($href, PHP_URL_QUERY), $query);
+
+            if (isset($query['questid']) && (int) $query['questid'] === $questId) {
+                return $href;
+            }
+        }
+
+        return null;
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Game\Auth\LoginService;
+use App\Game\Skills\BuffEnsurer;
 use App\Game\Skills\SkillCaster;
 use App\Models\Character;
 use App\Models\Skill;
@@ -40,8 +41,9 @@ class CastCommand extends Command
         $caster = SkillCaster::forCharacter($character);
 
         if ($this->option('on-start')) {
-            $cast = $caster->castOnStart(log: fn (string $m) => $this->line($m));
-            $this->info("Cast {$cast} cast-on-start skill(s).");
+            $result = BuffEnsurer::forCharacter($character)
+                ->ensure(log: fn (string $m) => $this->line($m));
+            $this->info("Cast {$result->castCount()} of the selected skill(s).");
 
             return self::SUCCESS;
         }

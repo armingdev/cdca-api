@@ -80,3 +80,17 @@ it('parses the Misc tab as acquired-only skills without Train links', function (
             ->and($row->isCastable())->toBeTrue();
     }
 });
+
+it('reports unknown level headings as unknown rather than zero', function () {
+    // Zeroing an unreadable heading marks a trained skill uncastable, and the
+    // row still stamps synced_at — so the skill is skipped for good.
+    $body = '<li onclick="loadskill(4);"><h6>Stealth (rank II)</h6>'
+        .'<p class="mg-b-0">Vanish.</p></li>';
+
+    $row = (new SkillsPageParser)->parse($body)->rows[0];
+
+    expect($row->trainedLevel)->toBeNull()
+        ->and($row->bonusLevel)->toBeNull()
+        ->and($row->hasKnownLevels())->toBeFalse()
+        ->and($row->isCastable())->toBeFalse();
+});

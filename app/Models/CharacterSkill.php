@@ -19,7 +19,9 @@ class CharacterSkill extends Model
         'cast_on_start',
         'last_cast_at',
         'recharge_until',
+        'recharge_synced_at',
         'buff_until',
+        'buff_synced_at',
         'synced_at',
     ];
 
@@ -38,7 +40,9 @@ class CharacterSkill extends Model
             'cast_on_start' => 'boolean',
             'last_cast_at' => 'datetime',
             'recharge_until' => 'datetime',
+            'recharge_synced_at' => 'datetime',
             'buff_until' => 'datetime',
+            'buff_synced_at' => 'datetime',
             'synced_at' => 'datetime',
         ];
     }
@@ -92,11 +96,22 @@ class CharacterSkill extends Model
      * When the current buff window closes: the server-read value when known,
      * otherwise last cast + the (level-scaled, else catalog) duration. Null
      * when the skill was never cast and no window was read.
+     *
+     * A sync that saw no entry for this skill in the Current Effects panel
+     * clears buff_until and stamps buff_synced_at. That reading is the truth
+     * for everything cast before it — without this check the estimate wins,
+     * and since plenty of skills last longer than they recharge (Empower:
+     * 180 min of buff, 120 min of cooldown), a skill the game says is *not*
+     * active still reads as "already active" and never gets re-cast.
      */
     public function buffEndsAt(): ?CarbonInterface
     {
         if ($this->buff_until !== null) {
             return $this->buff_until;
+        }
+
+        if ($this->serverReadingSupersedesLastCast($this->buff_synced_at)) {
+            return null;
         }
 
         $duration = $this->current_duration_minutes ?? $this->skill->duration_minutes;
@@ -124,11 +139,19 @@ class CharacterSkill extends Model
      * When the current cooldown ends: the server-read recharge window when
      * known, otherwise last cast + the (level-scaled, else catalog) cooldown.
      * Null when the skill was never cast and no recharge was read.
+     *
+     * As with the buff window, a skills_info.php read that carried no
+     * "recharging" notice means the skill is ready *now*; the local estimate
+     * only applies to casts made after that reading.
      */
     public function cooldownEndsAt(): ?CarbonInterface
     {
         if ($this->recharge_until !== null) {
             return $this->recharge_until;
+        }
+
+        if ($this->serverReadingSupersedesLastCast($this->recharge_synced_at)) {
+            return null;
         }
 
         $cooldown = $this->current_cooldown_minutes ?? $this->skill->cooldown_minutes;
@@ -138,5 +161,18 @@ class CharacterSkill extends Model
         }
 
         return $this->last_cast_at->addMinutes($cooldown);
+    }
+
+    /**
+     * Whether a server reading taken at $syncedAt is newer than our last cast
+     * and therefore describes the current state better than the estimate.
+     */
+    private function serverReadingSupersedesLastCast(?CarbonInterface $syncedAt): bool
+    {
+        if ($syncedAt === null) {
+            return false;
+        }
+
+        return $this->last_cast_at === null || $this->last_cast_at->lessThan($syncedAt);
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Game\Skills\BuffEnsurer;
 use App\Game\Skills\SkillCaster;
 use App\Game\Skills\SkillSyncService;
 use App\Http\Controllers\Controller;
@@ -102,7 +103,11 @@ class CharacterSkillController extends Controller
     }
 
     /**
-     * Cast one skill now, or the whole cast-on-start set.
+     * Cast one skill now, or bring the whole selected set up.
+     *
+     * The set path reads the character's live skill state first and reports
+     * per skill: a bare count hid the fact that most of the set had been
+     * silently skipped, and the reasons are what the player needs.
      */
     public function cast(CastSkillRequest $request, Character $character): JsonResponse
     {
@@ -111,9 +116,14 @@ class CharacterSkillController extends Controller
         $caster = SkillCaster::forCharacter($character);
 
         if ($request->boolean('on_start')) {
-            $count = $caster->castOnStart();
+            $result = BuffEnsurer::forCharacter($character)->ensure();
 
-            return response()->json(['message' => "Cast {$count} skill(s).", 'cast' => $count]);
+            return response()->json([
+                'message' => "Cast {$result->castCount()} skill(s).",
+                'cast' => $result->cast,
+                'skipped' => $result->skipped,
+                'failed' => $result->failed,
+            ]);
         }
 
         $skill = Skill::findOrFail($request->validated('skill_id'));

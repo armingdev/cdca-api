@@ -26,6 +26,7 @@ class RunPvpJob extends RunJob
         RunParticipant $participant,
         Closure $log,
         Closure $signal,
+        Closure $ensureBuffs,
         Closure $onBattle,
     ): ParticipantOutcome {
         $config = PvpRunConfig::fromArray($participant->run->config);
@@ -36,7 +37,7 @@ class RunPvpJob extends RunJob
         }
 
         $summary = PvpRunner::forCharacter($character, $config, $source)
-            ->run(log: $log, signal: $signal, onBattle: $onBattle);
+            ->run(log: $log, signal: $signal, onBattle: $onBattle, ensureBuffs: $ensureBuffs);
 
         if ($summary->endReason === RunEndReason::CircumspectExpired) {
             return $this->waitForCircumspect($character, $summary->stopReason);
