@@ -3,6 +3,7 @@
 use App\Game\Engine\QuestRunConfig;
 use App\Game\Engine\RunEndReason;
 use App\Game\Exceptions\GameException;
+use App\Game\Exceptions\QuestNotAvailableException;
 use App\Game\Quest\QuestRunner;
 use App\Models\Character;
 use App\Models\Mob;
@@ -338,4 +339,77 @@ it('finishes every step of a multi-step quest instead of stopping at the first t
     expect($summary->completed)->toBeTrue()
         ->and($summary->stepsCompleted)->toBe(2)
         ->and($summary->endReason)->toBe(RunEndReason::Completed);
+});
+
+it('resumes a quest whose current step has moved on to another mob', function () {
+    // The bug this exists for: quest 743 was given by Sgt. Neatham, the
+    // character is several steps in, and the step now belongs to Stella — so
+    // Neatham's popup is silent and the whole quest was written off as done.
+    seedResumedQuestWorld();
+    fakeResumedQuestWorld();
+    Quest::factory()->create(['game_quest_id' => 743, 'name' => 'Cleansing the Church', 'giver' => 'Sgt. Neatham']);
+
+    $character = Character::factory()->for(Rga::factory()->withSession())->create();
+
+    $log = [];
+    $summary = QuestRunner::forCharacter($character, new QuestRunConfig(
+        npcName: 'Sgt. Neatham',
+        questId: 743,
+    ))->run(log: function (string $m) use (&$log) {
+        $log[] = $m;
+    });
+
+    expect($summary->completed)->toBeTrue()
+        ->and($summary->stepsCompleted)->toBe(1)
+        ->and($summary->endReason)->toBe(RunEndReason::Completed)
+        ->and(collect($log)->contains(fn ($l) => str_contains($l, 'Continuing quest 743 at Stella')))->toBeTrue();
+
+    // It went straight to the mob the tracker named, without asking the giver.
+    Http::assertSent(fn ($request) => str_contains($request->url(), 'mob.php') && str_contains($request->url(), 'id=888'));
+    Http::assertNotSent(fn ($request) => str_contains($request->url(), 'mob.php') && str_contains($request->url(), 'id=999'));
+});
+
+it('farms the objectives the tracker reports before walking to any dialog', function () {
+    seedResumedQuestWorld();
+    fakeResumedQuestWorld(needsKills: true);
+    Quest::factory()->create(['game_quest_id' => 743, 'name' => 'Cleansing the Church', 'giver' => 'Sgt. Neatham']);
+
+    $character = Character::factory()->for(Rga::factory()->withSession())->create();
+
+    $summary = QuestRunner::forCharacter($character, new QuestRunConfig(
+        npcName: 'Sgt. Neatham',
+        questId: 743,
+    ))->run();
+
+    expect($summary->completed)->toBeTrue()
+        ->and($summary->kills)->toBe(5);
+
+    // No dialog was opened while the counts were still short.
+    $order = collect(Http::recorded())
+        ->map(fn ($pair) => $pair[0]->url())
+        ->filter(fn (string $url) => str_contains($url, 'somethingelse.php') || str_contains($url, 'mob_talk.php'))
+        ->values();
+
+    expect($order->first())->toContain('somethingelse.php');
+});
+
+it('does not call an in-progress quest unavailable when no mob will open it', function () {
+    // Recording "unavailable" here would skip the quest on every future run.
+    // A quest the tracker still lists is in progress whatever the mobs say.
+    seedResumedQuestWorld();
+    fakeResumedQuestWorld(offeredAtStella: false);
+    Quest::factory()->create(['game_quest_id' => 743, 'name' => 'Cleansing the Church', 'giver' => 'Sgt. Neatham']);
+
+    $character = Character::factory()->for(Rga::factory()->withSession())->create();
+
+    expect(fn () => QuestRunner::forCharacter($character, new QuestRunConfig(
+        npcName: 'Sgt. Neatham',
+        questId: 743,
+    ))->run())
+        ->toThrow(GameException::class, 'is in progress at step 3380');
+
+    expect(fn () => QuestRunner::forCharacter($character, new QuestRunConfig(
+        npcName: 'Sgt. Neatham',
+        questId: 743,
+    ))->run())->not->toThrow(QuestNotAvailableException::class);
 });

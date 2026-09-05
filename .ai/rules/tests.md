@@ -19,3 +19,8 @@ The engine now trusts the game's own answers over its local estimates, so an und
 - `cast_skills.php` POST must echo the real skill name (`fakeCastConfirmationHtml`) — casts are name-matched now.
 
 `fakeSkillsPageHtml` derives the window from `last_cast_at + duration`, never from `buff_until`: reading back our own derived column and rounding it nudges the expiry forward on every sync, producing a buff that can never lapse.
+
+## Quest fakes must answer world_questHelper.php
+Every fake driving `QuestRunner` must serve `world_questHelper.php`, because the runner now reads the tracker before it walks anywhere. A catch-all returning `<html>world</html>` throws `ParseException` and kills the run.
+
+Build the body with `questHelperJson([...])` (live tracker markup). An empty list is the honest answer for a quest still sitting unaccepted at its giver — that is what `fakeQuestWorld`, `fakeMultiObjectiveQuestWorld` and `fakeLosingQuestWorld` return. A fake modelling a quest already under way must be stateful: `fakeMultiStepQuestWorld` lists the quest at step 2 only between its two turn-ins, and `fakeCollectQuestWorld` reports the live item count and adds the `Return to Rune Master` row once it is met. A static tracker that never advances makes the runner farm the same objective forever.
