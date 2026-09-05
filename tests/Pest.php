@@ -450,6 +450,11 @@ function fakeLosingQuestWorld(int $rage = 50000): void
             return Http::response(fakeSkillInfoHtml((int) $request['id']));
         }
 
+        if (str_contains($url, 'world_questHelper.php')) {
+            // Offered fresh at the giver: nothing in progress on the character.
+            return Http::response(questHelperJson([]));
+        }
+
         if (str_contains($url, 'mob_talk.php')) {
             return Http::response(gameFixture('quest/mob_talk_kill_incomplete.html'));
         }
@@ -502,6 +507,138 @@ function seedQuestWorld(): void
     Room::factory()->create(['id' => 2, 'west' => 1]);
     Mob::factory()->create(['name' => 'Stella'])->rooms()->attach(1, ['last_seen_at' => now()]);
     Mob::factory()->create(['name' => 'Street Crawler'])->rooms()->attach(2, ['last_seen_at' => now()]);
+}
+
+/**
+ * DB side of the resumed-quest world, on top of seedQuestWorld(): the quest's
+ * catalog giver (Sgt. Neatham) stands in room 3, two rooms from Stella, who
+ * holds the step the character has actually reached.
+ */
+function seedResumedQuestWorld(): void
+{
+    Room::whereKey(2)->update(['east' => 3]);
+    Room::factory()->create(['id' => 3, 'west' => 2]);
+    Mob::factory()->create(['name' => 'Sgt. Neatham'])->rooms()->attach(3, ['last_seen_at' => now()]);
+}
+
+/**
+ * A quest already several steps in: quest 743 was given by Sgt. Neatham, but
+ * the character's current step (3380) belongs to Stella, so Neatham's popup
+ * offers nothing at all.
+ *
+ * This is the shape that used to be read as "already completed" and written to
+ * the progress ledger, skipping quests that were merely under way. Only the
+ * tracker knows better, and here it names Stella.
+ *
+ * $needsKills puts an unmet kill objective on the step first, so the tracker
+ * asks for 5 Street Crawlers before anyone will talk. $offeredAtStella false
+ * is the pathological case where the tracker lists the quest but no mob will
+ * open it.
+ */
+function fakeResumedQuestWorld(bool $needsKills = false, bool $offeredAtStella = true): void
+{
+    $position = 1;
+    $killed = 0;
+    $finished = false;
+
+    $roomBlob = function (int $roomId) use (&$killed): string {
+        $mobs = match ($roomId) {
+            1 => [questMobJson('Stella', 59293, 888, 'npchash', level: 10)],
+            2 => [questMobJson('Street Crawler', 4000, 5000, 'x', level: 20, isDead: $killed >= 5)],
+            3 => [questMobJson('Sgt. Neatham', 4500, 999, 'givhash', level: 10)],
+            default => [],
+        };
+
+        return json_encode([
+            'error' => '', 'curRoom' => (string) $roomId, 'name' => "Room {$roomId}",
+            'north' => '0',
+            'east' => $roomId === 1 ? '2' : ($roomId === 2 ? '3' : '0'),
+            'south' => '0',
+            'west' => $roomId === 2 ? '1' : ($roomId === 3 ? '2' : '0'),
+            'roomDetailsNew' => $mobs, 'doorsData' => null,
+        ]);
+    };
+
+    Http::fake(function ($request) use (&$position, &$killed, &$finished, $roomBlob, $needsKills, $offeredAtStella) {
+        $url = $request->url();
+
+        if (str_contains($url, 'userstats.php')) {
+            return Http::response(json_encode(['exp' => '1,000', 'rage' => '50,000', 'level' => '20', 'width' => 0]));
+        }
+
+        if (str_contains($url, 'skills_info.php')) {
+            return Http::response(fakeSkillInfoHtml((int) $request['id']));
+        }
+
+        if (str_contains($url, 'cast_skills.php')) {
+            return Http::response($request->method() === 'POST'
+                ? fakeCastConfirmationHtml((int) $request['castskillid'])
+                : fakeSkillsPageHtml());
+        }
+
+        if (str_contains($url, 'world_questHelper.php')) {
+            if ($finished) {
+                return Http::response(questHelperJson([]));
+            }
+
+            $rows = $needsKills
+                ? [['type' => 'kill', 'target' => 'Street Crawler', 'current' => min($killed, 5), 'required' => 5, 'mobId' => 4000, 'conditionId' => 77]]
+                : [];
+
+            // The tracker names the mob holding the step only once every
+            // count on it is in — exactly as the live game does.
+            if (! $needsKills || $killed >= 5) {
+                $rows[] = ['type' => 'talk', 'target' => 'Stella', 'mobId' => 868];
+            }
+
+            return Http::response(questHelperJson([[
+                'questId' => 743,
+                'name' => 'Cleansing the Church',
+                'stepId' => 3380,
+                'rows' => $rows,
+            ]]));
+        }
+
+        if (str_contains($url, 'mob_talk.php')) {
+            if (str_contains($url, 'finish=1')) {
+                $finished = true;
+
+                return Http::response(gameFixture('quest/mob_talk_step_finish.html'));
+            }
+
+            return Http::response(gameFixture('quest/mob_talk_kill_complete.html'));
+        }
+
+        if (str_contains($url, 'mob.php')) {
+            // Stella holds the current step; the catalog giver has nothing to
+            // say about a quest that has moved past him.
+            $offered = str_contains($url, 'id=888') && $offeredAtStella;
+
+            return Http::response($offered
+                ? '<div><a href="mob_talk.php?id=59293&stepid=3380&userspawn=&questid=743">Cleansing the Church</a></div>'
+                : '<div>Nothing for you today.</div>');
+        }
+
+        if (str_contains($url, 'somethingelse.php')) {
+            $killed++;
+
+            return Http::response('', 302, ['Location' => 'https://sigil.outwar.com/attack/900/']);
+        }
+
+        if (str_contains($url, 'attack/900')) {
+            return Http::response('var battle_result = "Hero has gained 500 experience!"; var defender_name = "Street Crawler";');
+        }
+
+        if (str_contains($url, 'ajax_changeroomb.php')) {
+            $query = [];
+            parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
+            $position = (int) $query['room'] ?: $position;
+
+            return Http::response($roomBlob($position));
+        }
+
+        return Http::response('<html>world</html>');
+    });
 }
 
 /**
@@ -561,6 +698,11 @@ function fakeMultiObjectiveQuestWorld(int $rage = 50000, bool $ratsFarmable = tr
 
         if (str_contains($url, 'skills_info.php')) {
             return Http::response(fakeSkillInfoHtml((int) $request['id']));
+        }
+
+        if (str_contains($url, 'world_questHelper.php')) {
+            // Offered fresh at the giver: nothing in progress on the character.
+            return Http::response(questHelperJson([]));
         }
 
         if (str_contains($url, 'cast_skills.php')) {
@@ -646,6 +788,18 @@ function fakeMultiStepQuestWorld(int $rage = 50000): void
             ]));
         }
 
+        if (str_contains($url, 'world_questHelper.php')) {
+            // The tracker is the only thing that knows the quest is not over
+            // after step one: its turn-in page carries no onward link, so
+            // without this the runner would call the quest complete there.
+            return Http::response(questHelperJson($stepsFinished === 1 ? [[
+                'questId' => 742,
+                'name' => 'Street Crawler',
+                'stepId' => 3379,
+                'rows' => [['type' => 'talk', 'target' => 'Stella', 'mobId' => 868]],
+            ]] : []));
+        }
+
         if (str_contains($url, 'skills_info.php')) {
             return Http::response(fakeSkillInfoHtml((int) $request['id']));
         }
@@ -715,6 +869,82 @@ function seedQuestCatalog(): array
         742 => Quest::factory()->create(['game_quest_id' => 742, 'name' => 'Street Crawler', 'giver' => 'Stella']),
         743 => Quest::factory()->create(['game_quest_id' => 743, 'name' => 'Cleansing the Church', 'giver' => 'Stella']),
     ];
+}
+
+/**
+ * A `world_questHelper.php` body in the live tracker's markup: one
+ * `<div align="center" class="mb-3">` per in-progress quest, wrapping a
+ * `<table id="quest-{id}">` of objective rows.
+ *
+ * An empty list is the honest answer for a character with nothing in progress
+ * — which is also what a quest still sitting unaccepted at its giver looks
+ * like. Row shapes follow the capture: a kill/collect row carries the counter
+ * and goes green at its target, a talk row carries no counter and names the
+ * mob to visit.
+ *
+ * @param  list<array{questId: int, name?: string, stepId: int, rows: list<array<string, mixed>>}>  $quests
+ */
+function questHelperJson(array $quests): string
+{
+    $blocks = '';
+
+    foreach ($quests as $quest) {
+        $rows = '';
+
+        foreach ($quest['rows'] as $row) {
+            $type = $row['type'];
+            $target = (string) $row['target'];
+            $call = sprintf(
+                "getQuestHelpData2('%d', '%d', '%s', '%d', '%d');",
+                $quest['questId'],
+                $row['mobId'] ?? 0,
+                $type === 'collect' ? $target : '',
+                $quest['stepId'],
+                $row['conditionId'] ?? 0,
+            );
+
+            if ($type === 'talk') {
+                $rows .= sprintf(
+                    '<tr><td bgcolor="#FFFFFF" id="questStep_%d_0"><a href="javascript:void(0);" onClick="%s">'
+                    .'<font color="#000000" face="Arial"><b>%s %s</a></b></font></td></tr>',
+                    $quest['stepId'],
+                    $call,
+                    $row['verb'] ?? 'Find',
+                    $target,
+                );
+
+                continue;
+            }
+
+            $current = (int) ($row['current'] ?? 0);
+            $required = (int) ($row['required'] ?? 1);
+
+            $rows .= sprintf(
+                '<tr><td><font face="Arial" size="1"><font color="#A00000"><a href="javascript:void(0);" onClick="%s">'
+                .'<font color="%s" face="Verdana, Arial, Helvetica, sans-serif"><b>%s</a>: </b>%d/%d%s</font></td></tr>',
+                $call,
+                $current >= $required ? '#008000' : '#EA2300',
+                $target,
+                $current,
+                $required,
+                $type === 'kill' ? ' killed' : '',
+            );
+        }
+
+        $blocks .= sprintf(
+            '<div align="center" class="mb-3"><table width="100%%" cellspacing="0" cellpadding="0"><tr><td colspan="2">'
+            .'<table border="0"><tr><td><a href="show_quest.php?quest=%d"><img src="/images/questwiki.jpg" /></a>'
+            .'<svg class="togglequestcollapse"></svg> <svg class="hidequest"></svg> %s</span></b></td></tr></table>'
+            .'</td></tr><tr><td rowspan="2"><table id="quest-%d" border="0" class="wquesttable">%s</table>'
+            .'</td></tr></table></div>',
+            $quest['questId'],
+            $quest['name'] ?? "Quest {$quest['questId']}",
+            $quest['questId'],
+            $rows,
+        );
+    }
+
+    return json_encode(['qtable' => $blocks]);
 }
 
 function questMobJson(
@@ -793,6 +1023,12 @@ function fakeQuestWorld(
 
         if (str_contains($url, 'userstats.php')) {
             return Http::response(json_encode(['exp' => '1,000', 'rage' => number_format($rage), 'level' => (string) $level, 'width' => 0]));
+        }
+
+        if (str_contains($url, 'world_questHelper.php')) {
+            // Quest 742 sits unaccepted at Stella, so the character has
+            // nothing in progress — before the run or after its single step.
+            return Http::response(questHelperJson([]));
         }
 
         if (str_contains($url, 'levelup.php')) {
@@ -934,6 +1170,7 @@ function fakeCollectQuestWorld(
     $dropped = 0;
     $kills = 0;
     $helpOn = false;
+    $finished = false;
 
     $roomBlob = function (int $roomId) use (&$helpOn, &$kills, &$liveKills): string {
         $mobs = match ($roomId) {
@@ -950,7 +1187,7 @@ function fakeCollectQuestWorld(
         ]);
     };
 
-    Http::fake(function ($request) use (&$position, &$dropped, &$kills, &$helpOn, $roomBlob, $rage, $helper, $drops, $objectiveItem) {
+    Http::fake(function ($request) use (&$position, &$dropped, &$kills, &$helpOn, &$finished, $roomBlob, $rage, $helper, $drops, $objectiveItem) {
         $url = $request->url();
 
         if (str_contains($url, 'userstats.php')) {
@@ -958,11 +1195,28 @@ function fakeCollectQuestWorld(
         }
 
         if (str_contains($url, 'world_questHelper.php')) {
-            return Http::response(json_encode([
-                'qtable' => $helper
-                    ? '<a href="javascript:void(0);" onClick="getQuestHelpData2(\'1449\', \'0\', \'Holy Elemental Crystal\', \'4001\', \'555\');">Holy Elemental Crystal</a>: 0/1'
-                    : '',
-            ]));
+            // The quest leaves the tracker once turned in; until then it
+            // reports the item count, and adds the "go and hand it over" row
+            // the moment the count is met.
+            $collected = min($dropped, 1);
+            $rows = [[
+                'type' => 'collect',
+                'target' => $objectiveItem,
+                'current' => $collected,
+                'required' => 1,
+                'conditionId' => 555,
+            ]];
+
+            if ($collected >= 1) {
+                $rows[] = ['type' => 'talk', 'verb' => 'Return to', 'target' => 'Rune Master', 'mobId' => 910];
+            }
+
+            return Http::response(questHelperJson(! $helper || $finished ? [] : [[
+                'questId' => 1449,
+                'name' => 'Primal Elemental Rune',
+                'stepId' => 4001,
+                'rows' => $rows,
+            ]]));
         }
 
         if (str_contains($url, 'quest_help.php')) {
@@ -975,6 +1229,8 @@ function fakeCollectQuestWorld(
 
         if (str_contains($url, 'mob_talk.php')) {
             if (str_contains($url, 'finish=1')) {
+                $finished = true;
+
                 return Http::response(gameFixture('quest/mob_talk_step_finish.html'));
             }
 

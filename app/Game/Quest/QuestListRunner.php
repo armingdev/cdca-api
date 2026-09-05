@@ -218,9 +218,13 @@ class QuestListRunner
             $summary = QuestRunner::forCharacter($this->character, $questConfig)
                 ->run(log: $log, signal: $signal, onBattle: $onBattle, ensureBuffs: $ensureBuffs, events: $this->events);
         } catch (QuestNotAvailableException) {
+            // Not in the character's tracker and offered by nobody: either
+            // finished long ago or gated behind something unmet. A quest that
+            // is merely *under way* never reaches here — QuestRunner raises a
+            // plain GameException for that, so no guess lands in the ledger.
             $this->skipped++;
-            $log("Already completed — skipping {$item->displayName()}.");
-            $this->recordSkip($item, 'not_available', 'The giver does not offer this quest.');
+            $log("No mob offers {$item->displayName()} and it is not in progress — skipping.");
+            $this->recordSkip($item, 'not_available', 'No mob offers this quest and it is not in progress.');
             // Remember it, so the next run does not walk here to be told the
             // same thing. Clearable, because the giver is equally silent about
             // a quest whose prerequisites are simply not met yet.

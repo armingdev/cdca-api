@@ -233,3 +233,56 @@ it('records a quest the giver does not offer, and runs it again once cleared', f
 
     expect(count(Http::recorded()))->toBeGreaterThan($before);
 });
+
+it('skips an in-progress quest no mob will open without recording it as unavailable', function () {
+    // The 153-row incident: a quest merely under way was recorded
+    // "unavailable", so every later run walked past it without looking.
+    seedResumedQuestWorld();
+    fakeResumedQuestWorld(offeredAtStella: false);
+
+    $character = Character::factory()->for(Rga::factory()->withSession())->create();
+    $quest = Quest::factory()->create([
+        'game_quest_id' => 743,
+        'name' => 'Cleansing the Church',
+        'giver' => 'Sgt. Neatham',
+    ]);
+
+    $list = QuestList::create(['name' => 'Armins List']);
+    $list->addQuest($quest->id);
+
+    $log = [];
+    $summary = QuestListRunner::forCharacter($character, new QuestListRunConfig(questListId: $list->id))
+        ->run(log: function (string $m) use (&$log) {
+            $log[] = $m;
+        });
+
+    expect($summary->completed)->toBeTrue()
+        ->and($summary->questsSkipped)->toBe(1)
+        ->and(collect($log)->contains(fn ($l) => str_contains($l, 'is in progress at step 3380')))->toBeTrue()
+        ->and(CharacterQuestProgress::count())->toBe(0);
+});
+
+it('runs a quest whose step has moved past its giver instead of skipping it', function () {
+    seedResumedQuestWorld();
+    fakeResumedQuestWorld();
+
+    $character = Character::factory()->for(Rga::factory()->withSession())->create();
+    $quest = Quest::factory()->create([
+        'game_quest_id' => 743,
+        'name' => 'Cleansing the Church',
+        'giver' => 'Sgt. Neatham',
+    ]);
+
+    $list = QuestList::create(['name' => 'Armins List']);
+    $list->addQuest($quest->id);
+
+    $summary = QuestListRunner::forCharacter($character, new QuestListRunConfig(questListId: $list->id))
+        ->run(log: fn (string $m) => null);
+
+    expect($summary->questsCompleted)->toBe(1)
+        ->and($summary->questsSkipped)->toBe(0);
+
+    $progress = CharacterQuestProgress::first();
+
+    expect($progress->status)->toBe(QuestProgressStatus::Completed);
+});

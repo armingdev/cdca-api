@@ -177,6 +177,12 @@ it('teleports to a quest-giver that no walk reaches', function () {
             return Http::response('{"exp":"1,000","rage":"5,000","level":"20","width":0}');
         }
 
+        if (str_contains($url, 'world_questHelper.php')) {
+            // Quest 742 has not been started, so it is in no tracker — the
+            // runner must fall back to walking (here, teleporting) to Stella.
+            return Http::response(questHelperJson([]));
+        }
+
         if (str_contains($url, 'backpack_action.php')) {
             $teleported = true;
 

@@ -2,6 +2,7 @@
 
 namespace App\Game\Quest;
 
+use App\Game\Data\ActiveQuest;
 use App\Game\Data\AvailableQuest;
 use App\Game\Data\QuestHelperToggle;
 use App\Game\Data\QuestStepPage;
@@ -73,13 +74,37 @@ class QuestService
     }
 
     /**
+     * Every quest the character has in progress, with the step it currently
+     * stands on and that step's objectives.
+     *
+     * This — not the quest-giver's popup — is the authority on where a
+     * character is in a quest: the popup lists a quest only while its current
+     * step belongs to that mob, so a quest several steps in reads as "not
+     * offered" there.
+     *
+     * @return list<ActiveQuest>
+     */
+    public function activeQuests(): array
+    {
+        return $this->helperParser->parse($this->client->get('world_questHelper.php')->body());
+    }
+
+    /**
      * The "find my target" toggles of every active-quest objective.
      *
      * @return list<QuestHelperToggle>
      */
     public function helperToggles(): array
     {
-        return $this->helperParser->parse($this->client->get('world_questHelper.php')->body());
+        $toggles = [];
+
+        foreach ($this->activeQuests() as $quest) {
+            foreach ($quest->toggles() as $toggle) {
+                $toggles[] = $toggle;
+            }
+        }
+
+        return $toggles;
     }
 
     /**

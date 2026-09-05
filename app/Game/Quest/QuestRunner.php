@@ -3,6 +3,8 @@
 namespace App\Game\Quest;
 
 use App\Game\Combat\StatsService;
+use App\Game\Data\ActiveQuest;
+use App\Game\Data\AvailableQuest;
 use App\Game\Data\MobSighting;
 use App\Game\Data\QuestObjective;
 use App\Game\Data\QuestStepPage;
@@ -36,12 +38,24 @@ use Closure;
  * each step: if the game shows the finish link (accept step, or objective
  * met) follow it and advance to the continue link; otherwise fulfill the
  * unmet objective by driving MobRunner against the named mob (or the item's
- * source mobs) and re-view the step. Ends when a finished step offers no
- * continue link (quest complete).
+ * source mobs) and re-view the step.
+ *
+ * Where the character *already* stands in a quest comes from the tracker
+ * (`world_questHelper.php`), never from the giver. The giver's popup lists a
+ * quest only while its current step belongs to that mob, so a quest several
+ * steps in — whose step has moved to another mob — reads as "not offered"
+ * there, and taking that silence at face value skipped quests wholesale.
  */
 class QuestRunner
 {
     private const int MAX_COMPASS_STEPS = 150;
+
+    /**
+     * How many locate cycles may pass without a step turned in or a kill
+     * landed before the quest is called stuck. Productive cycles never count
+     * against it, so a long quest runs as long as it keeps moving.
+     */
+    private const int MAX_IDLE_CYCLES = 3;
 
     private int $stepsCompleted = 0;
 
@@ -55,6 +69,12 @@ class QuestRunner
 
     private ?int $expectedSteps = null;
 
+    /**
+     * The mob whose dialog is being worked through. It starts as the catalog
+     * giver and moves with the quest as the tracker hands us on.
+     */
+    private string $currentNpcName;
+
     public function __construct(
         private readonly Character $character,
         private readonly QuestRunConfig $config,
@@ -64,7 +84,9 @@ class QuestRunner
         private readonly StatsService $stats,
         private readonly PurchasedQuestItems $purchasedItems,
         private readonly ?TeleportService $teleports = null,
-    ) {}
+    ) {
+        $this->currentNpcName = $config->npcName;
+    }
 
     public static function forCharacter(Character $character, QuestRunConfig $config): self
     {
@@ -100,34 +122,115 @@ class QuestRunner
             $this->levelUpToQuestRequirement($log);
         }
 
-        $npc = $this->navigateToNpc();
-        $quest = collect($this->questService->availableQuests($npc->spawnId, $npc->hash))
-            ->firstWhere('questId', $this->config->questId);
+        $idleCycles = 0;
+        $lastSignature = null;
 
-        if ($quest === null) {
-            throw new QuestNotAvailableException($this->config->questId, $this->config->npcName);
+        while (true) {
+            $control = $this->externalVerdict($signal);
+
+            if ($control !== null) {
+                return $control;
+            }
+
+            $stepsBefore = $this->stepsCompleted;
+            $tracked = $this->trackedQuest();
+            $signature = $this->trackerSignature($tracked);
+
+            // Nothing left to work and the tracker has forgotten it: the last
+            // turn-in ended the quest.
+            if ($tracked === null && $this->stepsCompleted > 0) {
+                $events?->record(RunEventType::QuestCompleted, "Quest {$this->config->questId} complete.", [
+                    'quest_id' => $this->config->questId,
+                    'steps_completed' => $this->stepsCompleted,
+                    'steps_expected' => $this->expectedSteps(),
+                ]);
+
+                return $this->summary(completed: true, reason: 'Quest complete.', endReason: RunEndReason::Completed);
+            }
+
+            if ($tracked !== null && $tracked->unmetObjectives() !== []) {
+                // Farm straight off the tracker: the step's mob has nothing to
+                // say until the counts are in, so walking to it first only
+                // spends the trip twice.
+                $outcome = $this->farmObjectives(
+                    $tracked->unmetObjectives(),
+                    $tracked->stepId,
+                    $log,
+                    $signal,
+                    $onBattle,
+                    $ensureBuffs,
+                    $events,
+                );
+
+                if ($outcome instanceof QuestRunSummary) {
+                    return $outcome;
+                }
+            } else {
+                $entry = $this->enterQuest($tracked, $log);
+
+                // Being handed back a step we already turned in means the
+                // game is not registering the turn-in; following it would
+                // finish the same step forever.
+                if (in_array($entry->firstStepId, $this->completedStepIds, true)) {
+                    return $this->summary(
+                        completed: false,
+                        reason: "Step {$entry->firstStepId} was turned in but the game keeps offering it.",
+                        endReason: RunEndReason::Stuck,
+                    );
+                }
+
+                $outcome = $this->workSteps($entry, $log, $signal, $onBattle, $ensureBuffs, $events);
+
+                if ($outcome instanceof QuestRunSummary) {
+                    return $outcome;
+                }
+            }
+
+            // Kills alone are not progress: a farm that lands wins the quest
+            // never counts would otherwise spin here forever. Only a step
+            // turned in, or the tracker's own counters moving, resets this.
+            $moved = $this->stepsCompleted > $stepsBefore || $signature !== $lastSignature;
+            $idleCycles = $moved ? 0 : $idleCycles + 1;
+            $lastSignature = $signature;
+
+            if ($idleCycles >= self::MAX_IDLE_CYCLES) {
+                return $this->summary(
+                    completed: false,
+                    reason: "Quest {$this->config->questId} stopped making progress.",
+                    endReason: RunEndReason::Stuck,
+                );
+            }
         }
+    }
 
-        $log("Accepting quest {$this->config->questId} from {$this->config->npcName}.");
-
-        $npcId = $quest->npcId;
-        $stepId = $quest->firstStepId;
+    /**
+     * Work the dialog forward from an entry point, step by step. Returns a
+     * summary when the quest must end, or null when the dialog has run out of
+     * links and the caller should re-locate from the tracker.
+     *
+     * @param  Closure(string): void  $log
+     * @param  Closure(): RunSignal|null  $signal
+     * @param  Closure(BattleEvent): void|null  $onBattle
+     * @param  Closure(): void|null  $ensureBuffs
+     */
+    private function workSteps(
+        AvailableQuest $entry,
+        Closure $log,
+        ?Closure $signal,
+        ?Closure $onBattle,
+        ?Closure $ensureBuffs,
+        ?RunEventRecorder $events,
+    ): ?QuestRunSummary {
+        $npcId = $entry->npcId;
+        $stepId = $entry->firstStepId;
         $sendQuestId = true;
         $reviewedStalledStep = false;
 
         while (true) {
-            $control = $signal !== null ? $signal() : RunSignal::None;
+            $control = $this->externalVerdict($signal);
 
-            if ($control === RunSignal::Stop) {
-                return $this->summary(completed: false, reason: 'Stop requested.', endReason: RunEndReason::ExternalStop);
-            }
-
-            if ($control === RunSignal::Pause) {
-                return $this->summary(completed: false, reason: 'Pause requested.', endReason: RunEndReason::ExternalPause);
-            }
-
-            if ($control === RunSignal::CircumspectExpired) {
-                return $this->summary(completed: false, reason: 'Circumspect expired.', endReason: RunEndReason::CircumspectExpired);
+            if ($control !== null) {
+                return $control;
             }
 
             $page = $this->questService->viewStep($npcId, $stepId, $sendQuestId ? $this->config->questId : null);
@@ -146,20 +249,10 @@ class QuestRunner
                     // A turn-in page with no onward link is the *usual* way a
                     // quest ends, but it is also how an intermediate step
                     // renders — and taking it at face value abandoned every
-                    // remaining step. Ask the giver before calling it done.
-                    $nextStep = $this->reEnterUnfinishedQuest($log, $events);
-
-                    if ($nextStep === null) {
-                        $events?->record(RunEventType::QuestCompleted, "Quest {$this->config->questId} complete.", [
-                            'quest_id' => $this->config->questId,
-                            'steps_completed' => $this->stepsCompleted,
-                            'steps_expected' => $this->expectedSteps(),
-                        ]);
-
-                        return $this->summary(completed: true, reason: 'Quest complete.', endReason: RunEndReason::Completed);
-                    }
-
-                    $sendQuestId = true;
+                    // remaining step. Hand back to the tracker, which knows
+                    // whether the quest is finished and, if not, which mob
+                    // holds the next step.
+                    return null;
                 }
 
                 $stepId = $nextStep;
@@ -203,14 +296,11 @@ class QuestRunner
     }
 
     /**
-     * Work every unmet objective on the step, then report back.
+     * Work the objectives a step *page* is showing, then walk back to its mob
+     * so the loop can re-view it.
      *
      * Returns a summary when the quest must end, or the new "already re-viewed
      * a stalled step" flag when the loop should re-view the step and carry on.
-     *
-     * Looping matters: a step that wants ten of mob A *and* ten of mob B used
-     * to inspect only the first entry, so B's mob being unfarmable condemned
-     * the whole quest after A had been farmed at full rage cost.
      *
      * @param  Closure(string): void  $log
      * @param  Closure(): RunSignal|null  $signal
@@ -247,6 +337,41 @@ class QuestRunner
             );
         }
 
+        $outcome = $this->farmObjectives($unmet, $stepId, $log, $signal, $onBattle, $ensureBuffs, $events);
+
+        if ($outcome instanceof QuestRunSummary) {
+            return $outcome;
+        }
+
+        $this->navigateToNpc($this->currentNpcName);
+
+        return false;
+    }
+
+    /**
+     * Farm every unmet objective in the list, then report whether the pass
+     * moved at all. Returns a summary when the quest must end, or null when
+     * something was killed and the caller should look again.
+     *
+     * Looping matters: a step that wants ten of mob A *and* ten of mob B used
+     * to inspect only the first entry, so B's mob being unfarmable condemned
+     * the whole quest after A had been farmed at full rage cost.
+     *
+     * @param  list<QuestObjective>  $unmet
+     * @param  Closure(string): void  $log
+     * @param  Closure(): RunSignal|null  $signal
+     * @param  Closure(BattleEvent): void|null  $onBattle
+     * @param  Closure(): void|null  $ensureBuffs
+     */
+    private function farmObjectives(
+        array $unmet,
+        int $stepId,
+        Closure $log,
+        ?Closure $signal,
+        ?Closure $onBattle,
+        ?Closure $ensureBuffs,
+        ?RunEventRecorder $events,
+    ): ?QuestRunSummary {
         $totalWins = 0;
         $anySourceKnown = false;
         $respawnPending = false;
@@ -341,9 +466,7 @@ class QuestRunner
             return $this->summary(completed: false, reason: $reason, endReason: RunEndReason::Stuck);
         }
 
-        $this->navigateToNpc();
-
-        return false;
+        return null;
     }
 
     /**
@@ -372,65 +495,136 @@ class QuestRunner
     }
 
     /**
-     * After a turn-in that offered no onward link, ask the giver whether the
-     * quest is still open. It is the only authority that can tell a finished
-     * quest from a multi-step one whose intermediate turn-in simply renders
-     * without a link.
-     *
-     * Returns the step to re-enter, or null when the quest really is done.
-     *
-     * @param  Closure(string): void  $log
+     * This quest as the tracker currently reports it, or null when the
+     * character has it neither started nor unfinished.
      */
-    private function reEnterUnfinishedQuest(Closure $log, ?RunEventRecorder $events): ?int
+    private function trackedQuest(): ?ActiveQuest
     {
-        $expected = $this->expectedSteps();
-
-        if ($expected === null || $this->stepsCompleted >= $expected) {
-            return null;
+        foreach ($this->questService->activeQuests() as $quest) {
+            if ($quest->questId === $this->config->questId) {
+                return $quest;
+            }
         }
 
-        $log(sprintf(
-            'Completed %d of %d known step(s) — checking whether the giver still offers the quest.',
-            $this->stepsCompleted,
-            $expected,
-        ));
-
-        try {
-            $npc = $this->navigateToNpc();
-            $quest = collect($this->questService->availableQuests($npc->spawnId, $npc->hash))
-                ->firstWhere('questId', $this->config->questId);
-        } catch (GameException $exception) {
-            // Cannot ask right now. Reporting "complete" on a guess would be
-            // worse than admitting we do not know.
-            $events?->record(
-                RunEventType::QuestSkipped,
-                "Could not re-check quest {$this->config->questId} with its giver: {$exception->getMessage()}",
-                ['quest_id' => $this->config->questId],
-                RunEvent::LEVEL_WARNING,
-            );
-
-            return null;
-        }
-
-        if ($quest === null) {
-            return null;
-        }
-
-        // The popup pointing back at a step we have already turned in means it
-        // has nothing new for us; taking it would loop forever.
-        if (in_array($quest->firstStepId, $this->completedStepIds, true)) {
-            return null;
-        }
-
-        $log("Quest {$this->config->questId} is still open — continuing at step {$quest->firstStepId}.");
-
-        return $quest->firstStepId;
+        return null;
     }
 
     /**
-     * How many steps the catalog says this quest has. Advisory: a zero (the
-     * column's default) means the crawl never recorded one, and stale counts
-     * are corrected by the giver check that consumes this.
+     * A fingerprint of where the tracker says the character stands, so a cycle
+     * that changed nothing can be told from one that advanced a counter.
+     */
+    private function trackerSignature(?ActiveQuest $tracked): string
+    {
+        if ($tracked === null) {
+            return 'absent';
+        }
+
+        return $tracked->stepId.':'.implode(',', array_map(
+            fn (QuestObjective $objective) => sprintf(
+                '%s=%d/%d%s',
+                $objective->target,
+                $objective->current,
+                $objective->required,
+                $objective->complete ? '!' : '',
+            ),
+            $tracked->objectives,
+        ));
+    }
+
+    /**
+     * Walk to a mob that will talk to us about this quest and open its dialog.
+     *
+     * The tracker names the mob holding the current step, which is the only
+     * reliable answer once a quest is under way — its step moves from mob to
+     * mob as the chain advances, and the original giver falls silent the
+     * moment it does. The giver is tried too, both as the entry point for a
+     * quest not yet started and as a fallback.
+     *
+     * @param  Closure(string): void  $log
+     *
+     * @throws QuestNotAvailableException when nobody offers a quest that is not under way
+     * @throws GameException when a quest that *is* under way cannot be reached
+     */
+    private function enterQuest(?ActiveQuest $tracked, Closure $log): AvailableQuest
+    {
+        $candidates = array_values(array_unique(array_filter([
+            $tracked?->talkTarget(),
+            $this->config->npcName,
+        ])));
+
+        $blocker = null;
+
+        foreach ($candidates as $npcName) {
+            try {
+                $sighting = $this->navigateToNpc($npcName);
+            } catch (TransientGameException $exception) {
+                // The mob is mapped and we are standing in its room; it is
+                // simply not rendered this instant. Retrying is the whole
+                // point of the transient tier — never downgrade it to a skip.
+                throw $exception;
+            } catch (GameException $exception) {
+                // Unmapped or unreachable. A sibling candidate may still work,
+                // so remember the reason and try the next one.
+                $blocker ??= $exception;
+                $log("Cannot reach '{$npcName}': {$exception->getMessage()}");
+
+                continue;
+            }
+
+            $quest = collect($this->questService->availableQuests($sighting->spawnId, $sighting->hash))
+                ->firstWhere('questId', $this->config->questId);
+
+            if ($quest !== null) {
+                $this->currentNpcName = $npcName;
+                $log($tracked === null
+                    ? "Accepting quest {$this->config->questId} from {$npcName}."
+                    : "Continuing quest {$this->config->questId} at {$npcName}, step {$quest->firstStepId}.");
+
+                return $quest;
+            }
+
+            $log("'{$npcName}' does not offer quest {$this->config->questId}.");
+        }
+
+        if ($blocker !== null) {
+            throw $blocker;
+        }
+
+        // A quest the tracker still lists is *in progress*, whatever the mobs
+        // say. Calling it unavailable would write that guess to the ledger and
+        // skip the quest on every future run — the exact failure this whole
+        // path exists to prevent.
+        if ($tracked !== null) {
+            throw new GameException(sprintf(
+                'Quest %d is in progress at step %d but no mob offers it (tried %s).',
+                $this->config->questId,
+                $tracked->stepId,
+                implode(', ', $candidates),
+            ));
+        }
+
+        throw new QuestNotAvailableException($this->config->questId, $this->config->npcName);
+    }
+
+    /**
+     * The caller's stop/pause verdict, when it has one.
+     *
+     * @param  Closure(): RunSignal|null  $signal
+     */
+    private function externalVerdict(?Closure $signal): ?QuestRunSummary
+    {
+        return match ($signal !== null ? $signal() : RunSignal::None) {
+            RunSignal::Stop => $this->summary(false, 'Stop requested.', RunEndReason::ExternalStop),
+            RunSignal::Pause => $this->summary(false, 'Pause requested.', RunEndReason::ExternalPause),
+            RunSignal::CircumspectExpired => $this->summary(false, 'Circumspect expired.', RunEndReason::CircumspectExpired),
+            RunSignal::None => null,
+        };
+    }
+
+    /**
+     * How many steps the catalog says this quest has. Advisory only — it just
+     * annotates the completion event, and a zero means the crawl never
+     * recorded one.
      */
     private function expectedSteps(): ?int
     {
@@ -610,12 +804,16 @@ class QuestRunner
     }
 
     /**
-     * Walk to the quest-giver's room and return its sighting (for spawn id +
+     * Walk to the named mob's room and return its sighting (for spawn id +
      * hash). Cheap when already there.
+     *
+     * Mobs are found by name, never by the game's mob id: the seeded ids are
+     * not unique (184 names share one) and do not always match the live world,
+     * whereas a talkable mob's name does.
      */
-    private function navigateToNpc(): MobSighting
+    private function navigateToNpc(string $npcName): MobSighting
     {
-        $rooms = Mob::where('name', $this->config->npcName)
+        $rooms = Mob::where('name', $npcName)
             ->with('rooms:id')
             ->get()
             ->flatMap(fn (Mob $mob) => $mob->rooms->pluck('id'))
@@ -623,7 +821,7 @@ class QuestRunner
             ->values();
 
         if ($rooms->isEmpty()) {
-            throw new GameException("Quest-giver '{$this->config->npcName}' is not in the mapped world.");
+            throw new GameException("Quest-giver '{$npcName}' is not in the mapped world.");
         }
 
         $blob = $this->navigator->loadCurrentRoom();
@@ -639,7 +837,7 @@ class QuestRunner
             );
 
             if ($plan === null) {
-                throw new GameException("No path to quest-giver '{$this->config->npcName}'.");
+                throw new GameException("No path to quest-giver '{$npcName}'.");
             }
 
             $blob = $this->teleports !== null
@@ -648,14 +846,14 @@ class QuestRunner
         }
 
         foreach ($blob->mobs as $sighting) {
-            if ($sighting->name === $this->config->npcName) {
+            if ($sighting->name === $npcName) {
                 return $sighting;
             }
         }
 
         // The giver is mapped and we are standing in its room — it simply is
         // not rendered this instant. Nothing about the quest is wrong.
-        throw new TransientGameException("Quest-giver '{$this->config->npcName}' is not present in its room right now.");
+        throw new TransientGameException("Quest-giver '{$npcName}' is not present in its room right now.");
     }
 
     private function completionLine(int $stepId, QuestStepPage $finished): string
