@@ -5,6 +5,7 @@ namespace App\Game\Engine;
 use App\Game\Enums\RunMode;
 use App\Game\Enums\RunStatus;
 use App\Game\Exceptions\CharactersBusyException;
+use App\Game\Skills\SkillSelection;
 use App\Models\Character;
 use App\Models\Run;
 use App\Models\RunParticipant;
@@ -19,11 +20,22 @@ use Illuminate\Support\Collection;
  */
 class RunLauncher
 {
-    public function __construct(private readonly RunDispatcher $dispatcher) {}
+    public function __construct(
+        private readonly RunDispatcher $dispatcher,
+        private readonly SkillSelection $selection,
+    ) {}
 
     /**
+     * A non-null $skillIds replaces every character's cast-on-start selection
+     * before any worker is dispatched — the fleet-wide picker writes one
+     * selection across ten characters in one request instead of ten PUTs, and
+     * because it lands in the same per-character table, each of them keeps
+     * that set as its own default afterwards. Null leaves every character's
+     * existing selection alone.
+     *
      * @param  Collection<int, Character>  $characters
      * @param  array<string, mixed>  $config  the mode's config array (MobRunConfig::toArray(), etc.)
+     * @param  list<int>|null  $skillIds
      *
      * @throws CharactersBusyException when a character is already enrolled in an unfinished run
      */
@@ -36,6 +48,7 @@ class RunLauncher
         ?int $restartEveryMinutes = null,
         ?Carbon $startAt = null,
         ?User $user = null,
+        ?array $skillIds = null,
     ): Run {
         if ($startAt !== null && $startAt->isPast()) {
             $startAt = $startAt->addDay();
@@ -43,12 +56,20 @@ class RunLauncher
 
         $this->guardAgainstBusyCharacters($characters);
 
+        if ($skillIds !== null) {
+            $skillIds = $this->applySelection($characters, $skillIds);
+
+            // A selection is only meaningful if something casts it.
+            $castOnStart = $castOnStart || $skillIds !== [];
+        }
+
         $run = Run::create([
             'user_id' => $user?->id,
             'mode' => $mode,
             'config' => $config,
             'cast_on_start' => $castOnStart,
             'require_circumspect' => $requireCircumspect,
+            'skill_ids' => $skillIds,
             'status' => $startAt?->isFuture() ?? false ? RunStatus::Pending : RunStatus::Running,
             'restart_every_minutes' => $restartEveryMinutes,
             'start_at' => $startAt,
@@ -61,6 +82,24 @@ class RunLauncher
         }
 
         return $run;
+    }
+
+    /**
+     * Write one selection across the whole fleet.
+     *
+     * @param  Collection<int, Character>  $characters
+     * @param  list<int>  $skillIds
+     * @return list<int> the deduplicated ids stored on every character
+     */
+    private function applySelection(Collection $characters, array $skillIds): array
+    {
+        $stored = array_values(array_unique($skillIds));
+
+        foreach ($characters as $character) {
+            $this->selection->replaceFor($character, $stored);
+        }
+
+        return $stored;
     }
 
     /**

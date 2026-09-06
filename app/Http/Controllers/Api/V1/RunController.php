@@ -74,6 +74,7 @@ class RunController extends Controller
                 restartEveryMinutes: $request->filled('restart_every_minutes') ? $request->integer('restart_every_minutes') : null,
                 startAt: $request->filled('start_at') ? Carbon::parse($request->validated('start_at')) : null,
                 user: $user,
+                skillIds: $request->has('skill_ids') ? $request->validated('skill_ids') : null,
             );
         } catch (CharactersBusyException $exception) {
             throw ValidationException::withMessages(['characters' => [$exception->getMessage()]]);

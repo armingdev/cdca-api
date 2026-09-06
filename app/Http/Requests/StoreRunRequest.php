@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Game\Enums\RunMode;
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -11,6 +12,31 @@ class StoreRunRequest extends FormRequest
     public function authorize(): bool
     {
         return true;
+    }
+
+    /**
+     * A selection nothing will cast is a mistake worth surfacing rather than
+     * silently overriding — the launcher turns cast-on-start on by itself when
+     * the flag is simply absent.
+     *
+     * @return array<int, callable>
+     */
+    public function after(): array
+    {
+        return [
+            function (Validator $validator): void {
+                if ($this->input('skill_ids') === [] || ! $this->has('skill_ids')) {
+                    return;
+                }
+
+                if ($this->has('cast_on_start') && ! $this->boolean('cast_on_start')) {
+                    $validator->errors()->add(
+                        'cast_on_start',
+                        'Turn on cast-on-start or leave the skill selection empty.',
+                    );
+                }
+            },
+        ];
     }
 
     /**
@@ -24,6 +50,13 @@ class StoreRunRequest extends FormRequest
             'characters.*' => ['integer', 'exists:characters,id'],
 
             'cast_on_start' => ['sometimes', 'boolean'],
+
+            // The fleet-wide selection: replaces every listed character's
+            // cast-on-start set. Omitted = each keeps its own. The array-level
+            // exists rule checks the whole list in one query.
+            'skill_ids' => ['sometimes', 'array', Rule::exists('skills', 'id')],
+            'skill_ids.*' => ['integer'],
+
             'require_circumspect' => ['sometimes', 'boolean'],
             'restart_every_minutes' => ['sometimes', 'nullable', 'integer', 'min:1'],
             'start_at' => ['sometimes', 'nullable', 'date'],

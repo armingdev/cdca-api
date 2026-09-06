@@ -4,9 +4,11 @@ use App\Game\Enums\RunStatus;
 use App\Jobs\RunMobJob;
 use App\Jobs\RunPvpJob;
 use App\Models\Character;
+use App\Models\CharacterSkill;
 use App\Models\Rga;
 use App\Models\Run;
 use App\Models\RunParticipant;
+use App\Models\Skill;
 use App\Models\User;
 use Illuminate\Support\Facades\Queue;
 use Laravel\Sanctum\Sanctum;
@@ -303,4 +305,119 @@ it('paginates the run history and caps the page size', function () {
     $this->getJson('/api/v1/runs?per_page=5000')
         ->assertUnprocessable()
         ->assertJsonValidationErrorFor('per_page');
+});
+
+/**
+ * The fleet-wide skill picker: one selection, ten characters, one request.
+ * It writes the same per-character rows the Skills page does, so each of them
+ * also keeps that set as its own default afterwards.
+ */
+function seedTwoSkills(): void
+{
+    Skill::create(['id' => 4, 'name' => 'Stealth', 'school' => 'class', 'rage_cost' => 10, 'cooldown_minutes' => 60, 'duration_minutes' => 60]);
+    Skill::create(['id' => 9, 'name' => 'Boost', 'school' => 'ferocity', 'rage_cost' => 10, 'cooldown_minutes' => 120, 'duration_minutes' => 60]);
+}
+
+function castOnStartIdsFor(Character $character): array
+{
+    return CharacterSkill::where('character_id', $character->id)
+        ->where('cast_on_start', true)
+        ->orderBy('skill_id')
+        ->pluck('skill_id')
+        ->all();
+}
+
+it('applies one skill selection to every character in the run', function () {
+    Queue::fake();
+    seedTwoSkills();
+    $characters = Character::factory()->for($this->rga)->count(3)->create();
+
+    $this->postJson('/api/v1/runs', [
+        'mode' => 'mob',
+        'characters' => $characters->pluck('id')->all(),
+        'mobs' => ['Kix Harvester'],
+        // Duplicated on purpose: the stored selection is deduplicated.
+        'skill_ids' => [4, 9, 4],
+    ])
+        ->assertCreated()
+        ->assertJsonPath('data.skill_ids', [4, 9])
+        // A selection nothing casts is pointless, so the flag comes on by itself.
+        ->assertJsonPath('data.cast_on_start', true);
+
+    foreach ($characters as $character) {
+        expect(castOnStartIdsFor($character))->toBe([4, 9]);
+    }
+});
+
+it('leaves every character\'s own selection alone when the run sends no skill ids', function () {
+    Queue::fake();
+    seedTwoSkills();
+    $character = Character::factory()->for($this->rga)->create();
+    CharacterSkill::create(['character_id' => $character->id, 'skill_id' => 4, 'cast_on_start' => true]);
+
+    $this->postJson('/api/v1/runs', [
+        'mode' => 'mob',
+        'characters' => [$character->id],
+        'mobs' => ['Kix Harvester'],
+    ])
+        ->assertCreated()
+        ->assertJsonPath('data.skill_ids', null)
+        ->assertJsonPath('data.cast_on_start', false);
+
+    expect(castOnStartIdsFor($character))->toBe([4]);
+});
+
+it('clears every selected character\'s set when the run sends an empty skill list', function () {
+    Queue::fake();
+    seedTwoSkills();
+    $character = Character::factory()->for($this->rga)->create();
+    CharacterSkill::create(['character_id' => $character->id, 'skill_id' => 4, 'cast_on_start' => true]);
+
+    $this->postJson('/api/v1/runs', [
+        'mode' => 'mob',
+        'characters' => [$character->id],
+        'mobs' => ['Kix Harvester'],
+        'skill_ids' => [],
+    ])
+        ->assertCreated()
+        ->assertJsonPath('data.skill_ids', [])
+        // Nothing to cast, so an empty selection must not arm the flag.
+        ->assertJsonPath('data.cast_on_start', false);
+
+    expect(castOnStartIdsFor($character))->toBe([]);
+});
+
+it('rejects a fleet skill selection the run would never cast', function () {
+    Queue::fake();
+    seedTwoSkills();
+    $character = Character::factory()->for($this->rga)->create();
+
+    $this->postJson('/api/v1/runs', [
+        'mode' => 'mob',
+        'characters' => [$character->id],
+        'mobs' => ['Kix Harvester'],
+        'skill_ids' => [4],
+        'cast_on_start' => false,
+    ])
+        ->assertStatus(422)
+        ->assertJsonValidationErrors('cast_on_start');
+
+    expect(Run::count())->toBe(0);
+});
+
+it('rejects a fleet skill selection naming a skill that does not exist', function () {
+    Queue::fake();
+    seedTwoSkills();
+    $character = Character::factory()->for($this->rga)->create();
+
+    $this->postJson('/api/v1/runs', [
+        'mode' => 'mob',
+        'characters' => [$character->id],
+        'mobs' => ['Kix Harvester'],
+        'skill_ids' => [4, 999999],
+    ])
+        ->assertStatus(422)
+        ->assertJsonValidationErrors('skill_ids');
+
+    expect(castOnStartIdsFor($character))->toBe([]);
 });

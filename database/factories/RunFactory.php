@@ -30,6 +30,7 @@ class RunFactory extends Factory
             ],
             'cast_on_start' => false,
             'require_circumspect' => false,
+            'skill_ids' => null,
             'status' => RunStatus::Pending,
             'restart_every_minutes' => null,
             'start_at' => null,
