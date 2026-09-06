@@ -198,8 +198,27 @@ Synchronous single-character refresh (one live `userstats.php` read).
     "cast_on_start": true, "last_cast_at": "…",
     "buff_active": true, "on_cooldown": true } ] }
   ```
+  Each row also carries the resolved windows: `buff_ends_at` /
+  `cooldown_ends_at` (null = not active / ready) and `ready`
+  (`castable && !on_cooldown`). Prefer these over recomputing from
+  `last_cast_at`: a server reading beats the local estimate, and only the
+  server applies that precedence.
 - `PUT /characters/{id}/skills` — **replace** the cast-on-start set:
   `{ "skill_ids": [3008, 9, 4] }` → returns the new selection. Send `[]` to clear.
+  To set one selection across a whole fleet, send `skill_ids` on `POST /runs`
+  instead of looping this endpoint.
+- `POST /characters/{id}/skills/sync` — read levels, points, school and active
+  buffs from the game (5 throttled game requests, a few seconds). Optional body:
+  `max_age_seconds` (int 0–86400) returns the stored state untouched with
+  `synced: false` when the last sync is newer than that, costing the game
+  nothing — this is what makes syncing on every character selection cheap;
+  `with_recharge` (bool) additionally reads each **trained** skill's
+  authoritative recharge window, one extra game request apiece.
+  Response: `{ message, synced, synced_at, rows_synced, skills_discovered,
+  skill_points, school, active_buffs, skills }`. The counts describe what the
+  call did; every other field describes the character as it now stands, on both
+  paths. **`skills` is a plain array, not a `data` envelope** (same as the
+  teleport sync).
 - `POST /characters/{id}/cast` — cast now. Either `{ "skill_id": 3008 }` (one
   skill) or `{ "on_start": true }` (the whole selected set). `200 { "message": … }`,
   or `422` if the cast was rejected (rage/cooldown/not learned).
@@ -329,7 +348,8 @@ Common fields (all modes):
 | `stop_rage` | int | rage-pool floor; stop below it (default 2500) |
 | `level_up` | bool | level up (refills rage) instead of stopping when low |
 | `smart` | bool | smart mode (mob/quest/quest-list): auto-equip the best backpack gear, level up after a lost battle, and stop with an `outmatched` reason after 3 straight losses to the same mob instead of grinding rage away. Built for low-level characters that start with no gear |
-| `cast_on_start` | bool | cast the characters' selected skills before the run |
+| `cast_on_start` | bool | keep the characters' selected skills active for the run |
+| `skill_ids` | int[] | **replaces every listed character's cast-on-start selection**, then runs with it. Omit to let each character keep its own set. `[]` clears them all. A non-empty list turns `cast_on_start` on by itself; sending it alongside an explicit `cast_on_start: false` is a `422` on `cast_on_start`. Echoed back on the run as `skill_ids` (null when omitted) |
 | `require_circumspect` | bool | run on the Circumspect cycle: cast it when possible, otherwise park `waiting` and auto-resume when its cooldown ends |
 | `restart_every_minutes` | int? | re-dispatch this run every N minutes after it **completes** |
 | `start_at` | datetime? | delay the first start until this time (run stays `pending` until then) |

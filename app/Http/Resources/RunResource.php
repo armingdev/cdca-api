@@ -23,6 +23,7 @@ class RunResource extends JsonResource
             'config' => $this->config,
             'cast_on_start' => $this->cast_on_start,
             'require_circumspect' => $this->require_circumspect,
+            'skill_ids' => $this->skill_ids,
             'restart_every_minutes' => $this->restart_every_minutes,
             'start_at' => $this->start_at,
             'last_started_at' => $this->last_started_at,

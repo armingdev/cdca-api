@@ -7,12 +7,15 @@ use App\Game\Data\SkillsPage;
 use App\Game\Data\SkillSyncResult;
 use App\Game\Data\TrainResult;
 use App\Game\Enums\SkillSchool;
+use App\Game\Exceptions\GameException;
 use App\Game\Http\GameClient;
 use App\Game\Parsers\SkillInfoParser;
 use App\Game\Parsers\SkillsPageParser;
 use App\Models\Character;
 use App\Models\CharacterSkill;
 use App\Models\Skill;
+use Carbon\CarbonInterface;
+use Illuminate\Support\Carbon;
 
 /**
  * Syncs one character's skill state from the game: trained/bonus levels from
@@ -42,8 +45,12 @@ class SkillSyncService
      * Fetch all five tabs (throttled GETs) and persist levels, skill points,
      * discovered skills, and active buffs. skills_info.php is only fetched
      * for catalog-unknown skills discovered on a tab.
+     *
+     * @param  bool  $withRecharge  additionally read every trained skill's
+     *                              authoritative recharge window — one extra
+     *                              throttled GET per skill, so opt-in
      */
-    public function sync(): SkillSyncResult
+    public function sync(bool $withRecharge = false): SkillSyncResult
     {
         $rowsSynced = 0;
         $discovered = 0;
@@ -68,6 +75,10 @@ class SkillSyncService
 
         $activeBuffs = $this->persistBuffs($firstPage);
 
+        if ($withRecharge) {
+            $this->refreshRecharges();
+        }
+
         return new SkillSyncResult(
             rowsSynced: $rowsSynced,
             skillsDiscovered: $discovered,
@@ -76,6 +87,41 @@ class SkillSyncService
             activeBuffs: $activeBuffs,
             unreadableLevels: $unreadable,
         );
+    }
+
+    /**
+     * When the game last told us anything about this character's skills — the
+     * newest per-row stamp. Null until the first sync, which is also what
+     * makes a freshness guard safe: unknown always syncs.
+     */
+    public function lastSyncedAt(): ?CarbonInterface
+    {
+        $value = $this->character->skills()->max('synced_at');
+
+        return $value === null ? null : Carbon::parse($value);
+    }
+
+    /**
+     * Read the authoritative recharge window for every trained skill.
+     *
+     * A failed read leaves that row on its local last_cast_at + cooldown
+     * estimate rather than failing the whole sync: an incomplete cooldown
+     * picture is worth more to the caller than an error.
+     */
+    private function refreshRecharges(): void
+    {
+        $states = $this->character->skills()
+            ->with('skill')
+            ->get()
+            ->filter(fn (CharacterSkill $state): bool => $state->isCastable());
+
+        foreach ($states as $state) {
+            try {
+                $this->refreshSkillInfo($state->skill);
+            } catch (GameException) {
+                // Keep the stored estimate.
+            }
+        }
     }
 
     /**

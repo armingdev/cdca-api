@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Game\Skills\SkillSelection;
 use App\Models\Character;
 use App\Models\CharacterSkill;
 use App\Models\Skill;
@@ -17,6 +18,11 @@ use Illuminate\Console\Command;
 #[Description('View the skill catalog and manage a character\'s cast-on-start selection')]
 class SkillsCommand extends Command
 {
+    public function __construct(private readonly SkillSelection $selection)
+    {
+        parent::__construct();
+    }
+
     public function handle(): int
     {
         return match ($this->argument('action')) {
@@ -64,10 +70,7 @@ class SkillsCommand extends Command
             return self::FAILURE;
         }
 
-        CharacterSkill::updateOrCreate(
-            ['character_id' => $character->id, 'skill_id' => $skill->id],
-            ['cast_on_start' => $selected],
-        );
+        $this->selection->set($character, $skill->id, $selected);
 
         $this->info(sprintf('%s %s cast-on-start for %s.', $skill->name, $selected ? '→ selected for' : '→ removed from', $character->name));
 

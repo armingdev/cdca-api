@@ -33,6 +33,16 @@ class CharacterSkillResource extends JsonResource
             'synced_at' => $this->synced_at,
             'buff_active' => $this->when($this->relationLoaded('skill'), fn () => $this->isBuffActive()),
             'on_cooldown' => $this->when($this->relationLoaded('skill'), fn () => $this->isOnCooldown()),
+
+            // The resolved windows, so a client can count down without
+            // re-implementing the "a server reading beats the local estimate"
+            // precedence that buff_until/recharge_until alone do not carry.
+            'buff_ends_at' => $this->when($this->relationLoaded('skill'), fn () => $this->buffEndsAt()),
+            'cooldown_ends_at' => $this->when($this->relationLoaded('skill'), fn () => $this->cooldownEndsAt()),
+            'ready' => $this->when(
+                $this->relationLoaded('skill'),
+                fn (): bool => $this->isCastable() && ! $this->isOnCooldown(),
+            ),
         ];
     }
 }

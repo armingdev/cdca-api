@@ -145,3 +145,121 @@ it('lists the skill catalog filtered by school', function () {
         ->assertJsonCount(1, 'data')
         ->assertJsonPath('data.0.name', 'Boost');
 });
+
+it('skips the game read when the character\'s skills were synced recently', function () {
+    $character = Character::factory()->for($this->rga)->create(['skill_points' => 15]);
+    Skill::create(['id' => 4, 'name' => 'Stealth', 'school' => 'class', 'rage_cost' => 10, 'cooldown_minutes' => 60, 'duration_minutes' => 60]);
+    CharacterSkill::create([
+        'character_id' => $character->id,
+        'skill_id' => 4,
+        'trained_level' => 2,
+        'cast_on_start' => true,
+        'synced_at' => now()->subMinute(),
+    ]);
+
+    $this->postJson("/api/v1/characters/{$character->id}/skills/sync", ['max_age_seconds' => 300])
+        ->assertOk()
+        ->assertJsonPath('synced', false)
+        ->assertJsonPath('rows_synced', 0)
+        // Everything but the counts still describes the character as it stands.
+        ->assertJsonPath('skill_points', 15)
+        // A plain array, like the sibling teleport sync — no data envelope.
+        ->assertJsonCount(1, 'skills')
+        ->assertJsonPath('skills.0.skill_id', 4);
+
+    Http::fake();
+    Http::assertNothingSent();
+});
+
+it('syncs when the stored skill state is older than the requested max age', function () {
+    $character = Character::factory()->for($this->rga)->create();
+    (new SkillSeeder)->run();
+    CharacterSkill::create([
+        'character_id' => $character->id,
+        'skill_id' => 3,
+        'trained_level' => 1,
+        'synced_at' => now()->subHours(2),
+    ]);
+
+    Http::fake([
+        '*skills_info.php*' => Http::response(gameFixture('skills/skills_info_misc_triworld.html')),
+        '*cast_skills.php?C=7*' => Http::response(gameFixture('skills/cast_skills_misc_tab.html')),
+        '*cast_skills.php*' => Http::response(gameFixture('skills/cast_skills_page.html')),
+    ]);
+
+    $this->postJson("/api/v1/characters/{$character->id}/skills/sync", ['max_age_seconds' => 300])
+        ->assertOk()
+        ->assertJsonPath('synced', true)
+        ->assertJsonPath('skill_points', 15);
+});
+
+it('reads a recharge window for every trained skill only when asked', function () {
+    $character = Character::factory()->for($this->rga)->create();
+    (new SkillSeeder)->run();
+
+    Http::fake([
+        '*skills_info.php*' => Http::response(gameFixture('skills/skills_info_trained_recharging.html')),
+        '*cast_skills.php?C=7*' => Http::response(gameFixture('skills/cast_skills_misc_tab.html')),
+        '*cast_skills.php*' => Http::response(gameFixture('skills/cast_skills_page.html')),
+    ]);
+
+    $this->postJson("/api/v1/characters/{$character->id}/skills/sync")->assertOk();
+
+    $trainedIds = CharacterSkill::where('character_id', $character->id)
+        ->where('trained_level', '>=', 1)
+        ->pluck('skill_id');
+
+    expect($trainedIds)->not->toBeEmpty()
+        ->and(CharacterSkill::where('character_id', $character->id)->whereNotNull('recharge_synced_at')->exists())
+        ->toBeFalse();
+
+    $this->postJson("/api/v1/characters/{$character->id}/skills/sync", ['with_recharge' => true])
+        ->assertOk()
+        ->assertJsonPath('synced', true);
+
+    $stamped = CharacterSkill::where('character_id', $character->id)
+        ->whereNotNull('recharge_synced_at')
+        ->pluck('skill_id');
+
+    expect($stamped->sort()->values()->all())->toBe($trainedIds->sort()->values()->all());
+});
+
+it('reports the resolved buff and cooldown windows on each skill row', function () {
+    $character = Character::factory()->for($this->rga)->create();
+    Skill::create(['id' => 9, 'name' => 'Boost', 'school' => 'ferocity', 'rage_cost' => 10, 'cooldown_minutes' => 120, 'duration_minutes' => 60]);
+    Skill::create(['id' => 4, 'name' => 'Stealth', 'school' => 'class', 'rage_cost' => 10, 'cooldown_minutes' => 60, 'duration_minutes' => 60]);
+
+    // Cast 30 minutes ago: 60m of buff still running, 120m of cooldown still to go.
+    CharacterSkill::create([
+        'character_id' => $character->id,
+        'skill_id' => 9,
+        'trained_level' => 1,
+        'cast_on_start' => true,
+        'last_cast_at' => now()->subMinutes(30),
+        'synced_at' => now(),
+    ]);
+    // Trained but never cast: nothing to count down, ready to go.
+    CharacterSkill::create([
+        'character_id' => $character->id,
+        'skill_id' => 4,
+        'trained_level' => 1,
+        'cast_on_start' => true,
+        'synced_at' => now(),
+    ]);
+
+    $rows = collect($this->getJson("/api/v1/characters/{$character->id}/skills")->assertOk()->json('data'));
+
+    $running = $rows->firstWhere('skill_id', 9);
+    expect($running['buff_active'])->toBeTrue()
+        ->and($running['on_cooldown'])->toBeTrue()
+        ->and($running['ready'])->toBeFalse()
+        ->and($running['buff_ends_at'])->not->toBeNull()
+        ->and($running['cooldown_ends_at'])->not->toBeNull();
+
+    $idle = $rows->firstWhere('skill_id', 4);
+    expect($idle['buff_active'])->toBeFalse()
+        ->and($idle['on_cooldown'])->toBeFalse()
+        ->and($idle['ready'])->toBeTrue()
+        ->and($idle['buff_ends_at'])->toBeNull()
+        ->and($idle['cooldown_ends_at'])->toBeNull();
+});

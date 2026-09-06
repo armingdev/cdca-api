@@ -4,13 +4,17 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Game\Skills\BuffEnsurer;
 use App\Game\Skills\SkillCaster;
+use App\Game\Skills\SkillSelection;
 use App\Game\Skills\SkillSyncService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CastSkillRequest;
+use App\Http\Requests\SyncCharacterSkillsRequest;
 use App\Http\Requests\UpdateCharacterSkillsRequest;
 use App\Http\Resources\CharacterSkillResource;
 use App\Models\Character;
+use App\Models\CharacterSkill;
 use App\Models\Skill;
+use Carbon\CarbonInterface;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\Gate;
@@ -29,27 +33,17 @@ class CharacterSkillController extends Controller
     /**
      * Replace the character's cast-on-start selection with the given skill ids.
      */
-    public function update(UpdateCharacterSkillsRequest $request, Character $character): AnonymousResourceCollection
-    {
+    public function update(
+        UpdateCharacterSkillsRequest $request,
+        Character $character,
+        SkillSelection $selection,
+    ): AnonymousResourceCollection {
         Gate::authorize('update', $character);
 
         /** @var list<int> $skillIds */
         $skillIds = $request->validated('skill_ids');
-        $selected = collect($skillIds)->unique();
 
-        if ($selected->isNotEmpty()) {
-            $character->skills()->upsert(
-                $selected->map(fn (int $skillId) => [
-                    'character_id' => $character->id,
-                    'skill_id' => $skillId,
-                    'cast_on_start' => true,
-                ])->all(),
-                ['character_id', 'skill_id'],
-                ['cast_on_start'],
-            );
-        }
-
-        $character->skills()->whereNotIn('skill_id', $selected)->update(['cast_on_start' => false]);
+        $selection->replaceFor($character, $skillIds);
 
         return CharacterSkillResource::collection(
             $character->skills()->where('cast_on_start', true)->with('skill')->get()
@@ -58,23 +52,74 @@ class CharacterSkillController extends Controller
 
     /**
      * Sync the character's skill state (levels, points, buffs) from the game.
+     *
+     * Five throttled game reads, so the client that syncs on every character
+     * selection passes `max_age_seconds`: state read more recently than that
+     * is returned straight from the database with `synced: false` and costs
+     * the game nothing. `with_recharge` additionally reads each trained
+     * skill's authoritative cooldown, one request apiece.
      */
-    public function sync(Character $character): JsonResponse
+    public function sync(SyncCharacterSkillsRequest $request, Character $character): JsonResponse
     {
         Gate::authorize('update', $character);
 
-        $result = SkillSyncService::forCharacter($character)->sync();
+        $service = SkillSyncService::forCharacter($character);
+        $lastSyncedAt = $service->lastSyncedAt();
+
+        if ($request->has('max_age_seconds')
+            && $lastSyncedAt !== null
+            && $lastSyncedAt->greaterThan(now()->subSeconds($request->integer('max_age_seconds')))) {
+            return $this->syncResponse(
+                $character,
+                message: 'Skills are up to date.',
+                synced: false,
+                syncedAt: $lastSyncedAt,
+                rowsSynced: 0,
+                skillsDiscovered: 0,
+            );
+        }
+
+        $result = $service->sync($request->boolean('with_recharge'));
+
+        return $this->syncResponse(
+            $character->refresh(),
+            message: "Synced {$result->rowsSynced} skill(s).",
+            synced: true,
+            syncedAt: $service->lastSyncedAt(),
+            rowsSynced: $result->rowsSynced,
+            skillsDiscovered: $result->skillsDiscovered,
+        );
+    }
+
+    /**
+     * One response shape for both sync paths, so a client never has to branch
+     * on `synced` to read the state: the counts describe what this call did,
+     * every other field describes the character as it now stands.
+     *
+     * `skills` is a plain array, not a `data` envelope — a resource collection
+     * nested inside a JSON array serializes unwrapped, and the sibling
+     * teleport sync reports its list the same way.
+     */
+    private function syncResponse(
+        Character $character,
+        string $message,
+        bool $synced,
+        ?CarbonInterface $syncedAt,
+        int $rowsSynced,
+        int $skillsDiscovered,
+    ): JsonResponse {
+        $states = $character->skills()->with('skill')->get();
 
         return response()->json([
-            'message' => "Synced {$result->rowsSynced} skill(s).",
-            'rows_synced' => $result->rowsSynced,
-            'skills_discovered' => $result->skillsDiscovered,
-            'skill_points' => $result->skillPoints,
-            'school' => $result->school,
-            'active_buffs' => $result->activeBuffs,
-            'skills' => CharacterSkillResource::collection(
-                $character->skills()->with('skill')->get()
-            ),
+            'message' => $message,
+            'synced' => $synced,
+            'synced_at' => $syncedAt,
+            'rows_synced' => $rowsSynced,
+            'skills_discovered' => $skillsDiscovered,
+            'skill_points' => $character->skill_points,
+            'school' => $character->school,
+            'active_buffs' => $states->filter(fn (CharacterSkill $state): bool => $state->isBuffActive())->count(),
+            'skills' => CharacterSkillResource::collection($states),
         ]);
     }
 
