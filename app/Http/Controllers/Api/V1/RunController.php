@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Game\Combat\DropTotals;
 use App\Game\Engine\MobRunConfig;
 use App\Game\Engine\PvpRunConfig;
 use App\Game\Engine\QuestListRunConfig;
@@ -16,15 +17,18 @@ use App\Http\Requests\IndexBattleEventsRequest;
 use App\Http\Requests\IndexRunEventsRequest;
 use App\Http\Requests\IndexRunsRequest;
 use App\Http\Requests\StoreRunRequest;
+use App\Http\Requests\UpdateRunRequest;
 use App\Http\Resources\BattleEventResource;
 use App\Http\Resources\RunEventResource;
 use App\Http\Resources\RunResource;
 use App\Models\AttackList;
 use App\Models\BattleEvent;
 use App\Models\Character;
+use App\Models\Quest;
 use App\Models\QuestList;
 use App\Models\Run;
 use App\Models\RunEvent;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Carbon;
@@ -43,6 +47,8 @@ class RunController extends Controller
             $request->user()->runs()
                 ->with('participants.character')
                 ->latest()
+                // created_at ties (runs launched in the same second) must not reorder between polls.
+                ->latest('id')
                 ->paginate($request->integer('per_page', 25))
                 ->withQueryString()
         );
@@ -75,6 +81,9 @@ class RunController extends Controller
                 startAt: $request->filled('start_at') ? Carbon::parse($request->validated('start_at')) : null,
                 user: $user,
                 skillIds: $request->has('skill_ids') ? $request->validated('skill_ids') : null,
+                name: $request->validated('name'),
+                reserveRageFor: array_values($request->validated('reserve_rage_for') ?? []),
+                reserveRageHours: $request->integer('reserve_rage_hours', 12),
             );
         } catch (CharactersBusyException $exception) {
             throw ValidationException::withMessages(['characters' => [$exception->getMessage()]]);
@@ -86,6 +95,19 @@ class RunController extends Controller
     public function show(Run $run): RunResource
     {
         Gate::authorize('view', $run);
+
+        return RunResource::make($run->load('participants.character'));
+    }
+
+    /**
+     * Rename a run. Allowed in any status — the label is for the person
+     * reading the list, not for the workers.
+     */
+    public function update(UpdateRunRequest $request, Run $run): RunResource
+    {
+        Gate::authorize('update', $run);
+
+        $run->update(['name' => $request->validated('name')]);
 
         return RunResource::make($run->load('participants.character'));
     }
@@ -173,15 +195,46 @@ class RunController extends Controller
     {
         Gate::authorize('view', $run);
 
-        $characterIds = $run->participants()->pluck('character_id');
-
-        $events = BattleEvent::query()
-            ->whereIn('character_id', $characterIds)
+        $events = $this->battlesOf($run)
             ->with('mob:id,name')
             ->orderByDesc('occurred_at')
             ->paginate($request->integer('per_page', 50));
 
         return BattleEventResource::collection($events);
+    }
+
+    /**
+     * What this run has dropped so far, per item and source mob.
+     */
+    public function drops(Run $run, DropTotals $totals): JsonResponse
+    {
+        Gate::authorize('view', $run);
+
+        $rows = $totals->byDropAndMob($this->battlesOf($run));
+
+        return response()->json([
+            'drops' => $rows,
+            'total' => $rows->sum('count'),
+        ]);
+    }
+
+    /**
+     * The battles fought by this run. Runs from before battles were tagged
+     * with their run have none, and fall back to what the list used to show:
+     * their characters' battles since the run was created.
+     *
+     * @return Builder<BattleEvent>
+     */
+    private function battlesOf(Run $run): Builder
+    {
+        if (BattleEvent::where('run_id', $run->id)->exists()) {
+            return BattleEvent::query()->where('battle_events.run_id', $run->id);
+        }
+
+        return BattleEvent::query()
+            ->whereNull('battle_events.run_id')
+            ->whereIn('battle_events.character_id', $run->participants()->select('character_id'))
+            ->where('occurred_at', '>=', $run->created_at);
     }
 
     /**
@@ -206,6 +259,29 @@ class RunController extends Controller
             ->withQueryString();
 
         return RunEventResource::collection($events);
+    }
+
+    /**
+     * Who to talk to and which quest to ask for. A catalog pick carries both;
+     * the engine itself works from the giver's name and the game's quest id.
+     *
+     * @return array{npcName: string, questId: int}
+     */
+    private function questTarget(StoreRunRequest $request): array
+    {
+        if (! $request->filled('catalog_quest_id')) {
+            return ['npcName' => $request->validated('npc'), 'questId' => $request->integer('quest_id')];
+        }
+
+        $quest = Quest::findOrFail($request->integer('catalog_quest_id'));
+
+        if ($quest->giver === null) {
+            throw ValidationException::withMessages([
+                'catalog_quest_id' => ["The catalog does not know who gives {$quest->name} yet."],
+            ]);
+        }
+
+        return ['npcName' => $quest->giver, 'questId' => $quest->game_quest_id];
     }
 
     /**
@@ -236,8 +312,7 @@ class RunController extends Controller
             ))->toArray(),
 
             RunMode::Quest => (new QuestRunConfig(
-                npcName: $request->validated('npc'),
-                questId: $request->integer('quest_id'),
+                ...$this->questTarget($request),
                 stopRage: $stopRage,
                 levelUp: $levelUp,
                 smart: $smart,
@@ -265,7 +340,7 @@ class RunController extends Controller
                 attackListId: $request->filled('attack_list_id')
                     ? $this->ownedAttackListId($request, $userId)
                     : null,
-                crewGameId: $request->filled('crew_game_id') ? $request->integer('crew_game_id') : null,
+                crewGameIds: array_map(intval(...), $request->validated('crew_game_ids') ?? array_filter([$request->validated('crew_game_id')])),
                 attacksPerTarget: $request->integer('attacks_per_target', 1),
                 stopRage: $stopRage,
                 message: (string) $request->input('message', ''),

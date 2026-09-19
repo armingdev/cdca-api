@@ -15,13 +15,13 @@ class RoomBlobParser
         $data = json_decode($body, true);
 
         if (! is_array($data)) {
-            throw new ParseException('Room blob is not valid JSON: '.substr($body, 0, 200));
+            throw ParseException::unexpected('Room blob is not valid JSON', $body);
         }
 
         $error = (string) ($data['error'] ?? '');
 
         if (! array_key_exists('curRoom', $data) && $error === '') {
-            throw new ParseException('Room blob is missing curRoom and carries no error: '.substr($body, 0, 200));
+            throw ParseException::unexpected('Room blob is missing curRoom and carries no error', $body);
         }
 
         $exits = [];

@@ -5,6 +5,7 @@ namespace App\Game\World;
 use App\Game\Data\BackpackItem;
 use App\Game\Data\RoomBlob;
 use App\Game\Data\TeleportSyncResult;
+use App\Game\Enums\RunSignal;
 use App\Game\Enums\TeleportKind;
 use App\Game\Exceptions\DesyncException;
 use App\Game\Exceptions\GameException;
@@ -15,6 +16,7 @@ use App\Models\Character;
 use App\Models\CharacterSkill;
 use App\Models\CharacterTeleportAnchor;
 use App\Models\TeleportAnchor;
+use Closure;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -241,6 +243,17 @@ class TeleportService
             $this->usableAnchors(),
             fn (TeleportAnchor $anchor): bool => $anchor->isFree(),
         ));
+    }
+
+    /**
+     * Forwarded to the navigator that walks a plan's last leg, so a teleport
+     * route is as interruptible as a plain walk (see Navigator::interruptWith).
+     *
+     * @param  (Closure(): RunSignal)|null  $signal
+     */
+    public function interruptWith(?Closure $signal): void
+    {
+        $this->navigator->interruptWith($signal);
     }
 
     /**

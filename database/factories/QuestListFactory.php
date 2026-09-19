@@ -20,6 +20,17 @@ class QuestListFactory extends Factory
         return [
             'user_id' => null,
             'name' => fake()->unique()->words(2, true),
+            'is_public' => false,
         ];
+    }
+
+    /**
+     * A list its owner has shared with every other user.
+     */
+    public function public(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'is_public' => true,
+        ]);
     }
 }

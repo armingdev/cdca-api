@@ -19,6 +19,7 @@ class BattleEventResource extends JsonResource
         return [
             'id' => $this->id,
             'character_id' => $this->character_id,
+            'run_id' => $this->run_id,
             'kind' => $this->kind,
             'outcome' => $this->outcome,
             'mob_id' => $this->mob_id,

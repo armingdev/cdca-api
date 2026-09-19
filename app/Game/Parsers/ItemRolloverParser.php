@@ -73,7 +73,7 @@ class ItemRolloverParser
         $name = trim(substr($text, 0, $end));
 
         if ($name === '') {
-            throw new ParseException('item_rollover response has no item name: '.substr($text, 0, 120));
+            throw ParseException::unexpected('item_rollover response has no item name', $text);
         }
 
         return $name;

@@ -216,3 +216,75 @@ it('still casts when the skill sync itself fails to parse', function () {
 
     expect(BuffEnsurer::forCharacter($this->character)->ensure()->castCount())->toBe(1);
 });
+
+/** A skill world where the game never confirms a cast — what a skill that needs a parameter looks like. */
+function fakeRefusingSkillWorld(): void
+{
+    Http::fake(function ($request) {
+        $url = $request->url();
+
+        if (str_contains($url, 'userstats.php')) {
+            return Http::response(json_encode(['exp' => '1,000', 'rage' => '5,000', 'level' => '60', 'width' => 0]));
+        }
+
+        if (str_contains($url, 'skills_info.php')) {
+            return Http::response(fakeSkillInfoHtml((int) $request['id']));
+        }
+
+        return Http::response($request->method() === 'POST' ? '<html>nothing happened</html>' : fakeSkillsPageHtml());
+    });
+}
+
+it('backs off further each time the game refuses the same skill', function (int $refusalsSoFar, string $nextTry) {
+    $this->travelTo('2026-09-19 12:00:00');
+    $state = selectSkill($this->character, makeSkill(2996, 'Daily Grind', 60, 60), ['cast_refusals' => $refusalsSoFar]);
+    fakeRefusingSkillWorld();
+
+    BuffEnsurer::forCharacter($this->character)->ensure();
+
+    expect($state->fresh()->cast_refusals)->toBe($refusalsSoFar + 1)
+        ->and($state->fresh()->cast_refused_until->toDateTimeString())->toBe($nextTry);
+})->with([
+    'first refusal: five minutes' => [0, '2026-09-19 12:05:00'],
+    'second refusal: an hour' => [1, '2026-09-19 13:00:00'],
+    'third and later: a day' => [2, '2026-09-20 12:00:00'],
+    'never longer than a day' => [7, '2026-09-20 12:00:00'],
+]);
+
+it('does not attempt a refused skill again until its backoff has passed', function () {
+    selectSkill($this->character, makeSkill(2996, 'Daily Grind', 60, 60), [
+        'cast_refusals' => 2,
+        'cast_refused_until' => now()->addHours(3),
+    ]);
+    fakeRefusingSkillWorld();
+
+    $result = BuffEnsurer::forCharacter($this->character)->ensure();
+
+    expect($result->failed)->toBe([])
+        ->and($result->skipped[0]['reason'])->toBe(BuffEnsureResult::REASON_BACKING_OFF);
+    Http::assertNotSent(fn ($request) => $request->method() === 'POST');
+});
+
+it('clears the backoff once the game accepts the skill again', function () {
+    $state = selectSkill($this->character, makeSkill(4, 'Stealth', 60, 60), [
+        'cast_refusals' => 2,
+        'cast_refused_until' => now()->subMinute(),
+    ]);
+    fakeSkillWorld();
+
+    BuffEnsurer::forCharacter($this->character)->ensure();
+
+    expect($state->fresh()->cast_refusals)->toBe(0)
+        ->and($state->fresh()->cast_refused_until)->toBeNull();
+});
+
+it('never casts Teleport as a buff, because it needs a destination', function () {
+    selectSkill($this->character, makeSkill(27, 'Teleport', 60, 0, 100));
+    fakeSkillWorld();
+
+    $result = BuffEnsurer::forCharacter($this->character)->ensure();
+
+    expect($result->cast)->toBe([])
+        ->and($result->failed)->toBe([]);
+    Http::assertNotSent(fn ($request) => $request->method() === 'POST');
+});

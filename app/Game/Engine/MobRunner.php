@@ -10,6 +10,7 @@ use App\Game\Data\UserStats;
 use App\Game\Enums\BattleOutcome;
 use App\Game\Enums\RunSignal;
 use App\Game\Exceptions\GameException;
+use App\Game\Exceptions\RunInterruptedException;
 use App\Game\Exceptions\SessionCollisionException;
 use App\Game\Items\GearManager;
 use App\Game\Items\JunkDropper;
@@ -114,11 +115,31 @@ class MobRunner
         $log ??= fn (string $message) => null;
         $this->winsBaseline = max(0, $killsAlreadyDone);
 
+        $this->navigator->interruptWith($signal);
+        $this->teleports?->interruptWith($signal);
+
         try {
             return $this->loop($log, $signal, $onBattle, $ensureBuffs);
+        } catch (RunInterruptedException $interrupt) {
+            // The signal landed mid-walk; end the pass exactly as the loop's
+            // own check would have.
+            return $this->signalSummary($interrupt->signal)
+                ?? $this->summary('Worker restarting.', RunEndReason::WorkerShutdown);
         } finally {
             $this->dropJunk($log);
         }
+    }
+
+    /** How the pass ends for a control signal, or null when there is none. */
+    private function signalSummary(RunSignal $signal): ?MobRunSummary
+    {
+        return match ($signal) {
+            RunSignal::Stop => $this->summary('Stop requested.', RunEndReason::ExternalStop),
+            RunSignal::Pause => $this->summary('Pause requested.', RunEndReason::ExternalPause),
+            RunSignal::CircumspectExpired => $this->summary('Circumspect expired.', RunEndReason::CircumspectExpired),
+            RunSignal::WorkerShutdown => $this->summary('Worker restarting.', RunEndReason::WorkerShutdown),
+            RunSignal::None => null,
+        };
     }
 
     /**
@@ -140,7 +161,7 @@ class MobRunner
             throw new GameException('No known rooms for the target mobs — map the area first or check the names.');
         }
 
-        $graph = RoomGraph::fromDatabase();
+        $graph = app(RoomGraph::class);
         $planner = new TeleportPlanner($graph);
 
         // Free item anchors only: a run must never spend rage (its fuel) or the
@@ -164,22 +185,10 @@ class MobRunner
         $exhausted = [];
 
         while (true) {
-            $control = $signal !== null ? $signal() : RunSignal::None;
+            $control = $this->signalSummary($signal !== null ? $signal() : RunSignal::None);
 
-            if ($control === RunSignal::Stop) {
-                return $this->summary('Stop requested.', RunEndReason::ExternalStop);
-            }
-
-            if ($control === RunSignal::Pause) {
-                return $this->summary('Pause requested.', RunEndReason::ExternalPause);
-            }
-
-            if ($control === RunSignal::CircumspectExpired) {
-                return $this->summary('Circumspect expired.', RunEndReason::CircumspectExpired);
-            }
-
-            if ($control === RunSignal::WorkerShutdown) {
-                return $this->summary('Worker restarting.', RunEndReason::WorkerShutdown);
+            if ($control !== null) {
+                return $control;
             }
 
             if ($current->rage < $this->config->stopRage) {

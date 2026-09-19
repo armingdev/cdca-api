@@ -44,7 +44,7 @@ class QuestListSeeder extends Seeder
      */
     private function seedList(string $name, array $questNames, Collection $questIdsByName): void
     {
-        $questList = QuestList::firstOrCreate(['name' => $name], ['user_id' => null]);
+        $questList = QuestList::firstOrCreate(['name' => $name, 'user_id' => null]);
 
         $rows = [];
         $missing = [];

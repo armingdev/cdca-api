@@ -51,7 +51,7 @@ class WorldQuestHelperParser
         $data = json_decode($body, true);
 
         if (! is_array($data) || ! array_key_exists('qtable', $data)) {
-            throw new ParseException('Not a questHelper response: '.substr($body, 0, 200));
+            throw ParseException::unexpected('Not a questHelper response', $body);
         }
 
         $quests = [];

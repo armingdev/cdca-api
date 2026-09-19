@@ -29,7 +29,7 @@ class QuestListRunCommand extends Command
             return self::FAILURE;
         }
 
-        $list = QuestList::where('name', $this->argument('list'))->first();
+        $list = QuestList::named($this->argument('list'))->first();
 
         if ($list === null) {
             $this->error("Quest list '{$this->argument('list')}' not found.");

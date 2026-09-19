@@ -12,7 +12,7 @@ class UserStatsParser
         $data = json_decode($body, true);
 
         if (! is_array($data) || ! isset($data['rage'], $data['exp'], $data['level'])) {
-            throw new ParseException('userstats.php response is not the expected JSON: '.substr($body, 0, 200));
+            throw ParseException::unexpected('userstats.php response is not the expected JSON', $body);
         }
 
         return new UserStats(

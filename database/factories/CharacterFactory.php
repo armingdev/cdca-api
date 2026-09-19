@@ -21,6 +21,7 @@ class CharacterFactory extends Factory
     {
         return [
             'rga_id' => Rga::factory(),
+            'is_trustee' => false,
             'suid' => fake()->unique()->numberBetween(1000, 999999),
             'server_id' => 1,
             'name' => fake()->unique()->userName(),
@@ -32,6 +33,16 @@ class CharacterFactory extends Factory
             'last_stats_at' => null,
             'status' => CharacterActivity::Idle,
         ];
+    }
+
+    /**
+     * A character another RGA shared with this one, not one of its own.
+     */
+    public function trustee(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'is_trustee' => true,
+        ]);
     }
 
     /**

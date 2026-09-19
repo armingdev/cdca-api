@@ -2,10 +2,12 @@
 
 namespace App\Http\Requests;
 
+use App\Game\Enums\RageReserveEvent;
 use App\Game\Enums\RunMode;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\RequiredIf;
 
 class StoreRunRequest extends FormRequest
 {
@@ -46,6 +48,7 @@ class StoreRunRequest extends FormRequest
     {
         return [
             'mode' => ['required', Rule::enum(RunMode::class)],
+            'name' => ['sometimes', 'nullable', 'string', 'max:80'],
             'characters' => ['required', 'array', 'min:1'],
             'characters.*' => ['integer', 'exists:characters,id'],
 
@@ -58,6 +61,11 @@ class StoreRunRequest extends FormRequest
             'skill_ids.*' => ['integer'],
 
             'require_circumspect' => ['sometimes', 'boolean'],
+
+            // Park ahead of these events so the rage bar is full for them.
+            'reserve_rage_for' => ['sometimes', 'array'],
+            'reserve_rage_for.*' => [Rule::enum(RageReserveEvent::class), 'distinct'],
+            'reserve_rage_hours' => ['sometimes', 'integer', 'min:1', 'max:72'],
             'restart_every_minutes' => ['sometimes', 'nullable', 'integer', 'min:1'],
             'start_at' => ['sometimes', 'nullable', 'date'],
             'stop_rage' => ['sometimes', 'integer', 'min:0'],
@@ -72,9 +80,12 @@ class StoreRunRequest extends FormRequest
             'run_count' => ['sometimes', 'nullable', 'integer', 'min:0'],
             'attack_interval_seconds' => ['sometimes', 'nullable', 'integer', 'min:60', 'max:86400'],
 
-            // quest mode
-            'npc' => ['required_if:mode,quest', 'string', 'max:255'],
-            'quest_id' => ['required_if:mode,quest', 'integer', 'min:1'],
+            // quest mode — either a quest picked from the catalog (its giver
+            // and game id come from the catalog row), or the raw pair for a
+            // quest the catalog does not know yet.
+            'catalog_quest_id' => ['sometimes', 'nullable', 'integer', 'exists:quests,id'],
+            'npc' => [$this->requiredForRawQuest(), 'string', 'max:255'],
+            'quest_id' => [$this->requiredForRawQuest(), 'integer', 'min:1'],
 
             // quest + quest-list: pause before re-checking rooms whose targets were all dead
             'respawn_wait_seconds' => ['sometimes', 'nullable', 'integer', 'min:60', 'max:86400'],
@@ -96,7 +107,14 @@ class StoreRunRequest extends FormRequest
             'targets.*' => ['string', 'max:255'],
 
             // pvp — crew-members mode
-            'crew_game_id' => ['required_if:mode,pvp-crew-members', 'integer', 'min:1'],
+            // One run can work through several crews' rosters. The single
+            // crew_game_id is still accepted from clients that predate that.
+            'crew_game_ids' => [
+                Rule::requiredIf(fn (): bool => $this->input('mode') === RunMode::PvpCrewMembers->value && ! $this->filled('crew_game_id')),
+                'array', 'min:1', 'max:10',
+            ],
+            'crew_game_ids.*' => ['integer', 'min:1', 'distinct'],
+            'crew_game_id' => ['sometimes', 'nullable', 'integer', 'min:1'],
 
             // pvp — shared options.
             // No attack_rage: the rage cost is supplied by the server per
@@ -108,5 +126,15 @@ class StoreRunRequest extends FormRequest
             'cooldown_minutes' => ['sometimes', 'integer', 'min:1', 'max:60'],
             'message' => ['sometimes', 'nullable', 'string', 'max:255'],
         ];
+    }
+
+    /**
+     * The hand-typed giver + game quest id are only needed when no catalog
+     * quest was picked.
+     */
+    private function requiredForRawQuest(): RequiredIf
+    {
+        return Rule::requiredIf(fn (): bool => $this->input('mode') === RunMode::Quest->value
+            && ! $this->filled('catalog_quest_id'));
     }
 }

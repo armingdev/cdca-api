@@ -27,6 +27,7 @@ class RunParticipant extends Model
         'last_activity',
         'progress',
         'resume_at',
+        'heartbeat_at',
         'dispatch_token',
         'started_at',
         'finished_at',
@@ -44,6 +45,7 @@ class RunParticipant extends Model
             'errors' => 'integer',
             'progress' => 'array',
             'resume_at' => 'datetime',
+            'heartbeat_at' => 'datetime',
             'started_at' => 'datetime',
             'finished_at' => 'datetime',
         ];

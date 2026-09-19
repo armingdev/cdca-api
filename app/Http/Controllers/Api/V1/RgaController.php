@@ -23,7 +23,7 @@ class RgaController extends Controller
     public function index(Request $request): AnonymousResourceCollection
     {
         return RgaResource::collection(
-            $request->user()->rgas()->withCount('characters')->latest()->get()
+            $request->user()->rgas()->withCount('characters')->latest()->latest('id')->get()
         );
     }
 

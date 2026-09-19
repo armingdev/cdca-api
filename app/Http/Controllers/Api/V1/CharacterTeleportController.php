@@ -101,7 +101,7 @@ class CharacterTeleportController extends Controller
         $navigator = Navigator::forCharacter($character);
         $from = $navigator->loadCurrentRoom()->curRoom;
 
-        $plan = new TeleportPlanner(RoomGraph::fromDatabase())->plan(
+        $plan = new TeleportPlanner(app(RoomGraph::class))->plan(
             $from,
             $destination,
             $service->usableAnchors(),

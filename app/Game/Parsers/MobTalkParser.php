@@ -19,7 +19,7 @@ class MobTalkParser
     public function parse(string $html): QuestStepPage
     {
         if (! str_contains($html, 'mob-dialog-container') && ! str_contains($html, 'mob_talk.php')) {
-            throw new ParseException('Not a mob_talk step page: '.substr(strip_tags($html), 0, 200));
+            throw ParseException::unexpected('Not a mob_talk step page', $html);
         }
 
         $crawler = new Crawler($html);

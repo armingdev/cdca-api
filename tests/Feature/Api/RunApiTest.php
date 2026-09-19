@@ -5,6 +5,7 @@ use App\Jobs\RunMobJob;
 use App\Jobs\RunPvpJob;
 use App\Models\Character;
 use App\Models\CharacterSkill;
+use App\Models\Quest;
 use App\Models\Rga;
 use App\Models\Run;
 use App\Models\RunParticipant;
@@ -420,4 +421,156 @@ it('rejects a fleet skill selection naming a skill that does not exist', functio
         ->assertJsonValidationErrors('skill_ids');
 
     expect(castOnStartIdsFor($character))->toBe([]);
+});
+
+describe('run names', function () {
+    it('stores the name a run is started with and returns it', function () {
+        Queue::fake();
+        $character = Character::factory()->for($this->rga)->create();
+
+        $this->postJson('/api/v1/runs', [
+            'mode' => 'mob',
+            'name' => 'amdir harvester',
+            'characters' => [$character->id],
+            'mobs' => ['Amdir Harvester'],
+        ])->assertCreated()->assertJsonPath('data.name', 'amdir harvester');
+
+        expect(Run::sole()->name)->toBe('amdir harvester');
+    });
+
+    it('leaves a run unnamed when no name is given', function () {
+        Queue::fake();
+        $character = Character::factory()->for($this->rga)->create();
+
+        $this->postJson('/api/v1/runs', [
+            'mode' => 'mob',
+            'characters' => [$character->id],
+            'mobs' => ['Amdir Harvester'],
+        ])->assertCreated()->assertJsonPath('data.name', null);
+    });
+
+    it('renames a run, and clears the name when sent null', function () {
+        $run = Run::factory()->for($this->user)->create(['name' => 'tincture mobs']);
+
+        $this->patchJson("/api/v1/runs/{$run->id}", ['name' => 'sub85 veldara'])
+            ->assertOk()
+            ->assertJsonPath('data.name', 'sub85 veldara');
+
+        $this->patchJson("/api/v1/runs/{$run->id}", ['name' => null])->assertOk();
+
+        expect($run->fresh()->name)->toBeNull();
+    });
+
+    it('returns 403 when renaming another user\'s run', function () {
+        $run = Run::factory()->for(User::factory())->create(['name' => 'theirs']);
+
+        $this->patchJson("/api/v1/runs/{$run->id}", ['name' => 'mine now'])->assertForbidden();
+
+        expect($run->fresh()->name)->toBe('theirs');
+    });
+
+    it('returns 422 for a name longer than 80 characters or a rename without one', function (array $payload) {
+        $run = Run::factory()->for($this->user)->create(['name' => 'kept']);
+
+        $this->patchJson("/api/v1/runs/{$run->id}", $payload)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('name');
+
+        expect($run->fresh()->name)->toBe('kept');
+    })->with([
+        'too long' => [['name' => str_repeat('x', 81)]],
+        'missing' => [[]],
+    ]);
+});
+
+describe('single-quest runs picked from the catalog', function () {
+    it('takes the giver and the game quest id from the picked quest', function () {
+        Queue::fake();
+        $character = Character::factory()->for($this->rga)->create();
+        $quest = Quest::factory()->create(['game_quest_id' => 1128, 'giver' => 'Tyson']);
+
+        $this->postJson('/api/v1/runs', [
+            'mode' => 'quest',
+            'characters' => [$character->id],
+            'catalog_quest_id' => $quest->id,
+        ])
+            ->assertCreated()
+            ->assertJsonPath('data.config.npc_name', 'Tyson')
+            ->assertJsonPath('data.config.quest_id', 1128);
+    });
+
+    it('returns 422 when the picked quest is not in the catalog', function () {
+        $character = Character::factory()->for($this->rga)->create();
+
+        $this->postJson('/api/v1/runs', [
+            'mode' => 'quest',
+            'characters' => [$character->id],
+            'catalog_quest_id' => 999_999,
+        ])->assertUnprocessable()->assertJsonValidationErrors('catalog_quest_id');
+
+        expect(Run::count())->toBe(0);
+    });
+
+    it('returns 422 when the catalog does not know the quest\'s giver', function () {
+        $character = Character::factory()->for($this->rga)->create();
+        $quest = Quest::factory()->create(['name' => 'Orphaned Errand', 'giver' => null]);
+
+        $this->postJson('/api/v1/runs', [
+            'mode' => 'quest',
+            'characters' => [$character->id],
+            'catalog_quest_id' => $quest->id,
+        ])
+            ->assertUnprocessable()
+            ->assertJsonPath('errors.catalog_quest_id.0', 'The catalog does not know who gives Orphaned Errand yet.');
+
+        expect(Run::count())->toBe(0);
+    });
+
+    it('still requires the giver and quest id when no catalog quest is picked', function () {
+        $character = Character::factory()->for($this->rga)->create();
+
+        $this->postJson('/api/v1/runs', ['mode' => 'quest', 'characters' => [$character->id]])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['npc', 'quest_id']);
+    });
+});
+
+describe('rage reserve options', function () {
+    it('stores the events a run saves rage for and the hours before them', function () {
+        Queue::fake();
+        $character = Character::factory()->for($this->rga)->create();
+
+        $this->postJson('/api/v1/runs', [
+            'mode' => 'mob',
+            'characters' => [$character->id],
+            'mobs' => ['Amdir Harvester'],
+            'reserve_rage_for' => ['pvp-brawl', 'faction-brawl'],
+            'reserve_rage_hours' => 8,
+        ])
+            ->assertCreated()
+            ->assertJsonPath('data.reserve_rage_for', ['pvp-brawl', 'faction-brawl'])
+            ->assertJsonPath('data.reserve_rage_hours', 8);
+    });
+
+    it('reserves nothing by default', function () {
+        Queue::fake();
+        $character = Character::factory()->for($this->rga)->create();
+
+        $this->postJson('/api/v1/runs', ['mode' => 'mob', 'characters' => [$character->id], 'mobs' => ['Amdir Harvester']])
+            ->assertCreated()
+            ->assertJsonPath('data.reserve_rage_for', [])
+            ->assertJsonPath('data.reserve_rage_hours', 12);
+    });
+
+    it('returns 422 for an event it cannot schedule around or an out-of-range lead time', function (array $payload, string $field) {
+        $character = Character::factory()->for($this->rga)->create();
+
+        $this->postJson('/api/v1/runs', ['mode' => 'mob', 'characters' => [$character->id], 'mobs' => ['Amdir Harvester'], ...$payload])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors($field);
+    })->with([
+        'gladiator is not supported yet' => [['reserve_rage_for' => ['gladiator']], 'reserve_rage_for.0'],
+        'zero hours' => [['reserve_rage_for' => ['pvp-brawl'], 'reserve_rage_hours' => 0], 'reserve_rage_hours'],
+        'more than three days' => [['reserve_rage_for' => ['pvp-brawl'], 'reserve_rage_hours' => 73], 'reserve_rage_hours'],
+    ]);
 });

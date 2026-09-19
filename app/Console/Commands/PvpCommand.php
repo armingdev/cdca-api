@@ -15,7 +15,7 @@ use Illuminate\Console\Command;
 #[Signature('outwar:pvp {character : Character id or name}
     {--target=* : Player name(s) to attack, in order}
     {--crew-hitlist : Pull targets from the crew hitlist instead of --target}
-    {--crew= : Pull targets from this crew id instead of --target}
+    {--crew=* : Pull targets from these crew id(s) instead of --target}
     {--attacks=1 : Attacks per target}
     {--stop-rage=2500 : Character rage-pool floor}
     {--message= : Optional attack message}')]
@@ -48,7 +48,7 @@ class PvpCommand extends Command
 
         $config = new PvpRunConfig(
             targets: $targets,
-            crewGameId: $this->option('crew') !== null ? (int) $this->option('crew') : null,
+            crewGameIds: array_map(intval(...), (array) $this->option('crew')),
             attacksPerTarget: (int) $this->option('attacks'),
             stopRage: (int) $this->option('stop-rage'),
             message: (string) ($this->option('message') ?? ''),
@@ -80,7 +80,7 @@ class PvpCommand extends Command
             return RunMode::PvpCrewHitlist;
         }
 
-        return $this->option('crew') !== null ? RunMode::PvpCrewMembers : RunMode::PvpAttackList;
+        return $this->option('crew') !== [] ? RunMode::PvpCrewMembers : RunMode::PvpAttackList;
     }
 
     private function resolveCharacter(string $identifier): ?Character

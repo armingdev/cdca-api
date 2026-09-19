@@ -21,7 +21,7 @@ class TrusteeListParser
         $data = json_decode($body, true);
 
         if (! is_array($data) || ! isset($data['results'])) {
-            throw new ParseException('trusteeList response is not the expected JSON: '.substr($body, 0, 200));
+            throw ParseException::unexpected('trusteeList response is not the expected JSON', $body);
         }
 
         $entries = [];

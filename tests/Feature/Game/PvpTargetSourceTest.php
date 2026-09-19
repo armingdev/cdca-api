@@ -159,3 +159,20 @@ it('knows when the character is not registered for the brawl', function () {
 
     expect(BrawlTargetSource::forType($character, BrawlType::Pvp)->isEntered())->toBeFalse();
 });
+
+it('reads every configured crew\'s roster and targets each player once', function () {
+    $character = pvpCharacter();
+
+    // Both ids answer with the same captured roster, as a player caught
+    // mid-transfer between two crews would appear in both.
+    Http::fake(['*crew_profile.php*' => Http::response(gameFixture('crew_profile_members.html'))]);
+
+    $source = CrewMembersTargetSource::forCrews($character, [17785, 8698]);
+    $single = CrewMembersTargetSource::forCrew($character, 17785)->targets();
+
+    expect($source->targets())->toHaveCount(count($single))
+        ->and($source->label())->toBe('crew members (crews 17785, 8698)');
+
+    Http::assertSent(fn ($request) => str_contains($request->url(), 'id=17785'));
+    Http::assertSent(fn ($request) => str_contains($request->url(), 'id=8698'));
+});

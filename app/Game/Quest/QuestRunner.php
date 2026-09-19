@@ -20,6 +20,7 @@ use App\Game\Enums\RunEventType;
 use App\Game\Enums\RunSignal;
 use App\Game\Exceptions\GameException;
 use App\Game\Exceptions\QuestNotAvailableException;
+use App\Game\Exceptions\RunInterruptedException;
 use App\Game\Exceptions\TransientGameException;
 use App\Game\World\Navigator;
 use App\Game\World\RoomGraph;
@@ -95,7 +96,7 @@ class QuestRunner
             $config,
             QuestService::forCharacter($character),
             Navigator::forCharacter($character),
-            RoomGraph::fromDatabase(),
+            app(RoomGraph::class),
             StatsService::forCharacter($character),
             app(PurchasedQuestItems::class),
             TeleportService::forCharacter($character),
@@ -118,6 +119,32 @@ class QuestRunner
     ): QuestRunSummary {
         $log ??= fn (string $message) => null;
 
+        $this->navigator->interruptWith($signal);
+        $this->teleports?->interruptWith($signal);
+
+        try {
+            return $this->work($log, $signal, $onBattle, $ensureBuffs, $events);
+        } catch (RunInterruptedException $interrupt) {
+            // The signal landed mid-walk; end the quest pass exactly as the
+            // loop's own check would have.
+            return $this->verdictFor($interrupt->signal)
+                ?? $this->summary(false, 'Worker restarting.', RunEndReason::WorkerShutdown);
+        }
+    }
+
+    /**
+     * @param  Closure(string): void  $log
+     * @param  Closure(): RunSignal|null  $signal
+     * @param  Closure(BattleEvent): void|null  $onBattle
+     * @param  Closure(): void|null  $ensureBuffs
+     */
+    private function work(
+        Closure $log,
+        ?Closure $signal,
+        ?Closure $onBattle,
+        ?Closure $ensureBuffs,
+        ?RunEventRecorder $events,
+    ): QuestRunSummary {
         if ($this->config->smart) {
             $this->levelUpToQuestRequirement($log);
         }
@@ -614,7 +641,13 @@ class QuestRunner
      */
     private function externalVerdict(?Closure $signal): ?QuestRunSummary
     {
-        return match ($signal !== null ? $signal() : RunSignal::None) {
+        return $this->verdictFor($signal !== null ? $signal() : RunSignal::None);
+    }
+
+    /** How the quest pass ends for a control signal, or null when there is none. */
+    private function verdictFor(RunSignal $signal): ?QuestRunSummary
+    {
+        return match ($signal) {
             RunSignal::Stop => $this->summary(false, 'Stop requested.', RunEndReason::ExternalStop),
             RunSignal::Pause => $this->summary(false, 'Pause requested.', RunEndReason::ExternalPause),
             RunSignal::CircumspectExpired => $this->summary(false, 'Circumspect expired.', RunEndReason::CircumspectExpired),

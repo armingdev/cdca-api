@@ -3,8 +3,12 @@
 namespace App\Jobs;
 
 use App\Game\Auth\LoginService;
+use App\Game\Data\RageReserveWindow;
 use App\Game\Engine\ParticipantOutcome;
+use App\Game\Engine\RageReserveGate;
 use App\Game\Engine\RunEventRecorder;
+use App\Game\Engine\TransientFailure;
+use App\Game\Engine\WorkerDeathRecovery;
 use App\Game\Enums\BattleOutcome;
 use App\Game\Enums\CharacterActivity;
 use App\Game\Enums\RunEventType;
@@ -26,9 +30,11 @@ use Closure;
 use Illuminate\Contracts\Queue\Interruptible;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Queue\MaxAttemptsExceededException;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
+use RedisException;
 use Throwable;
 
 /**
@@ -42,6 +48,12 @@ use Throwable;
  * Interruptible so a worker told to quit (deploy, horizon:terminate) does not
  * have to sit out the rest of the run: the engine ends its pass at the next
  * signal check and the participant parks for the resume scheduler.
+ *
+ * The dispatch token is this job's lease on the participant. Every write the
+ * job makes is conditional on still holding it, because a worker can be
+ * presumed dead (see WorkerDeathRecovery) while it is merely slow, and a job
+ * orphaned by a killed worker is redelivered hours later — neither may touch
+ * a participant that has since been handed to another job.
  */
 abstract class RunJob implements Interruptible, ShouldQueue
 {
@@ -74,12 +86,43 @@ abstract class RunJob implements Interruptible, ShouldQueue
      */
     private const int WORKER_RESTART_RESUME_SECONDS = 60;
 
+    /** Network/Redis/database blips in a row tolerated before failing loudly. */
+    private const int MAX_TRANSIENT_FAILURES = 5;
+
+    /** How long a run parks after such a blip before trying again. */
+    private const int TRANSIENT_RETRY_SECONDS = 120;
+
+    /**
+     * The pass ends itself this long before the job timeout and parks, so a
+     * run that legitimately outlives one job is handed to the next instead of
+     * being killed mid-request by the worker's alarm.
+     */
+    private const int PASS_END_MARGIN_SECONDS = 600;
+
     public int $timeout = 7200;
 
-    public int $tries = 1;
+    /**
+     * Not a retry budget for the run — the engine never runs twice, because a
+     * second delivery no longer finds the participant Pending under its token
+     * and no-ops. More than one try only means a job redelivered after its
+     * worker was killed is acknowledged quietly rather than failed as
+     * "attempted too many times".
+     */
+    public int $tries = 3;
+
+    /** @var list<int> */
+    public array $backoff = [30, 120];
+
+    public bool $failOnTimeout = true;
 
     /** Set from the worker's signal handler; read by the engines' signal closure. */
     private bool $workerShuttingDown = false;
+
+    /** Another dispatch owns the participant now; this job must not write to it again. */
+    private bool $leaseLost = false;
+
+    /** Set when a rage-reserve window opened mid-pass and is why the engine was told to end it. */
+    private ?RageReserveWindow $openedReserve = null;
 
     public function __construct(
         public RunParticipant $participant,
@@ -161,6 +204,23 @@ abstract class RunJob implements Interruptible, ShouldQueue
             return;
         }
 
+        // A stale delivery: the participant has been re-dispatched since, and
+        // failing it here would kill a healthy run (and free its lock) over a
+        // job that stopped mattering hours ago.
+        if ($participant->dispatch_token !== $this->dispatchToken) {
+            return;
+        }
+
+        // The queue's own verdicts on a worker that went away mid-run — a
+        // redelivery past its tries, or a timeout (TimeoutExceededException is
+        // a MaxAttemptsExceededException). Nothing is wrong with the run
+        // itself, so it is re-driven, not failed.
+        if ($exception instanceof MaxAttemptsExceededException) {
+            app(WorkerDeathRecovery::class)->recover($participant, 'The worker driving this run died.');
+
+            return;
+        }
+
         $message = $exception?->getMessage() ?? 'The worker died before the run finished.';
 
         $participant->transition(RunStatus::Failed, Str::limit($message, 250));
@@ -181,7 +241,7 @@ abstract class RunJob implements Interruptible, ShouldQueue
 
     private function drive(RunParticipant $participant, Character $character, LoginService $loginService): void
     {
-        $participant->update(['status' => RunStatus::Running, 'started_at' => now()]);
+        $participant->update(['status' => RunStatus::Running, 'started_at' => now(), 'heartbeat_at' => now()]);
         $character->update(['status' => CharacterActivity::Running]);
 
         $run = $participant->run;
@@ -211,13 +271,26 @@ abstract class RunJob implements Interruptible, ShouldQueue
                 return;
             }
 
+            // Saving rage for an event the user picked: park before spending any.
+            $reserve = app(RageReserveGate::class)->nextWindowFor($run, $character);
+
+            if ($reserve !== null && $reserve->isOpen()) {
+                $this->parkForRageReserve($participant, $recorder, $reserve);
+
+                return;
+            }
+
             $outcome = $this->runEngine(
                 $character,
                 $participant,
                 log: $log,
-                signal: $this->signalClosure($participant, $this->circumspectExpiryFor($character, $run), $character),
+                signal: $this->signalClosure($participant, $this->circumspectExpiryFor($character, $run), $character, $reserve),
                 ensureBuffs: $this->ensureBuffsClosure($run, $ensurer, $log, $recorder),
                 onBattle: function (BattleEvent $event) use ($participant): void {
+                    // Every engine reports each fight here, which makes this
+                    // the one place a battle learns which run it belongs to.
+                    $event->update(['run_id' => $participant->run_id]);
+
                     match ($event->outcome) {
                         BattleOutcome::Win => $participant->increment('wins'),
                         BattleOutcome::Loss => $participant->increment('losses'),
@@ -229,30 +302,128 @@ abstract class RunJob implements Interruptible, ShouldQueue
                 },
             );
 
+            if (! $this->holdsLease($participant)) {
+                return;
+            }
+
+            // The pass was ended for the reserve window, which the engine only
+            // knows as "end now and keep your progress" — say the real reason
+            // and resume when the event is over, not in a minute.
+            if ($this->openedReserve !== null && $outcome->status === RunStatus::Waiting) {
+                $outcome = new ParticipantOutcome(
+                    RunStatus::Waiting,
+                    $this->openedReserve->reason(),
+                    $this->openedReserve->resumeAt,
+                    $outcome->progress,
+                );
+            }
+
             $participant->transition(
                 $outcome->status,
                 $outcome->reason,
                 $outcome->resumeAt,
-                // A clean engine return proves the session works again.
-                array_merge($outcome->progress ?? [], ['relogin_attempts' => 0]),
+                // A clean engine return proves the session, the network and
+                // the worker all held up, so every recovery budget starts over.
+                array_merge($outcome->progress ?? [], [
+                    'relogin_attempts' => 0,
+                    'transient_failures' => 0,
+                    'worker_deaths' => 0,
+                ]),
             );
 
             $this->recordOutcome($recorder, $outcome);
         } catch (SessionCollisionException) {
-            $this->recoverSession($participant, $character, $loginService);
+            if ($this->holdsLease($participant)) {
+                $this->recoverSession($participant, $character, $loginService);
+            }
         } catch (Throwable $exception) {
-            $participant->transition(RunStatus::Failed, $exception->getMessage());
-            $recorder->record(
-                RunEventType::Failed,
-                $exception->getMessage(),
-                ['exception' => $exception::class],
-                RunEvent::LEVEL_ERROR,
-            );
+            if (! $this->holdsLease($participant)) {
+                return;
+            }
 
-            throw $exception;
+            if (app(TransientFailure::class)->matches($exception)) {
+                $this->recoverFromTransient($participant, $recorder, $exception);
+
+                return;
+            }
+
+            $this->failParticipant($participant, $recorder, $exception);
+
+            // Terminal, and said so explicitly: the job is marked failed for
+            // the dashboard without leaning on the retry budget to stop it.
+            report($exception);
+            $this->fail($exception);
         } finally {
-            $participant->run->refreshStatus();
+            if (! $this->leaseLost) {
+                $participant->run->refreshStatus();
+            }
         }
+    }
+
+    /**
+     * Whether this job still owns the participant. Checked before every write
+     * that ends the pass; the signal closure keeps the flag current in between.
+     */
+    private function holdsLease(RunParticipant $participant): bool
+    {
+        if (! $this->leaseLost) {
+            $this->leaseLost = RunParticipant::whereKey($participant->id)->value('dispatch_token') !== $this->dispatchToken;
+        }
+
+        return ! $this->leaseLost;
+    }
+
+    private function parkForRageReserve(RunParticipant $participant, RunEventRecorder $recorder, RageReserveWindow $reserve): void
+    {
+        $participant->transition(RunStatus::Waiting, $reserve->reason(), $reserve->resumeAt);
+        $recorder->record(RunEventType::Parked, $reserve->reason(), [
+            'status' => RunStatus::Waiting->value,
+            'resume_at' => $reserve->resumeAt->toIso8601String(),
+            'reserve_for' => $reserve->event->value,
+        ]);
+    }
+
+    private function failParticipant(RunParticipant $participant, RunEventRecorder $recorder, Throwable $exception): void
+    {
+        $participant->transition(RunStatus::Failed, $exception->getMessage());
+        $recorder->record(
+            RunEventType::Failed,
+            $exception->getMessage(),
+            ['exception' => $exception::class],
+            RunEvent::LEVEL_ERROR,
+        );
+    }
+
+    /**
+     * A blip that says nothing about the run (see TransientFailure): park
+     * briefly and let the resume scheduler try again. Bounded, like every
+     * park, so an outage that never ends still fails loudly.
+     */
+    private function recoverFromTransient(RunParticipant $participant, RunEventRecorder $recorder, Throwable $exception): void
+    {
+        $failures = (int) ($participant->progress['transient_failures'] ?? 0) + 1;
+
+        if ($failures > self::MAX_TRANSIENT_FAILURES) {
+            $this->failParticipant($participant, $recorder, $exception);
+
+            return;
+        }
+
+        $resumeAt = now()->addSeconds(self::TRANSIENT_RETRY_SECONDS);
+        $reason = Str::limit("Connection trouble — retrying at {$resumeAt->format('H:i')}: {$exception->getMessage()}", 250);
+
+        $participant->transition(RunStatus::Waiting, $reason, $resumeAt, ['transient_failures' => $failures]);
+        $recorder->record(
+            RunEventType::Parked,
+            $reason,
+            [
+                'status' => RunStatus::Waiting->value,
+                'resume_at' => $resumeAt->toIso8601String(),
+                'exception' => $exception::class,
+                'attempt' => $failures,
+            ],
+            RunEvent::LEVEL_WARNING,
+        );
     }
 
     /**
@@ -475,16 +646,37 @@ abstract class RunJob implements Interruptible, ShouldQueue
         RunParticipant $participant,
         ?CarbonInterface $circumspectExpiresAt = null,
         ?Character $character = null,
+        ?RageReserveWindow $reserve = null,
     ): Closure {
         $calls = 0;
+        $lastHeartbeat = now();
+        $passEndsAt = now()->addSeconds($this->timeout - self::PASS_END_MARGIN_SECONDS);
 
-        return function () use ($participant, &$calls, &$circumspectExpiresAt, $character): RunSignal {
+        return function () use ($participant, &$calls, &$lastHeartbeat, $passEndsAt, &$circumspectExpiresAt, $character, $reserve): RunSignal {
             $calls++;
 
-            $signal = $participant->run->currentSignal();
+            // Lost the participant to another dispatch: end the pass like a
+            // worker shutdown, and drive() then leaves the participant alone.
+            if ($this->leaseLost || ! $this->beat($participant, $lastHeartbeat)) {
+                return RunSignal::WorkerShutdown;
+            }
+
+            $signal = $this->cachedSignal($participant);
 
             if ($signal !== RunSignal::None) {
                 return $signal;
+            }
+
+            if ($passEndsAt->isPast()) {
+                return RunSignal::WorkerShutdown;
+            }
+
+            // The reserve window was still ahead at pickup and has opened
+            // since: end the pass the same way, and drive() parks it properly.
+            if ($reserve !== null && $reserve->isOpen()) {
+                $this->openedReserve = $reserve;
+
+                return RunSignal::WorkerShutdown;
             }
 
             // The worker is quitting, so the pass ends here whatever happens.
@@ -517,6 +709,45 @@ abstract class RunJob implements Interruptible, ShouldQueue
 
             return RunSignal::None;
         };
+    }
+
+    /**
+     * Prove this job is alive, at most once per heartbeat interval. The stamp
+     * is conditional on the dispatch token, so the same query is also how a
+     * job learns it has been superseded.
+     *
+     * @return bool false when the participant now belongs to another dispatch
+     */
+    private function beat(RunParticipant $participant, CarbonInterface &$lastHeartbeat): bool
+    {
+        if ($lastHeartbeat->diffInSeconds(now()) < (int) config('outwar.runs.heartbeat_seconds')) {
+            return true;
+        }
+
+        $lastHeartbeat = now();
+
+        $stamped = RunParticipant::whereKey($participant->id)
+            ->where('dispatch_token', $this->dispatchToken)
+            ->toBase()
+            ->update(['heartbeat_at' => $lastHeartbeat]);
+
+        $this->leaseLost = $stamped === 0;
+
+        return ! $this->leaseLost;
+    }
+
+    /**
+     * The fast path of the control check. Redis being briefly unreachable must
+     * not end a run that only asked it whether to stop, so a failed read falls
+     * back to the row the signal mirrors.
+     */
+    private function cachedSignal(RunParticipant $participant): RunSignal
+    {
+        try {
+            return $participant->run->currentSignal();
+        } catch (RedisException) {
+            return $this->signalFromStatus($participant);
+        }
     }
 
     /** The authoritative read behind the cache signal: what the participant's own row asks for. */

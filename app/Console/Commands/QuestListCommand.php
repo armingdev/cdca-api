@@ -39,7 +39,7 @@ class QuestListCommand extends Command
             return self::FAILURE;
         }
 
-        if (QuestList::where('name', $name)->exists()) {
+        if (QuestList::whereNull('user_id')->where('name', $name)->exists()) {
             $this->error("Quest list '{$name}' already exists.");
 
             return self::FAILURE;
@@ -168,7 +168,7 @@ class QuestListCommand extends Command
             return null;
         }
 
-        $list = QuestList::with('items.quest')->where('name', $name)->first();
+        $list = QuestList::with('items.quest')->named($name)->first();
 
         if ($list === null) {
             $this->error("Quest list '{$name}' not found.");

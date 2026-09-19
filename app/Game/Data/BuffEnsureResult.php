@@ -22,6 +22,9 @@ final readonly class BuffEnsureResult
 
     public const string REASON_REFUSED = 'refused';
 
+    /** Refused on an earlier pass and still backing off — not attempted this time. */
+    public const string REASON_BACKING_OFF = 'backing_off';
+
     /**
      * @param  list<array{skill_id: int, name: string}>  $cast
      * @param  list<array{skill_id: int, name: string, reason: string}>  $skipped

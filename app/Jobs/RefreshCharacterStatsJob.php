@@ -20,7 +20,8 @@ class RefreshCharacterStatsJob implements ShouldBeUnique, ShouldQueue
 {
     use Queueable, SerializesModels;
 
-    public int $timeout = 30;
+    /** One worst-case game request is ~50s (throttle lock + three 12s attempts). */
+    public int $timeout = 90;
 
     public int $tries = 1;
 

@@ -20,31 +20,62 @@ use App\Models\PlayerCharacter;
  */
 class CrewMembersTargetSource implements PvpTargetSource
 {
+    /**
+     * @param  list<int>  $gameCrewIds
+     */
     public function __construct(
         private readonly Character $character,
         private readonly GameClient $client,
         private readonly CrewRosterParser $parser,
-        private readonly int $gameCrewId,
+        private readonly array $gameCrewIds,
     ) {}
 
     public static function forCrew(Character $character, int $gameCrewId): self
+    {
+        return self::forCrews($character, [$gameCrewId]);
+    }
+
+    /**
+     * @param  list<int>  $gameCrewIds
+     */
+    public static function forCrews(Character $character, array $gameCrewIds): self
     {
         return new self(
             $character,
             GameClient::forCharacter($character),
             app(CrewRosterParser::class),
-            $gameCrewId,
+            array_values(array_unique($gameCrewIds)),
         );
+    }
+
+    /**
+     * Every crew's roster, one after the other in the order the crews were
+     * given. One crew_profile.php read per crew; a player listed twice (a
+     * roster caught mid-transfer) is only targeted once.
+     *
+     * @return list<AttackTarget>
+     */
+    public function targets(): array
+    {
+        $targets = [];
+
+        foreach ($this->gameCrewIds as $gameCrewId) {
+            foreach ($this->rosterTargets($gameCrewId) as $target) {
+                $targets[$target->playerId] ??= $target;
+            }
+        }
+
+        return array_values($targets);
     }
 
     /**
      * @return list<AttackTarget>
      */
-    public function targets(): array
+    private function rosterTargets(int $gameCrewId): array
     {
         $roster = $this->parser->parse(
-            $this->client->get('crew_profile.php', ['id' => $this->gameCrewId])->body(),
-            $this->gameCrewId,
+            $this->client->get('crew_profile.php', ['id' => $gameCrewId])->body(),
+            $gameCrewId,
         );
 
         $crew = Crew::updateOrCreate(
@@ -73,6 +104,8 @@ class CrewMembersTargetSource implements PvpTargetSource
 
     public function label(): string
     {
-        return "crew members (crew {$this->gameCrewId})";
+        return count($this->gameCrewIds) === 1
+            ? "crew members (crew {$this->gameCrewIds[0]})"
+            : 'crew members (crews '.implode(', ', $this->gameCrewIds).')';
     }
 }
