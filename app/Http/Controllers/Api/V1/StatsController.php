@@ -2,14 +2,17 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Game\Combat\DropTotals;
 use App\Game\Enums\BattleOutcome;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\IndexBattleEventsRequest;
+use App\Http\Requests\IndexDropStatsRequest;
 use App\Http\Resources\BattleEventResource;
 use App\Models\BattleEvent;
 use App\Models\Character;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 
@@ -28,6 +31,33 @@ class StatsController extends Controller
             ->paginate($request->integer('per_page', 50));
 
         return BattleEventResource::collection($events);
+    }
+
+    /**
+     * Drop totals across the whole fleet: "how many potions have dropped",
+     * whichever runs and characters they came from. Narrowed by date range,
+     * character, mob or run; `group_by=mob` splits each item by its source.
+     */
+    public function drops(IndexDropStatsRequest $request, DropTotals $totals): JsonResponse
+    {
+        $battles = BattleEvent::query()
+            ->whereIn('battle_events.character_id', Character::query()
+                ->select('id')
+                ->whereHas('rga', fn ($query) => $query->where('user_id', $request->user()->id)))
+            ->when($request->validated('from'), fn ($query, $from) => $query->where('occurred_at', '>=', Carbon::parse($from)))
+            ->when($request->validated('to'), fn ($query, $to) => $query->where('occurred_at', '<=', Carbon::parse($to)))
+            ->when($request->integer('character_id'), fn ($query, $id) => $query->where('battle_events.character_id', $id))
+            ->when($request->integer('mob_id'), fn ($query, $id) => $query->where('battle_events.mob_id', $id))
+            ->when($request->integer('run_id'), fn ($query, $id) => $query->where('battle_events.run_id', $id));
+
+        $rows = $request->validated('group_by') === 'mob'
+            ? $totals->byDropAndMob($battles)
+            : $totals->byDrop($battles);
+
+        return response()->json([
+            'drops' => $rows,
+            'total' => $rows->sum('count'),
+        ]);
     }
 
     /**

@@ -48,6 +48,9 @@ class SkillCaster
         // clearing them re-arms the local estimate (see CharacterSkill).
         $this->stateFor($skill)->update([
             'last_cast_at' => now(),
+            // A cast that went off ends any refusal backoff.
+            'cast_refusals' => 0,
+            'cast_refused_until' => null,
             'recharge_until' => null,
             'recharge_synced_at' => null,
             'buff_until' => null,

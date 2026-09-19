@@ -23,7 +23,8 @@ class SyncRgaCharactersJob implements ShouldBeUnique, ShouldQueue
 {
     use Queueable, SerializesModels;
 
-    public int $timeout = 120;
+    /** Several roster pages per server; must stay under the redis connection's retry_after. */
+    public int $timeout = 240;
 
     public int $tries = 1;
 

@@ -4,6 +4,12 @@ use Illuminate\Support\Facades\Schedule;
 
 Schedule::command('outwar:runs-restart-due')->everyMinute()->withoutOverlapping()->onOneServer();
 Schedule::command('outwar:runs-resume-due')->everyMinute()->withoutOverlapping()->onOneServer();
+
+// A worker killed outright (OOM, hard restart) cannot report its own death;
+// without this its participants sit at "Running" until the queue redelivers
+// the job two hours later.
+Schedule::command('outwar:runs-recover-stalled')->everyMinute()->withoutOverlapping()->onOneServer();
+
 Schedule::command('outwar:stats-refresh-stale')->everyFiveMinutes()->withoutOverlapping()->onOneServer();
 
 // Brawl windows are fortnightly, so an hourly read is ample to keep the

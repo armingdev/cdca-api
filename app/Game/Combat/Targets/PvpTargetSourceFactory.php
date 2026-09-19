@@ -49,10 +49,10 @@ class PvpTargetSourceFactory
 
     private static function crewMembers(Character $character, PvpRunConfig $config): PvpTargetSource
     {
-        if ($config->crewGameId === null) {
-            throw new GameException('Crew-members mode needs a crew id.');
+        if ($config->crewGameIds === []) {
+            throw new GameException('Crew-members mode needs at least one crew id.');
         }
 
-        return CrewMembersTargetSource::forCrew($character, $config->crewGameId);
+        return CrewMembersTargetSource::forCrews($character, $config->crewGameIds);
     }
 }

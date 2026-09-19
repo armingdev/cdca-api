@@ -3,11 +3,14 @@
 namespace App\Game\World;
 
 use App\Game\Data\RoomBlob;
+use App\Game\Enums\RunSignal;
 use App\Game\Exceptions\DesyncException;
 use App\Game\Exceptions\GatedRoomException;
+use App\Game\Exceptions\RunInterruptedException;
 use App\Game\Http\GameClient;
 use App\Game\Parsers\RoomBlobParser;
 use App\Models\Character;
+use Closure;
 
 /**
  * Executes movement for one character: one move = one ajax_changeroomb.php
@@ -17,6 +20,9 @@ use App\Models\Character;
  */
 class Navigator
 {
+    /** @var (Closure(): RunSignal)|null */
+    private ?Closure $signal = null;
+
     public function __construct(
         private readonly Character $character,
         private readonly GameClient $client,
@@ -54,15 +60,36 @@ class Navigator
     }
 
     /**
+     * Let a run's control signal cut a walk short. A long path is dozens of
+     * throttled requests, and without this a stop or pause waits for the
+     * character to arrive before anything looks at it.
+     *
+     * @param  (Closure(): RunSignal)|null  $signal
+     */
+    public function interruptWith(?Closure $signal): void
+    {
+        $this->signal = $signal;
+    }
+
+    /**
      * Walk a BFS path (list of room ids beginning at the current room).
      *
      * @param  list<int>  $path
+     *
+     * @throws RunInterruptedException between two steps, when the run's signal asks the pass to end
      */
     public function walk(array $path): ?RoomBlob
     {
         $blob = null;
 
         for ($i = 1; $i < count($path); $i++) {
+            // Between steps the character stands in a known room, so stopping
+            // here leaves nothing half-done. The first step is never checked:
+            // the engine looked at the signal just before it planned the walk.
+            if ($i > 1 && $this->signal !== null && ($signal = ($this->signal)()) !== RunSignal::None) {
+                throw new RunInterruptedException($signal);
+            }
+
             $blob = $this->stepTo($path[$i], $path[$i - 1]);
         }
 

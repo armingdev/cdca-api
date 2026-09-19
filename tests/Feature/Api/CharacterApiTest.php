@@ -263,3 +263,42 @@ it('reports the resolved buff and cooldown windows on each skill row', function 
         ->and($idle['buff_ends_at'])->toBeNull()
         ->and($idle['cooldown_ends_at'])->toBeNull();
 });
+
+it('lists same-level characters in one stable order however their rows were last written', function () {
+    $zed = Character::factory()->for($this->rga)->create(['level' => 95, 'name' => 'Zed']);
+    $amy = Character::factory()->for($this->rga)->create(['level' => 95, 'name' => 'Amy']);
+    $low = Character::factory()->for($this->rga)->create(['level' => 10, 'name' => 'Aaa']);
+
+    // A run touching a character rewrites its row, which is what used to move
+    // it within its level group between two polls of the fleet grid.
+    $amy->update(['rage' => 1]);
+    $zed->update(['rage' => 2]);
+
+    $this->getJson('/api/v1/characters')
+        ->assertOk()
+        ->assertJsonPath('data.*.id', [$amy->id, $zed->id, $low->id]);
+});
+
+it('filters the fleet to own characters or trustees and says which is which', function () {
+    $own = Character::factory()->for($this->rga)->create();
+    $trustee = Character::factory()->for($this->rga)->trustee()->create();
+
+    $this->getJson('/api/v1/characters?ownership=own')
+        ->assertOk()
+        ->assertJsonPath('data.*.id', [$own->id])
+        ->assertJsonPath('data.0.is_trustee', false);
+
+    $this->getJson('/api/v1/characters?ownership=trustee')
+        ->assertOk()
+        ->assertJsonPath('data.*.id', [$trustee->id])
+        ->assertJsonPath('data.0.is_trustee', true);
+});
+
+it('returns 422 for an ownership filter or server it does not know', function (array $query, string $field) {
+    $this->getJson('/api/v1/characters?'.http_build_query($query))
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors($field);
+})->with([
+    'unknown ownership' => [['ownership' => 'borrowed'], 'ownership'],
+    'unknown server' => [['server_id' => 3], 'server_id'],
+]);

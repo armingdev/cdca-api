@@ -8,17 +8,18 @@ use App\Game\Enums\RunMode;
  * Per-run PvP options — stored as the run's jsonb config.
  *
  * The five PvP modes share this shape and differ only in which target-source
- * field they read (`targets`, `attackListId`, `crewGameId`, brawl type).
+ * field they read (`targets`, `attackListId`, `crewGameIds`, brawl type).
  */
 final readonly class PvpRunConfig
 {
     /**
      * @param  list<string>  $targets  player names, for ad-hoc attack-list runs
+     * @param  list<int>  $crewGameIds  the game's crew ids whose rosters a crew-members run attacks
      */
     public function __construct(
         public array $targets = [],
         public ?int $attackListId = null,
-        public ?int $crewGameId = null,
+        public array $crewGameIds = [],
         public int $attacksPerTarget = 1,
         public int $stopRage = 2500,
         public string $message = '',
@@ -36,7 +37,11 @@ final readonly class PvpRunConfig
         return new self(
             targets: array_values($config['targets'] ?? []),
             attackListId: isset($config['attack_list_id']) ? (int) $config['attack_list_id'] : null,
-            crewGameId: isset($config['crew_game_id']) ? (int) $config['crew_game_id'] : null,
+            // Runs stored before multi-crew support carry a single crew_game_id.
+            crewGameIds: array_values(array_unique(array_map(
+                intval(...),
+                $config['crew_game_ids'] ?? array_filter([$config['crew_game_id'] ?? null]),
+            ))),
             attacksPerTarget: (int) ($config['attacks_per_target'] ?? 1),
             stopRage: (int) ($config['stop_rage'] ?? 2500),
             message: (string) ($config['message'] ?? ''),
@@ -63,7 +68,10 @@ final readonly class PvpRunConfig
         $config = [
             'targets' => $this->targets,
             'attack_list_id' => $this->attackListId,
-            'crew_game_id' => $this->crewGameId,
+            'crew_game_ids' => $this->crewGameIds,
+            // Deprecated mirror of the first crew, for clients that predate
+            // multi-crew runs.
+            'crew_game_id' => $this->crewGameIds[0] ?? null,
             'attacks_per_target' => $this->attacksPerTarget,
             'stop_rage' => $this->stopRage,
             'message' => $this->message,
@@ -86,10 +94,10 @@ final readonly class PvpRunConfig
     private static function irrelevantKeys(RunMode $mode): array
     {
         return match ($mode) {
-            RunMode::PvpAttackList => ['crew_game_id', 'auto_enter_brawl'],
-            RunMode::PvpCrewHitlist => ['targets', 'attack_list_id', 'crew_game_id', 'auto_enter_brawl'],
+            RunMode::PvpAttackList => ['crew_game_ids', 'crew_game_id', 'auto_enter_brawl'],
+            RunMode::PvpCrewHitlist => ['targets', 'attack_list_id', 'crew_game_ids', 'crew_game_id', 'auto_enter_brawl'],
             RunMode::PvpCrewMembers => ['targets', 'attack_list_id', 'auto_enter_brawl'],
-            RunMode::PvpBrawl, RunMode::PvpFactionBrawl => ['targets', 'attack_list_id', 'crew_game_id'],
+            RunMode::PvpBrawl, RunMode::PvpFactionBrawl => ['targets', 'attack_list_id', 'crew_game_ids', 'crew_game_id'],
             default => [],
         };
     }

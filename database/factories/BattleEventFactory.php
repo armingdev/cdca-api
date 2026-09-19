@@ -21,6 +21,7 @@ class BattleEventFactory extends Factory
     {
         return [
             'character_id' => Character::factory(),
+            'run_id' => null,
             'mob_id' => null,
             'room_id' => null,
             'battle_id' => fake()->unique()->numberBetween(1, 2 ** 40),

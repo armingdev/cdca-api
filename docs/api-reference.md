@@ -165,10 +165,15 @@ characters appear under `GET /characters` with live stats filling in.
 ## 5. Characters
 
 ### `GET /characters`
-All your characters (across RGAs), ordered by level desc. Filters:
-`?server_id=1|2`, `?rga_id={id}`.
+All your characters (across RGAs), in one stable order: level desc, then
+name, then id (rows with equal levels never swap between two polls). Filters:
+`?server_id=1|2`, `?rga_id={id}`, `?ownership=own|trustee`.
+
+`is_trustee` marks a character another RGA shared with this one (it shows up
+in the account's roster but is not its own). It is set by the roster sync
+from each server's `ajax/trusteeList.php`.
 ```json
-{ "data": [ { "id": 5, "rga_id": 1, "suid": 2403, "server_id": 1,
+{ "data": [ { "id": 5, "rga_id": 1, "is_trustee": false, "suid": 2403, "server_id": 1,
   "server": "sigil", "name": "RealLinuXX", "level": 95, "rage": 244093,
   "exp": 169548518310, "crew": "Collective 2", "current_room_id": 258,
   "home_tavern_room_id": 376, "status": "running", "last_stats_at": "…" } ] }
@@ -286,6 +291,16 @@ areas no walk reaches.
   { "mobs": [ { "name": "Kix Harvester", "total": 2595, "wins": 2595, "losses": 0 } ],
     "drops": [ { "drop_name": "Kix Potion", "count": 255 } ] }
   ```
+- `GET /stats/drops` — drop totals across **all** your characters and runs.
+  Filters: `from`, `to` (dates; `to` ≥ `from`), `character_id`, `mob_id`,
+  `run_id`; `group_by=drop` (default) or `mob`. Plain arrays, no `data`
+  envelope:
+  ```json
+  { "drops": [ { "drop_name": "Amdir Potion", "count": 41 } ], "total": 41 }
+  ```
+  `group_by=mob` adds `mob_id` and `mob_name` to each row (both `null` for a
+  drop with no source mob, e.g. PvP). Filtering by a character or run that is
+  not yours simply yields nothing.
 
 ---
 
@@ -297,6 +312,11 @@ areas no walk reaches.
   Circle of Protection = `14`.
 - `GET /world/mobs?q={name}&per_page=50` — search known mobs by name
   (paginated), for picking farm/attack targets. Each item includes `room_ids`.
+- `GET /crews?search={name or game crew id}&server_id=1|2&per_page=25` — crews
+  the app has seen so far (a crew is recorded the first time a run reads its
+  roster), for picking `crew_game_ids`. Game-world data, the same for every
+  user. Each item: `{ id, server_id, server, game_crew_id, name, leader,
+  total_members, average_level, members_synced_at }`. `per_page` ≤ 100.
 - `GET /world/rooms/{roomId}` — a mapped room with its exits + mobs:
   ```json
   { "data": { "id": 11, "name": "Intersection",
@@ -312,22 +332,47 @@ sparse. That's a backend/ops concern, not a client one.)*
 
 ## 7. Quest lists
 
-A quest list is a named, ordered set of quests, run in sequence by `quest-list`
-mode. **Note:** because there is no quest catalog yet, each item carries the
-giver **npc_name** + **quest_id** explicitly.
+A quest list is a named, ordered set of catalog quests, run in sequence by
+`quest-list` mode. Items reference the quest catalog (`quest_id` is the
+catalog row's `id`; the giver and the game's quest id come from it). Names are
+unique **per user**.
 
 - `GET /quest-lists` — your lists with `items_count`.
-- `POST /quest-lists` — `{ "name": "Armins List" }` → `201`.
-- `GET /quest-lists/{id}` — the list with its ordered `items`:
+  `?scope=community` instead lists what you can read but do not own: lists
+  other users published, plus the built-in ones (`shared_by` is the owner's
+  name, `null` for built-in).
+- `POST /quest-lists` — `{ "name": "Armins List", "is_public": false }` → `201`.
+- `GET /quest-lists/{id}` — the list with its ordered `items`. Yours, or any
+  shared one; `403` for someone else's private list.
   ```json
-  { "data": { "id": 1, "name": "Armins List", "items_count": 2,
-    "items": [ { "id": 10, "position": 1, "quest_id": 742, "npc_name": "Stella",
-      "label": "Street Crawler", "display_name": "Street Crawler" } ] } }
+  { "data": { "id": 1, "name": "Armins List", "is_public": false, "is_mine": true,
+    "items_count": 2,
+    "items": [ { "id": 10, "position": 1, "quest_id": 311, "label": null,
+      "quest": { "id": 311, "game_quest_id": 742, "name": "Street Crawler",
+        "giver": "Stella", "required_level": 1, "total_exp": 1200 },
+      "display_name": "Street Crawler" } ] } }
   ```
+- `PATCH /quest-lists/{id}` — `{ "name"?, "is_public"? }`, owner only. Publishing
+  makes the list readable and copyable by every user; only copies can be
+  edited or run by them.
+- `POST /quest-lists/{id}/copy` → `201`, a private copy (items and labels
+  included) in your lists. A taken name becomes "Name (2)".
+- `POST /quest-lists/import` → `201`. Multipart `file` (≤ 256 KB, text or
+  JSON — the extension is irrelevant) **or** JSON `{ "text": "…", "name": "…" }`.
+  Understands dDCT quest lists (`{"Name": "75 Caverns", "QuestNames": ["…"]}`;
+  `name` optional) and plain text (one quest **name or game quest id** per
+  line, `#` comments and blank lines ignored; `name` required). The response
+  is the list plus
+  ```json
+  "import": { "imported": 17, "unmatched": ["Renamed Quest"], "ambiguous": ["Aura EXP"] }
+  ```
+  `unmatched` lines matched no catalog quest; `ambiguous` names belong to more
+  than one quest (the lowest-level one was used). `422 { message }` when
+  nothing matched, a dDCT file has no `QuestNames`, or no name could be found.
 - `DELETE /quest-lists/{id}` — delete the list.
 - `POST /quest-lists/{id}/items` — append a quest:
-  `{ "quest_id": 742, "npc_name": "Stella", "label": "Street Crawler" }`
-  (`label` optional). Returns the full list.
+  `{ "quest_id": 311, "label": "Street Crawler" }` (`label` optional).
+  Returns the full list.
 - `DELETE /quest-lists/{id}/items/{position}` — remove the item at that
   1-based position; remaining positions close up. Returns the full list.
 
@@ -343,7 +388,8 @@ participant row live.
 Common fields (all modes):
 | Field | Type | Notes |
 |---|---|---|
-| `mode` | enum | `mob` · `quest` · `quest-list` · `pvp` (required) |
+| `mode` | enum | `mob` · `quest` · `quest-list` · `pvp-attack-list` · `pvp-crew-hitlist` · `pvp-crew-members` · `pvp-brawl` · `pvp-faction-brawl` (required) |
+| `name` | string? | a label for the run, max 80. Rename later with `PATCH /runs/{id}` |
 | `characters` | int[] | your character ids (required, ≥1). `422` if any isn't yours |
 | `stop_rage` | int | rage-pool floor; stop below it (default 2500) |
 | `level_up` | bool | level up (refills rage) instead of stopping when low |
@@ -353,14 +399,18 @@ Common fields (all modes):
 | `require_circumspect` | bool | run on the Circumspect cycle: cast it when possible, otherwise park `waiting` and auto-resume when its cooldown ends |
 | `restart_every_minutes` | int? | re-dispatch this run every N minutes after it **completes** |
 | `start_at` | datetime? | delay the first start until this time (run stays `pending` until then) |
+| `reserve_rage_for` | string[] | `pvp-brawl` · `faction-brawl`. Within `reserve_rage_hours` of that event on the character's server the participant parks `waiting` ("Saving rage for the PvP Brawl …") and resumes when the event window closes. Ignored by the two brawl modes. Event times come from the hourly brawl sync |
+| `reserve_rage_hours` | int | 1–72, default 12 |
 
 Mode-specific fields:
 | Mode | Fields |
 |---|---|
 | `mob` | `mobs`: string[] (exact mob names, required); `max_kills`: int (0 = unlimited, counted across passes); `run_count`: int (full passes per character; 0/absent = farm indefinitely, waiting out respawns — send 1 for a single pass); `attack_interval_seconds`: int 60–86400 (wait between passes); `drop_junk`: bool |
-| `quest` | `npc`: string (giver name, required); `quest_id`: int (required); `respawn_wait_seconds`: int 60–86400 (default 60, wait before retrying an objective whose targets are all dead) |
+| `quest` | **either** `catalog_quest_id`: int (a quest `id` from `GET /quests`; the giver and game quest id are taken from the catalog, `422` if the catalog has no giver for it) **or** `npc`: string (giver name) + `quest_id`: int (the *game's* quest id); `respawn_wait_seconds`: int 60–86400 (default 60, wait before retrying an objective whose targets are all dead) |
 | `quest-list` | `quest_list_id`: int (required, must be yours); `respawn_wait_seconds`: int 60–86400 (default 60) |
-| `pvp` | `targets`: string[] (player names, required); `attack_rage`: int 2–50 (default 50); `attacks_per_target`: int (default 1); `message`: string? |
+| `pvp-attack-list` | `attack_list_id`: int (yours) **or** `targets`: string[]; `attacks_per_target`, `max_attacks`, `skip_too_strong`, `cooldown_minutes` (1–60), `message` |
+| `pvp-crew-members` | `crew_game_ids`: int[] (1–10 distinct game crew ids — find them with `GET /crews`; the single `crew_game_id` is still accepted). Rosters are attacked in the order given. `config.crew_game_id` mirrors the first id and is deprecated |
+| `pvp-crew-hitlist` · `pvp-brawl` · `pvp-faction-brawl` | no target fields (`auto_enter_brawl`: bool for the brawl modes) |
 
 Example (mob mode, fleet of 2, cast skills + Circ gate):
 ```json
@@ -413,12 +463,30 @@ paused participant — skill options (cast-on-start selection, Circumspect
 gate) are re-applied at pickup, so changing the skill selection while paused
 takes effect, and each character continues from its persisted `progress`.
 
+### `PATCH /runs/{id}`
+`{ "name": "sub85 veldara" }` (or `null` to clear). Allowed in any status;
+`403` if the run is not yours. Nothing else about a run is editable.
+
 ### `DELETE /runs/{id}`
 Delete a **finished** run and its participants. `422` while live or parked
 (stop it first).
 
 ### `GET /runs/{id}/battles?per_page=50`
-All battle events across the run's characters (paginated, newest first).
+The battles **this run** fought (paginated, newest first) — every battle is
+tagged with its `run_id`. Runs recorded before tagging existed fall back to
+their characters' battles since the run was created.
+
+### `GET /runs/{id}/drops`
+What this run has dropped, per item and source mob (same shape as
+`GET /stats/drops?group_by=mob`).
+
+### Recovery parks (not errors)
+A participant can park `waiting` for reasons that have nothing to do with the
+game: "The worker driving this run died / stopped responding. Resuming
+shortly." (a worker was killed; bounded by `progress.worker_deaths`, fails
+after 3 in a row) and "Connection trouble — retrying at HH:MM: …" (network,
+Redis or database blip; bounded by `progress.transient_failures`, fails after
+5 in a row). Both counters reset after any pass that ends cleanly.
 
 **Participant status lifecycle:** `pending` → `running` → terminal
 (`completed` | `stopped` | `failed`) or parked (`waiting` with `resume_at`,
@@ -436,12 +504,14 @@ line (e.g. `"Beat Kix Harvester (+379 exp)"`).
 
 Returned by `/characters/{id}/battles` and `/runs/{id}/battles`:
 ```json
-{ "id": 900, "character_id": 5, "kind": "pve", "outcome": "win",
+{ "id": 900, "character_id": 5, "run_id": 12, "kind": "pve", "outcome": "win",
   "mob_id": 7, "mob": "Kix Harvester", "opponent_name": null,
   "room_id": 258, "battle_id": 20070546825,
   "exp_gained": 1001, "gold_gained": 125, "drop_name": "Thief Dagger",
   "fail_reason": null, "occurred_at": "…" }
 ```
+- `run_id` → the run that fought it; `null` for battles from console commands
+  and for everything recorded before 2026-09-19.
 - `kind: "pve"` → `mob`/`mob_id`/`room_id` set, `opponent_name` null.
 - `kind: "pvp"` → `opponent_name` set, `mob`/`room_id` null.
 - `outcome: "failed"` → `fail_reason` explains why (stale target, contention…).

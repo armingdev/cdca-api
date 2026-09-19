@@ -226,21 +226,31 @@ return [
             'maxJobs' => 0,
             'memory' => 128,
             'tries' => 1,
-            'timeout' => 60,
+            // Above the longest default-queue job (240) and below the redis
+            // connection's retry_after (300) — see config/queue.php.
+            'timeout' => 270,
             'nice' => 0,
         ],
 
         // One process per running character; a run job lives for the whole
         // attack loop, so the timeout chain is: job timeout (7200) <
         // supervisor timeout (7200) < redis-runs retry_after (7800).
+        //
+        // Size maxProcesses to the box, not to the fleet: a run worker sits at
+        // roughly 45MB base + 20MB room graph, peaking near 100MB while it
+        // loads. 25 of them on a 4GB server that also hosts Postgres, Redis
+        // and PHP-FPM got workers OOM-killed mid-run. Participants beyond the
+        // limit simply queue as Pending.
         'supervisor-runs' => [
             'connection' => 'redis-runs',
             'queue' => ['runs'],
             'balance' => 'simple',
-            'maxProcesses' => 10,
+            'maxProcesses' => (int) env('HORIZON_RUNS_MAX_PROCESSES', 10),
             'maxTime' => 0,
             'maxJobs' => 0,
-            'memory' => 128,
+            // Headroom over a worker's steady ~65MB so holding the graph does
+            // not get every worker recycled after each job.
+            'memory' => 192,
             'tries' => 1,
             'timeout' => 7200,
             'nice' => 0,
@@ -255,7 +265,7 @@ return [
                 'balanceCooldown' => 3,
             ],
             'supervisor-runs' => [
-                'maxProcesses' => 25,
+                'maxProcesses' => (int) env('HORIZON_RUNS_MAX_PROCESSES', 12),
             ],
         ],
 

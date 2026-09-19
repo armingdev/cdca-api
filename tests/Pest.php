@@ -93,6 +93,23 @@ function makeRunJob(RunParticipant $participant): RunJob
     };
 }
 
+/**
+ * An ajax/trusteeList.php dropdown body: the roster sync reads it next to
+ * accounts.php to tell an RGA's own characters from the trustees it was lent.
+ *
+ * @param  list<int>  $trusteeSuids
+ */
+function trusteeListJson(array $trusteeSuids = []): string
+{
+    return json_encode(['results' => [
+        ['text' => 'My Characters', 'children' => [['id' => 0, 'text' => '--Change Server--']]],
+        ['text' => 'Trustees', 'children' => array_map(
+            fn (int $suid): array => ['id' => (string) $suid, 'text' => "TRUSTEE{$suid}"],
+            $trusteeSuids,
+        )],
+    ]]);
+}
+
 /** One accounts.php row in the captured shape (name/level/crew font cells + PLAY! link). */
 function sigilAccountsHtml(int $level = 85): string
 {

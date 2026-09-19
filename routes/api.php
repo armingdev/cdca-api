@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\V1\CharacterController;
 use App\Http\Controllers\Api\V1\CharacterQuestProgressController;
 use App\Http\Controllers\Api\V1\CharacterSkillController;
 use App\Http\Controllers\Api\V1\CharacterTeleportController;
+use App\Http\Controllers\Api\V1\CrewController;
 use App\Http\Controllers\Api\V1\QuestController;
 use App\Http\Controllers\Api\V1\QuestListController;
 use App\Http\Controllers\Api\V1\QuestListItemController;
@@ -56,6 +57,7 @@ Route::prefix('v1')->group(function () {
 
         Route::get('characters/{character}/battles', [StatsController::class, 'battles']);
         Route::get('characters/{character}/stats', [StatsController::class, 'summary']);
+        Route::get('stats/drops', [StatsController::class, 'drops']);
 
         // Skill catalog (read-only).
         Route::get('skills', [SkillController::class, 'index']);
@@ -68,9 +70,12 @@ Route::prefix('v1')->group(function () {
         // World data (read-only).
         Route::get('world/rooms/{room}', [WorldController::class, 'showRoom']);
         Route::get('world/mobs', [WorldController::class, 'mobs']);
+        Route::get('crews', [CrewController::class, 'index']);
 
         // Quest lists + their ordered items.
-        Route::apiResource('quest-lists', QuestListController::class)->except(['update']);
+        Route::post('quest-lists/import', [QuestListController::class, 'import']);
+        Route::post('quest-lists/{questList}/copy', [QuestListController::class, 'copy']);
+        Route::apiResource('quest-lists', QuestListController::class);
         Route::post('quest-lists/{questList}/items', [QuestListItemController::class, 'store']);
         Route::delete('quest-lists/{questList}/items/{position}', [QuestListItemController::class, 'destroy']);
 
@@ -79,11 +84,12 @@ Route::prefix('v1')->group(function () {
         Route::delete('attack-lists/{attackList}/targets/{position}', [AttackListTargetController::class, 'destroy']);
 
         // Runs — the automation engine.
-        Route::apiResource('runs', RunController::class)->only(['index', 'store', 'show', 'destroy']);
+        Route::apiResource('runs', RunController::class)->only(['index', 'store', 'show', 'update', 'destroy']);
         Route::post('runs/{run}/stop', [RunController::class, 'stop']);
         Route::post('runs/{run}/pause', [RunController::class, 'pause']);
         Route::post('runs/{run}/resume', [RunController::class, 'resume']);
         Route::get('runs/{run}/battles', [RunController::class, 'battles']);
+        Route::get('runs/{run}/drops', [RunController::class, 'drops']);
         Route::get('runs/{run}/events', [RunController::class, 'events']);
     });
 });

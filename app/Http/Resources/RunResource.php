@@ -18,12 +18,15 @@ class RunResource extends JsonResource
     {
         return [
             'id' => $this->id,
+            'name' => $this->name,
             'mode' => $this->mode,
             'status' => $this->status,
             'config' => $this->config,
             'cast_on_start' => $this->cast_on_start,
             'require_circumspect' => $this->require_circumspect,
             'skill_ids' => $this->skill_ids,
+            'reserve_rage_for' => $this->reserve_rage_for ?? [],
+            'reserve_rage_hours' => $this->reserve_rage_hours,
             'restart_every_minutes' => $this->restart_every_minutes,
             'start_at' => $this->start_at,
             'last_started_at' => $this->last_started_at,

@@ -1,7 +1,9 @@
 <?php
 
+use App\Game\Enums\RunSignal;
 use App\Game\Exceptions\DesyncException;
 use App\Game\Exceptions\GatedRoomException;
+use App\Game\Exceptions\RunInterruptedException;
 use App\Game\World\Navigator;
 use App\Models\Character;
 use App\Models\Rga;
@@ -105,4 +107,28 @@ it('teleports to a bar and reloads the room', function () {
 
     Http::assertSent(fn ($request) => str_contains($request->url(), 'world.php')
         && str_contains($request->url(), 'teleport=1'));
+});
+
+it('abandons a walk between two steps when the run signals a stop', function () {
+    $character = Character::factory()->for(Rga::factory()->withSession())->create();
+    Http::fake(function ($request) {
+        parse_str((string) parse_url($request->url(), PHP_URL_QUERY), $query);
+
+        return Http::response(roomJson((int) $query['room']));
+    });
+    $navigator = Navigator::forCharacter($character);
+    $stopRequested = false;
+    $navigator->interruptWith(function () use (&$stopRequested): RunSignal {
+        $signal = $stopRequested ? RunSignal::Stop : RunSignal::None;
+        $stopRequested = true;
+
+        return $signal;
+    });
+
+    expect(fn () => $navigator->walk([1, 2, 3, 4, 5]))
+        ->toThrow(fn (RunInterruptedException $interrupt) => expect($interrupt->signal)->toBe(RunSignal::Stop));
+
+    // Stood in rooms 2 and 3, never set off for 4.
+    Http::assertSentCount(2);
+    expect($character->fresh()->current_room_id)->toBe(3);
 });

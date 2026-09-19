@@ -22,11 +22,14 @@ class Run extends Model
 
     protected $fillable = [
         'user_id',
+        'name',
         'mode',
         'config',
         'cast_on_start',
         'require_circumspect',
         'skill_ids',
+        'reserve_rage_for',
+        'reserve_rage_hours',
         'status',
         'restart_every_minutes',
         'start_at',
@@ -45,6 +48,8 @@ class Run extends Model
             'cast_on_start' => 'boolean',
             'require_circumspect' => 'boolean',
             'skill_ids' => 'array',
+            'reserve_rage_for' => 'array',
+            'reserve_rage_hours' => 'integer',
             'restart_every_minutes' => 'integer',
             'start_at' => 'datetime',
             'last_started_at' => 'datetime',

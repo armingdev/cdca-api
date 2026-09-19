@@ -64,11 +64,16 @@ return [
             'after_commit' => false,
         ],
 
+        // Short game reads (stats refresh, roster sync). One game request can
+        // legitimately take ~50s (throttle lock + three 12s attempts), so the
+        // chain is: longest job timeout (240) < supervisor-1 timeout (270) <
+        // retry_after (300). A reservation that expires under a live job gets
+        // it redelivered and failed as "attempted too many times".
         'redis' => [
             'driver' => 'redis',
             'connection' => env('REDIS_QUEUE_CONNECTION', 'default'),
             'queue' => env('REDIS_QUEUE', 'default'),
-            'retry_after' => (int) env('REDIS_QUEUE_RETRY_AFTER', 90),
+            'retry_after' => (int) env('REDIS_QUEUE_RETRY_AFTER', 300),
             'block_for' => null,
             'after_commit' => false,
         ],

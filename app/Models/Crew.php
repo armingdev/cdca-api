@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use Database\Factories\CrewFactory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -11,6 +13,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class Crew extends Model
 {
+    /** @use HasFactory<CrewFactory> */
+    use HasFactory;
+
     protected $fillable = [
         'server_id',
         'game_crew_id',

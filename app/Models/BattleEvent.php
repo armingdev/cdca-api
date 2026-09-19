@@ -21,6 +21,7 @@ class BattleEvent extends Model
 
     protected $fillable = [
         'character_id',
+        'run_id',
         'kind',
         'mob_id',
         'opponent_name',

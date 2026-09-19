@@ -20,12 +20,13 @@ use Illuminate\Support\Collection;
 #[Signature('outwar:run-start
     {--characters=* : Character ids or names to run}
     {--mode=mob : Run mode: mob, quest, quest-list, or pvp}
+    {--name= : A label for the run, shown in run lists}
     {--mob=* : (mob mode) Exact mob name(s) to farm}
     {--npc= : (quest mode) Exact quest-giver mob name}
     {--quest= : (quest mode) Quest id to run}
     {--list= : (quest-list mode) Quest list name}
     {--target=* : (pvp mode) Player name(s) to attack}
-    {--crew= : (pvp crew-members mode) Crew id to pull members from}
+    {--crew=* : (pvp crew-members mode) Crew id(s) to pull members from}
     {--auto-enter-brawl : (pvp brawl modes) Register for the round if not entered}
     {--attacks=1 : (pvp mode) Attacks per target}
     {--message= : (pvp mode) Optional attack message}
@@ -79,6 +80,7 @@ class RunStartCommand extends Command
                 requireCircumspect: (bool) $this->option('require-circ'),
                 restartEveryMinutes: $this->option('restart-every') !== null ? (int) $this->option('restart-every') : null,
                 startAt: $startAt,
+                name: $this->option('name'),
             );
         } catch (CharactersBusyException $exception) {
             $this->error($exception->getMessage());
@@ -133,7 +135,7 @@ class RunStartCommand extends Command
 
         return (new PvpRunConfig(
             targets: $targets,
-            crewGameId: $this->option('crew') !== null ? (int) $this->option('crew') : null,
+            crewGameIds: array_map(intval(...), (array) $this->option('crew')),
             attacksPerTarget: (int) $this->option('attacks'),
             stopRage: (int) $this->option('stop-rage'),
             message: (string) ($this->option('message') ?? ''),
@@ -200,7 +202,7 @@ class RunStartCommand extends Command
             return null;
         }
 
-        $list = QuestList::where('name', $this->option('list'))->first();
+        $list = QuestList::named($this->option('list'))->first();
 
         if ($list === null) {
             $this->error("Quest list '{$this->option('list')}' not found.");

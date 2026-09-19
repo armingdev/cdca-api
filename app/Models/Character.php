@@ -17,6 +17,7 @@ class Character extends Model
 
     protected $fillable = [
         'rga_id',
+        'is_trustee',
         'suid',
         'server_id',
         'name',
@@ -38,6 +39,7 @@ class Character extends Model
     protected function casts(): array
     {
         return [
+            'is_trustee' => 'boolean',
             'suid' => 'integer',
             'server_id' => 'integer',
             'level' => 'integer',

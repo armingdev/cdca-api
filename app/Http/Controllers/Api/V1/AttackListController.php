@@ -16,7 +16,7 @@ class AttackListController extends Controller
     public function index(Request $request): AnonymousResourceCollection
     {
         return AttackListResource::collection(
-            $request->user()->attackLists()->withCount('targets')->latest()->get()
+            $request->user()->attackLists()->withCount('targets')->latest()->latest('id')->get()
         );
     }
 

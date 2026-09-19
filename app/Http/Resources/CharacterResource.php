@@ -19,6 +19,7 @@ class CharacterResource extends JsonResource
         return [
             'id' => $this->id,
             'rga_id' => $this->rga_id,
+            'is_trustee' => $this->is_trustee,
             'suid' => $this->suid,
             'server_id' => $this->server_id,
             'server' => config("outwar.servers.{$this->server_id}.name"),

@@ -18,6 +18,7 @@ function fakeAccountsPage(): void
     Http::fake([
         'sigil.outwar.com/accounts.php*' => Http::response(sigilAccountsHtml()),
         'torax.outwar.com/accounts.php*' => Http::response('<html></html>'),
+        '*ajax/trusteeList.php*' => Http::response(trusteeListJson()),
     ]);
 }
 

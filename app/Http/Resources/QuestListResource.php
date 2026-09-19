@@ -19,6 +19,10 @@ class QuestListResource extends JsonResource
         return [
             'id' => $this->id,
             'name' => $this->name,
+            'is_public' => $this->is_public,
+            'is_mine' => $this->user_id !== null && $this->user_id === $request->user()?->id,
+            // Who a community list comes from; null for a built-in list.
+            'shared_by' => $this->whenLoaded('user', fn () => $this->user?->name),
             'items_count' => $this->whenCounted('items'),
             'items' => QuestListItemResource::collection($this->whenLoaded('items')),
             'created_at' => $this->created_at,

@@ -13,9 +13,11 @@ use App\Models\CharacterSkill;
 use App\Models\Mob;
 use App\Models\QuestList;
 use App\Models\Rga;
+use App\Models\Room;
 use App\Models\Run;
 use App\Models\RunParticipant;
 use App\Models\Skill;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 
 beforeEach(function () {
@@ -96,8 +98,13 @@ it('marks the participant failed when the run throws', function () {
         ->for(Character::factory()->for(Rga::factory()->withSession()))
         ->create();
 
-    expect(fn () => makeRunJob($participant)->handle(app(LoginService::class)))
-        ->toThrow(GameException::class);
+    $job = makeRunJob($participant)->withFakeQueueInteractions();
+
+    $job->handle(app(LoginService::class));
+
+    // Failed explicitly rather than by throwing: a run job has more than one
+    // try (see RunJob::$tries), and a terminal error must not lean on that.
+    $job->assertFailedWith(GameException::class);
 
     expect($participant->fresh()->status)->toBe(RunStatus::Failed)
         ->and($participant->fresh()->last_activity)->toContain('No known rooms')
@@ -360,4 +367,53 @@ it('executes a pvp job end to end and completes the run', function () {
     expect($participant->fresh()->status)->toBe(RunStatus::Completed)
         ->and($participant->fresh()->wins)->toBe(1)
         ->and($participant->run->fresh()->status)->toBe(RunStatus::Completed);
+});
+
+it('stops a run in the middle of a long walk instead of at its destination', function () {
+    // Stretch the world: the harvester now lives six rooms from the start.
+    Room::whereKey(2)->update(['east' => 3]);
+    foreach ([3, 4, 5, 6] as $id) {
+        Room::factory()->create(['id' => $id, 'west' => $id - 1, 'east' => $id < 6 ? $id + 1 : null]);
+    }
+    Mob::where('name', 'Kix Harvester')->first()->rooms()->sync([6 => ['last_seen_at' => now()]]);
+
+    $participant = RunParticipant::factory()
+        ->for(Run::factory()->state(['status' => RunStatus::Running, 'config' => ['mob_names' => ['Kix Harvester']]]))
+        ->for(Character::factory()->for(Rga::factory()->withSession()))
+        ->create();
+    $roomsEntered = [];
+
+    Http::fake(function ($request) use ($participant, &$roomsEntered) {
+        $url = $request->url();
+
+        if (str_contains($url, 'userstats.php')) {
+            return Http::response(json_encode(['exp' => '1,000', 'rage' => '5,000', 'level' => '60', 'width' => 0]));
+        }
+
+        if (! str_contains($url, 'ajax_changeroomb.php')) {
+            return Http::response('<html>world page</html>');
+        }
+
+        parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
+        $room = (int) $query['room'] ?: 1;
+        $roomsEntered[] = $room;
+
+        // The user presses stop while the character is walking through room 3.
+        if ($room === 3) {
+            $participant->run->requestStop();
+        }
+
+        return Http::response(json_encode([
+            'error' => '', 'curRoom' => (string) $room, 'name' => "Room {$room}",
+            'north' => '0', 'south' => '0',
+            'east' => $room < 6 ? (string) ($room + 1) : '0',
+            'west' => $room > 1 ? (string) ($room - 1) : '0',
+            'roomDetailsNew' => [], 'doorsData' => null,
+        ]));
+    });
+
+    makeRunJob($participant)->handle(app(LoginService::class));
+
+    expect($participant->fresh()->status)->toBe(RunStatus::Stopped)
+        ->and(max($roomsEntered))->toBe(3);
 });

@@ -21,6 +21,7 @@ class RunFactory extends Factory
     {
         return [
             'user_id' => null,
+            'name' => null,
             'mode' => RunMode::Mob,
             'config' => [
                 'mob_names' => ['Kix Harvester'],
@@ -31,6 +32,8 @@ class RunFactory extends Factory
             'cast_on_start' => false,
             'require_circumspect' => false,
             'skill_ids' => null,
+            'reserve_rage_for' => null,
+            'reserve_rage_hours' => 12,
             'status' => RunStatus::Pending,
             'restart_every_minutes' => null,
             'start_at' => null,

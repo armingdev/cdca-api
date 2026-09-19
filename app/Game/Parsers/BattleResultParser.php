@@ -31,7 +31,7 @@ class BattleResultParser
         $battleResult = $this->jsVar($html, 'battle_result');
 
         if ($battleResult === null) {
-            throw new ParseException('Battle page has no battle_result var: '.substr(strip_tags($html), 0, 200));
+            throw ParseException::unexpected('Battle page has no battle_result var', $html);
         }
 
         // PvP phrases its rewards differently, and wraps the numbers in <font>

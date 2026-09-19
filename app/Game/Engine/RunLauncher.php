@@ -36,6 +36,7 @@ class RunLauncher
      * @param  Collection<int, Character>  $characters
      * @param  array<string, mixed>  $config  the mode's config array (MobRunConfig::toArray(), etc.)
      * @param  list<int>|null  $skillIds
+     * @param  list<string>  $reserveRageFor  RageReserveEvent values the run parks ahead of
      *
      * @throws CharactersBusyException when a character is already enrolled in an unfinished run
      */
@@ -49,6 +50,9 @@ class RunLauncher
         ?Carbon $startAt = null,
         ?User $user = null,
         ?array $skillIds = null,
+        ?string $name = null,
+        array $reserveRageFor = [],
+        int $reserveRageHours = 12,
     ): Run {
         if ($startAt !== null && $startAt->isPast()) {
             $startAt = $startAt->addDay();
@@ -65,11 +69,14 @@ class RunLauncher
 
         $run = Run::create([
             'user_id' => $user?->id,
+            'name' => $name,
             'mode' => $mode,
             'config' => $config,
             'cast_on_start' => $castOnStart,
             'require_circumspect' => $requireCircumspect,
             'skill_ids' => $skillIds,
+            'reserve_rage_for' => $reserveRageFor === [] ? null : $reserveRageFor,
+            'reserve_rage_hours' => $reserveRageHours,
             'status' => $startAt?->isFuture() ?? false ? RunStatus::Pending : RunStatus::Running,
             'restart_every_minutes' => $restartEveryMinutes,
             'start_at' => $startAt,

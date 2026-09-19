@@ -15,7 +15,7 @@ class SkillInfoParser
     public function parse(string $body): SkillInfo
     {
         if (! preg_match('/<h5>\s*(.+?)\s*(?:—|-)?\s*Level\s+(\d+)\s*<\/h5>/', $body, $heading)) {
-            throw new ParseException('skills_info.php response has no "{name} Level {n}" heading: '.substr($body, 0, 200));
+            throw ParseException::unexpected('skills_info.php response has no "{name} Level {n}" heading', $body);
         }
 
         preg_match('/Level\s+\d+<\/h5>\s*(.*?)\s*<\/div>/s', $body, $description);

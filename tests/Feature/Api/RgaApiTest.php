@@ -186,3 +186,16 @@ it('returns 404 when revealing an RGA with no captured session', function () {
 
     $this->getJson("/api/v1/rgas/{$rga->id}/session")->assertNotFound();
 });
+
+it('lists accounts added in the same second in one stable order', function () {
+    $this->travelTo('2026-09-19 12:00:00');
+    $first = Rga::factory()->for($this->user)->create();
+    $second = Rga::factory()->for($this->user)->create();
+
+    // Rewriting a row moves it in the table; the list must not follow.
+    $second->touch();
+
+    $this->getJson('/api/v1/rgas')
+        ->assertOk()
+        ->assertJsonPath('data.*.id', [$second->id, $first->id]);
+});

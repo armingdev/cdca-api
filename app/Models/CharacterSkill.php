@@ -18,6 +18,8 @@ class CharacterSkill extends Model
         'current_duration_minutes',
         'cast_on_start',
         'last_cast_at',
+        'cast_refusals',
+        'cast_refused_until',
         'recharge_until',
         'recharge_synced_at',
         'buff_until',
@@ -39,6 +41,8 @@ class CharacterSkill extends Model
             'current_duration_minutes' => 'integer',
             'cast_on_start' => 'boolean',
             'last_cast_at' => 'datetime',
+            'cast_refusals' => 'integer',
+            'cast_refused_until' => 'datetime',
             'recharge_until' => 'datetime',
             'recharge_synced_at' => 'datetime',
             'buff_until' => 'datetime',
@@ -46,6 +50,15 @@ class CharacterSkill extends Model
             'synced_at' => 'datetime',
         ];
     }
+
+    /**
+     * Minutes to leave a skill alone after the game refuses to cast it: the
+     * first refusal may be a blip, a run of them means the skill cannot be
+     * cast the way we cast it, and hammering it only fills the run log.
+     *
+     * @var list<int>
+     */
+    private const array REFUSAL_BACKOFF_MINUTES = [5, 60, 1440];
 
     /**
      * @return BelongsTo<Character, $this>
@@ -66,6 +79,28 @@ class CharacterSkill extends Model
     /**
      * Effective level as the game displays it: trained + gear/item bonus.
      */
+    /** The game refused this skill recently enough that casting it again now is pointless. */
+    public function isCastRefused(): bool
+    {
+        return $this->cast_refused_until !== null && $this->cast_refused_until->isFuture();
+    }
+
+    /**
+     * Remember a refusal and back off further than last time.
+     *
+     * @return CarbonInterface when the skill is worth trying again
+     */
+    public function recordCastRefusal(): CarbonInterface
+    {
+        $refusals = $this->cast_refusals + 1;
+        $minutes = self::REFUSAL_BACKOFF_MINUTES[min($refusals, count(self::REFUSAL_BACKOFF_MINUTES)) - 1];
+        $retryAt = now()->addMinutes($minutes);
+
+        $this->update(['cast_refusals' => $refusals, 'cast_refused_until' => $retryAt]);
+
+        return $retryAt;
+    }
+
     public function effectiveLevel(): int
     {
         return $this->trained_level + $this->bonus_level;

@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Game\Http\GameTransport;
+use App\Game\World\RoomGraph;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\MassAssignmentException;
 use Illuminate\Database\Eloquent\MissingAttributeException;
@@ -22,6 +23,11 @@ class AppServiceProvider extends ServiceProvider
         // One handler per process is the whole point: it owns the kept-alive
         // connections every game request reuses.
         $this->app->singleton(GameTransport::class);
+
+        // Scoped, not singleton: a queue worker flushes scoped instances
+        // between jobs, so a run shares one graph across every runner it
+        // builds while the next job still starts from the database's truth.
+        $this->app->scoped(RoomGraph::class, fn (): RoomGraph => RoomGraph::fromDatabase());
     }
 
     /**

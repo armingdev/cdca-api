@@ -7,6 +7,7 @@ use App\Game\Data\BuffEnsureResult;
 use App\Game\Engine\RunEventRecorder;
 use App\Game\Enums\RunEventType;
 use App\Game\Exceptions\GameException;
+use App\Game\World\TeleportService;
 use App\Models\Character;
 use App\Models\CharacterSkill;
 use App\Models\RunEvent;
@@ -120,6 +121,9 @@ class BuffEnsurer
     {
         $states = CharacterSkill::with('skill')
             ->where('character_id', $this->character->id)
+            // Teleport is cast with a destination, by TeleportService, as a
+            // means of travel. Selected as a buff it can only ever be refused.
+            ->where('skill_id', '!=', TeleportService::TELEPORT_SKILL_ID)
             ->where(function ($query) use ($includeCircumspect) {
                 $query->where('cast_on_start', true)
                     ->when($includeCircumspect, fn ($q) => $q->orWhere('skill_id', Skill::CIRCUMSPECT_ID));
@@ -188,7 +192,7 @@ class BuffEnsurer
         $states = $this->selectedStates($includeCircumspect);
 
         foreach ($states as $state) {
-            if ($state->isBuffActive() || ! $state->isCastable()) {
+            if ($state->isBuffActive() || ! $state->isCastable() || $state->isCastRefused()) {
                 continue;
             }
 
@@ -236,6 +240,13 @@ class BuffEnsurer
                 continue;
             }
 
+            if ($state->isCastRefused()) {
+                $skipped[] = $entry + ['reason' => BuffEnsureResult::REASON_BACKING_OFF];
+                $log("{$state->skill->name} was refused earlier — next try {$state->cast_refused_until->format('H:i')}.");
+
+                continue;
+            }
+
             if ($state->isOnCooldown()) {
                 $skipped[] = $entry + ['reason' => BuffEnsureResult::REASON_COOLDOWN];
                 $log("{$state->skill->name} on cooldown — skipping.");
@@ -265,12 +276,15 @@ class BuffEnsurer
                 continue;
             }
 
+            $retryAt = $state->recordCastRefusal();
+            $message = "Failed to cast {$state->skill->name} — the game did not confirm it. Next try {$retryAt->format('Y-m-d H:i')}.";
+
             $failed[] = $entry + ['reason' => BuffEnsureResult::REASON_REFUSED];
-            $log("Failed to cast {$state->skill->name} — the game did not confirm it.");
+            $log($message);
             $events?->record(
                 RunEventType::SkillCastFailed,
-                "Failed to cast {$state->skill->name} — the game did not confirm it.",
-                $entry,
+                $message,
+                $entry + ['refusals' => $state->cast_refusals, 'retry_at' => $retryAt->toIso8601String()],
                 RunEvent::LEVEL_WARNING,
             );
         }
@@ -339,6 +353,12 @@ class BuffEnsurer
 
             if ($cooldownEndsAt !== null && $cooldownEndsAt->isFuture()) {
                 $candidates[] = $cooldownEndsAt;
+
+                continue;
+            }
+
+            if ($state->isCastRefused()) {
+                $candidates[] = $state->cast_refused_until;
 
                 continue;
             }

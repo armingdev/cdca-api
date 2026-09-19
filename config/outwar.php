@@ -113,6 +113,25 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Run liveness
+    |--------------------------------------------------------------------------
+    |
+    | A live run job stamps run_participants.heartbeat_at at most this often
+    | (from its per-iteration signal check). outwar:runs-recover-stalled treats
+    | an in-flight participant whose stamp is older than stalled_after_seconds
+    | as orphaned by a dead worker and re-drives it. Keep the window several
+    | times the heartbeat and well above one worst-case game request (~50s),
+    | or a slow request reads as a dead worker.
+    |
+    */
+
+    'runs' => [
+        'heartbeat_seconds' => (int) env('OUTWAR_RUN_HEARTBEAT_SECONDS', 30),
+        'stalled_after_seconds' => (int) env('OUTWAR_RUN_STALLED_AFTER_SECONDS', 600),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Brawls
     |--------------------------------------------------------------------------
     |

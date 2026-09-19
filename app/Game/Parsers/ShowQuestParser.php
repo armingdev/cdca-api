@@ -29,7 +29,7 @@ class ShowQuestParser
         }
 
         if (! str_contains($html, 'id="quest"')) {
-            throw new ParseException('Not a show_quest page: '.substr(strip_tags($html), 0, 200));
+            throw ParseException::unexpected('Not a show_quest page', $html);
         }
 
         $crawler = new Crawler($html);
