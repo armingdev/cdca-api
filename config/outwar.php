@@ -30,7 +30,10 @@ return [
     |
     | Every game request goes through one throttled client per character. The
     | throttle sleeps a jittered interval between requests to the game server.
-    | Timeout mirrors the reference tool's 12s default.
+    | Timeout mirrors the reference tool's 12s default. reuse_connections keeps
+    | one cURL handler per process so requests share a kept-alive connection
+    | instead of redoing the TLS handshake each time; turn it off to get a
+    | fresh connection per request back.
     |
     */
 
@@ -41,6 +44,7 @@ return [
         'retry_sleep_ms' => env('OUTWAR_HTTP_RETRY_SLEEP_MS', 500),
         'throttle_min_ms' => env('OUTWAR_THROTTLE_MIN_MS', 300),
         'throttle_max_ms' => env('OUTWAR_THROTTLE_MAX_MS', 800),
+        'reuse_connections' => (bool) env('OUTWAR_HTTP_REUSE_CONNECTIONS', true),
         'user_agent' => env(
             'OUTWAR_USER_AGENT',
             'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'

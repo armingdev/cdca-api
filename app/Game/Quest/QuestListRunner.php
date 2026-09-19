@@ -155,6 +155,10 @@ class QuestListRunner
                 return $this->summary(completed: false, reason: 'Circumspect expired.', endReason: RunEndReason::CircumspectExpired);
             }
 
+            if ($control === RunSignal::WorkerShutdown) {
+                return $this->summary(completed: false, reason: 'Worker restarting.', endReason: RunEndReason::WorkerShutdown);
+            }
+
             $outcome = $this->runQuest($item, $log, $signal, $onBattle, $ensureBuffs);
 
             if ($outcome !== null) {
@@ -264,6 +268,10 @@ class QuestListRunner
 
         if ($summary->endReason === RunEndReason::CircumspectExpired) {
             return $this->summary(completed: false, reason: $summary->stopReason, endReason: RunEndReason::CircumspectExpired);
+        }
+
+        if ($summary->endReason === RunEndReason::WorkerShutdown) {
+            return $this->summary(completed: false, reason: $summary->stopReason, endReason: RunEndReason::WorkerShutdown);
         }
 
         // Nothing the list can do about this quest, and everything it can do

@@ -23,6 +23,7 @@ use App\Models\RunParticipant;
 use App\Models\Skill;
 use Carbon\CarbonInterface;
 use Closure;
+use Illuminate\Contracts\Queue\Interruptible;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\SerializesModels;
@@ -37,8 +38,12 @@ use Throwable;
  * engine. Lives for the whole run (possibly hours) on the redis-runs
  * connection whose retry_after exceeds the supervisor timeout, so a live run
  * is never re-dispatched.
+ *
+ * Interruptible so a worker told to quit (deploy, horizon:terminate) does not
+ * have to sit out the rest of the run: the engine ends its pass at the next
+ * signal check and the participant parks for the resume scheduler.
  */
-abstract class RunJob implements ShouldQueue
+abstract class RunJob implements Interruptible, ShouldQueue
 {
     use Queueable, SerializesModels;
 
@@ -62,9 +67,19 @@ abstract class RunJob implements ShouldQueue
      */
     protected const int MAX_RAGE_WAITS = 24;
 
+    /**
+     * How long a run interrupted by a worker shutdown stays parked. Just long
+     * enough for the replacement workers to be up before the resume scheduler
+     * re-dispatches it.
+     */
+    private const int WORKER_RESTART_RESUME_SECONDS = 60;
+
     public int $timeout = 7200;
 
     public int $tries = 1;
+
+    /** Set from the worker's signal handler; read by the engines' signal closure. */
+    private bool $workerShuttingDown = false;
 
     public function __construct(
         public RunParticipant $participant,
@@ -118,6 +133,17 @@ abstract class RunJob implements ShouldQueue
         } finally {
             $lock->release();
         }
+    }
+
+    /**
+     * Called by the queue worker, from inside its async signal handler, when it
+     * receives SIGTERM/SIGQUIT/SIGINT while this job is running. Only a flag is
+     * flipped here — a signal handler can fire in the middle of any statement,
+     * so all the real work happens at the engine's next signal check.
+     */
+    public function interrupted(int $signal): void
+    {
+        $this->workerShuttingDown = true;
     }
 
     /**
@@ -309,6 +335,25 @@ abstract class RunJob implements ShouldQueue
     }
 
     /**
+     * The worker-shutdown outcome shared by all modes: nothing is wrong with
+     * the run, the process driving it is just going away. Park briefly and let
+     * the resume scheduler hand it to a fresh worker. Deliberately leaves the
+     * barren-wait and rage-wait counters alone — this wait says nothing about
+     * the targets.
+     *
+     * @param  array<string, mixed>|null  $progress
+     */
+    protected function waitForWorkerRestart(?array $progress = null): ParticipantOutcome
+    {
+        return new ParticipantOutcome(
+            RunStatus::Waiting,
+            'Worker restarting — resuming shortly.',
+            now()->addSeconds(self::WORKER_RESTART_RESUME_SECONDS),
+            $progress,
+        );
+    }
+
+    /**
      * The Circumspect cycle outcome shared by all modes: park the participant
      * until Circumspect's cooldown ends (fresh server reading when reachable),
      * carrying the mode's progress into the next cycle. Rage regenerates
@@ -442,6 +487,15 @@ abstract class RunJob implements ShouldQueue
                 return $signal;
             }
 
+            // The worker is quitting, so the pass ends here whatever happens.
+            // Ask the database first: parking over a stop or pause whose cache
+            // signal was lost would silently discard the user's request.
+            if ($this->workerShuttingDown) {
+                $requested = $this->signalFromStatus($participant);
+
+                return $requested === RunSignal::None ? RunSignal::WorkerShutdown : $requested;
+            }
+
             if ($circumspectExpiresAt !== null && $circumspectExpiresAt->isPast()) {
                 // The snapshot is only the fast path. Just-in-time casting can
                 // have renewed Circumspect since pickup, and ending the pass on
@@ -458,14 +512,20 @@ abstract class RunJob implements ShouldQueue
             }
 
             if ($calls % self::DB_SIGNAL_CHECK_EVERY === 0) {
-                return match ($participant->fresh()->status) {
-                    RunStatus::Stopping => RunSignal::Stop,
-                    RunStatus::Pausing => RunSignal::Pause,
-                    default => RunSignal::None,
-                };
+                return $this->signalFromStatus($participant);
             }
 
             return RunSignal::None;
+        };
+    }
+
+    /** The authoritative read behind the cache signal: what the participant's own row asks for. */
+    private function signalFromStatus(RunParticipant $participant): RunSignal
+    {
+        return match ($participant->fresh()->status) {
+            RunStatus::Stopping => RunSignal::Stop,
+            RunStatus::Pausing => RunSignal::Pause,
+            default => RunSignal::None,
         };
     }
 

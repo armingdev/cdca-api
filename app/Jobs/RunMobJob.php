@@ -61,6 +61,14 @@ class RunMobJob extends RunJob
             ]);
         }
 
+        // Same shape as a lapsed buff: the pass was cut short, not finished, so
+        // bank its kills without counting a cycle.
+        if ($summary->endReason === RunEndReason::WorkerShutdown) {
+            return $this->waitForWorkerRestart([
+                'kills_done' => (int) ($progress['kills_done'] ?? 0) + $summary->wins,
+            ]);
+        }
+
         return $this->outcomeForPassEnd($summary, $config, $participant->run, $progress, $character);
     }
 

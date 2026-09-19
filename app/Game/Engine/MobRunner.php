@@ -178,6 +178,10 @@ class MobRunner
                 return $this->summary('Circumspect expired.', RunEndReason::CircumspectExpired);
             }
 
+            if ($control === RunSignal::WorkerShutdown) {
+                return $this->summary('Worker restarting.', RunEndReason::WorkerShutdown);
+            }
+
             if ($current->rage < $this->config->stopRage) {
                 $recovered = $this->recoverRage($log);
 

@@ -159,6 +159,22 @@ it('parks a quest and a quest list until Circumspect can be recast', function ()
         ->and($list->progress)->toMatchArray(['position' => 3]);
 });
 
+it('parks a quest and a quest list for a minute when the worker is told to quit', function () {
+    $this->travelTo('2026-08-27 12:40:00');
+
+    $quest = questEndOutcome(RunEndReason::WorkerShutdown, progress: ['respawn_waits' => 4]);
+    $list = questListEndOutcome(RunEndReason::WorkerShutdown, nextPosition: 5);
+
+    expect($quest->status)->toBe(RunStatus::Waiting)
+        ->and($quest->reason)->toContain('Worker restarting')
+        ->and($quest->resumeAt->toDateTimeString())->toBe('2026-08-27 12:41:00')
+        // Says nothing about the targets, so the barren tally is left alone.
+        ->and($quest->progress)->toBeNull()
+        ->and($list->status)->toBe(RunStatus::Waiting)
+        ->and($list->resumeAt->toDateTimeString())->toBe('2026-08-27 12:41:00')
+        ->and($list->progress)->toBe(['position' => 5]);
+});
+
 it('parks a quest until the next game-clock rage tick when it cannot afford its target', function () {
     // 12:40 UTC, so the tick the run is waiting for is 13:00 — the game's
     // clock is a whole-hour offset, which is what makes this a UTC boundary.

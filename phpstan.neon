@@ -10,6 +10,19 @@ parameters:
     # this every cast attribute degrades to string and enum/array access breaks.
     parseModelCastsMethod: true
 
+    # Larastan's opt-in queue rules. Run jobs live for hours and the two
+    # ShouldBeUnique jobs gate login fan-outs, so a job that forgets its
+    # uniqueFor/uniqueId, holds a model without SerializesModels, or is
+    # dispatched inside a transaction without afterCommit should fail here
+    # rather than in production. The batch rules cost nothing until we batch.
+    checkUniqueJobUniqueFor: true
+    checkUniqueJobUniqueId: true
+    noBatchedUniqueJob: true
+    checkJobSerializesModels: true
+    checkBatchedJobIsBatchable: true
+    checkBatchableJobChecksCancellation: true
+    checkDispatchInTransactionAfterCommit: true
+
     # Production code only. The test suite leans on framework dynamism PHPStan
     # cannot model (facade spies, pivot attributes, by-reference fake-world
     # closures) and is already verified by running it.

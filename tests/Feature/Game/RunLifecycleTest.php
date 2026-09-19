@@ -10,6 +10,7 @@ use App\Models\QuestList;
 use App\Models\Rga;
 use App\Models\Run;
 use App\Models\RunParticipant;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 
 beforeEach(function () {
@@ -52,6 +53,52 @@ it('stops a running participant when a stop signal is set', function () {
     expect($participant->fresh()->status)->toBe(RunStatus::Stopped)
         ->and($participant->fresh()->finished_at)->not->toBeNull()
         ->and($run->fresh()->status)->toBe(RunStatus::Stopped);
+});
+
+it('parks a running participant for a quick resume when the worker is told to quit', function () {
+    fakeCombatWorld();
+    $this->freezeTime();
+
+    $character = Character::factory()->for(Rga::factory()->withSession())->create();
+    $run = Run::factory()->state(['status' => RunStatus::Running])->create();
+    $participant = RunParticipant::factory()->for($run)->for($character)->create([
+        'progress' => ['kills_done' => 3, 'rage_waits' => 2],
+    ]);
+
+    $job = makeRunJob($participant);
+    $job->interrupted(SIGTERM);
+    $job->handle(app(LoginService::class));
+
+    $participant->refresh();
+
+    expect($participant->status)->toBe(RunStatus::Waiting)
+        ->and($participant->last_activity)->toContain('Worker restarting')
+        ->and($participant->resume_at->timestamp)->toBe(now()->addMinute()->timestamp)
+        ->and($participant->finished_at)->toBeNull()
+        ->and($participant->progress)->toMatchArray(['kills_done' => 3, 'rage_waits' => 2])
+        ->and(Cache::lock("character-run:{$character->id}", 10)->get())->toBeTrue();
+});
+
+it('honours a stop request over a worker shutdown when the cache signal was lost', function () {
+    fakeCombatWorld();
+
+    $character = Character::factory()->for(Rga::factory()->withSession())->create();
+    $run = Run::factory()->state(['status' => RunStatus::Running])->create();
+    $participant = RunParticipant::factory()->for($run)->for($character)->create();
+
+    // The stop lands after pickup and only in the database — no cache signal.
+    RunParticipant::updated(function (RunParticipant $updated): void {
+        if ($updated->status === RunStatus::Running) {
+            RunParticipant::whereKey($updated->id)->update(['status' => RunStatus::Stopping]);
+        }
+    });
+
+    $job = makeRunJob($participant);
+    $job->interrupted(SIGTERM);
+    $job->handle(app(LoginService::class));
+
+    expect($participant->fresh()->status)->toBe(RunStatus::Stopped)
+        ->and($participant->fresh()->resume_at)->toBeNull();
 });
 
 it('counts kills from earlier cycles against max_kills when resuming', function () {

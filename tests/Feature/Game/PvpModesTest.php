@@ -71,6 +71,33 @@ it('runs crew-hitlist mode off a single list request', function () {
     Http::assertNotSent(fn ($request) => str_contains($request->url(), 'playersearch.php'));
 });
 
+it('parks a pvp pass without attacking when the worker is told to quit', function () {
+    Http::fake(function ($request) {
+        $url = $request->url();
+
+        return match (true) {
+            str_contains($url, 'attacklog') => Http::response('<html><table></table></html>'),
+            str_contains($url, 'crew_hitlist') => Http::response(gameFixture('crew_hitlist.html')),
+            str_contains($url, 'userstats') => Http::response(json_encode(['exp' => '1', 'rage' => '90000', 'level' => '95', 'width' => 0])),
+            default => Http::response('<html></html>'),
+        };
+    });
+
+    $participant = pvpParticipant(RunMode::PvpCrewHitlist);
+
+    $job = makeRunJob($participant);
+    $job->interrupted(SIGTERM);
+    $job->handle(app(LoginService::class));
+
+    $fresh = $participant->fresh();
+
+    expect($fresh->status)->toBe(RunStatus::Waiting)
+        ->and($fresh->last_activity)->toContain('Worker restarting')
+        ->and($fresh->resume_at)->not->toBeNull();
+
+    Http::assertNotSent(fn ($request) => str_contains($request->url(), 'somethingelse.php'));
+});
+
 it('finishes a pass with every target on cooldown as Completed, so the run keeps recurring', function () {
     // RunsRestartDueCommand only re-dispatches Completed runs. If an
     // all-blocked pass ended Stuck, a recurring PvP run would silently die

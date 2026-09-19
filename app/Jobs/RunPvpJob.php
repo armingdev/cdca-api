@@ -43,6 +43,12 @@ class RunPvpJob extends RunJob
             return $this->waitForCircumspect($character, $summary->stopReason);
         }
 
+        // The resumed pass re-reads its targets; anyone already hit is on the
+        // game's own 60-minute cooldown, so nothing is attacked twice.
+        if ($summary->endReason === RunEndReason::WorkerShutdown) {
+            return $this->waitForWorkerRestart();
+        }
+
         $status = match ($summary->endReason) {
             RunEndReason::ExternalStop => RunStatus::Stopped,
             RunEndReason::ExternalPause => RunStatus::Paused,
