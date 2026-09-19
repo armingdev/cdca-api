@@ -81,6 +81,12 @@ class RunQuestJob extends RunJob
             return $this->waitForCircumspect($character, $summary->stopReason, ['respawn_waits' => 0]);
         }
 
+        // The worker is going away, not the quest: the next pickup re-reads
+        // progress from the game's tracker, so nothing needs carrying.
+        if ($summary->endReason === RunEndReason::WorkerShutdown) {
+            return $this->waitForWorkerRestart();
+        }
+
         // Targets are dead but not gone: park until they respawn and continue
         // the same objective. A cycle that made progress starts the barren
         // counter over — only a run of fruitless waits gives up.

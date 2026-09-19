@@ -117,6 +117,7 @@ class GameClient
     private function pendingRequest(): PendingRequest
     {
         return Http::baseUrl($this->baseUrl)
+            ->setHandler(app(GameTransport::class)->handler())
             ->withUserAgent(config('outwar.http.user_agent'))
             ->timeout((int) config('outwar.http.timeout'))
             ->connectTimeout((int) config('outwar.http.connect_timeout'))

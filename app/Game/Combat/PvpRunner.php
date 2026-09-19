@@ -122,6 +122,10 @@ class PvpRunner
                     return $this->summary(false, 'Circumspect expired.', RunEndReason::CircumspectExpired);
                 }
 
+                if ($control === RunSignal::WorkerShutdown) {
+                    return $this->summary(false, 'Worker restarting.', RunEndReason::WorkerShutdown);
+                }
+
                 if ($current->rage < $this->config->stopRage) {
                     return $this->summary(
                         completed: false,

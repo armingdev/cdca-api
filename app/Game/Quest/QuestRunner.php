@@ -427,6 +427,7 @@ class QuestRunner
                 RunEndReason::ExternalStop => $this->summary(false, 'Stop requested.', RunEndReason::ExternalStop),
                 RunEndReason::ExternalPause => $this->summary(false, 'Pause requested.', RunEndReason::ExternalPause),
                 RunEndReason::CircumspectExpired,
+                RunEndReason::WorkerShutdown,
                 RunEndReason::RageExhausted,
                 RunEndReason::RageInsufficient,
                 RunEndReason::Outmatched => $this->summary(false, $farm->stopReason, $farm->endReason),
@@ -617,6 +618,7 @@ class QuestRunner
             RunSignal::Stop => $this->summary(false, 'Stop requested.', RunEndReason::ExternalStop),
             RunSignal::Pause => $this->summary(false, 'Pause requested.', RunEndReason::ExternalPause),
             RunSignal::CircumspectExpired => $this->summary(false, 'Circumspect expired.', RunEndReason::CircumspectExpired),
+            RunSignal::WorkerShutdown => $this->summary(false, 'Worker restarting.', RunEndReason::WorkerShutdown),
             RunSignal::None => null,
         };
     }

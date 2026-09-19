@@ -87,6 +87,12 @@ class RunQuestListJob extends RunJob
             ]);
         }
 
+        // The worker is going away mid-list: hold the position on the
+        // unsettled quest so the next worker re-enters it.
+        if ($summary->endReason === RunEndReason::WorkerShutdown) {
+            return $this->waitForWorkerRestart(['position' => $summary->nextPosition]);
+        }
+
         // A blip rather than a verdict on the quest: park briefly on the same
         // item so the next cycle re-enters it. The retry budget rides along in
         // progress, and QuestListRunner writes the quest off once it is spent.

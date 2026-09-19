@@ -63,6 +63,12 @@ enum RunEndReason: string
      */
     case TransientError = 'transient_error';
 
+    /**
+     * The worker was asked to quit mid-pass. Nothing is wrong with the run —
+     * jobs park it briefly so the next worker picks it straight back up.
+     */
+    case WorkerShutdown = 'worker_shutdown';
+
     case ExternalStop = 'external_stop';
     case ExternalPause = 'external_pause';
 }
