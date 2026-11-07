@@ -14,5 +14,7 @@ final readonly class QuestListRunSummary
         public int $nextPosition = 0,
         /** Parked retries spent so far on the quest at $nextPosition. */
         public int $questRetries = 0,
+        /** Which of the run's lists $nextPosition belongs to (0-based). */
+        public int $nextListIndex = 0,
     ) {}
 }

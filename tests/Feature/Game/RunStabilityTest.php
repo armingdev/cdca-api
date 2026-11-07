@@ -13,6 +13,7 @@ use App\Models\RunParticipant;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Sleep;
 
 beforeEach(function () {
     config(['outwar.http.throttle_min_ms' => 0, 'outwar.http.throttle_max_ms' => 0]);
@@ -80,9 +81,11 @@ it('fails loudly instead of double-driving a locked character', function () {
         ->for($character)
         ->create();
 
-    // Another worker holds this character's run lock.
+    // Another worker holds this character's run lock. The job waits a short
+    // grace period for it; fake sleep in step with the clock so it is instant.
     $foreign = Cache::lock("character-run:{$character->id}", 60);
     expect($foreign->get())->toBeTrue();
+    Sleep::fake(syncWithCarbon: true);
 
     makeRunJob($participant)->handle(app(LoginService::class));
 

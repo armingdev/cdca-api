@@ -2,8 +2,10 @@
 
 namespace App\Http\Requests;
 
+use App\Game\Engine\QuestListRunConfig;
 use App\Game\Enums\RageReserveEvent;
 use App\Game\Enums\RunMode;
+use App\Game\Enums\RunPriority;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -49,6 +51,8 @@ class StoreRunRequest extends FormRequest
         return [
             'mode' => ['required', Rule::enum(RunMode::class)],
             'name' => ['sometimes', 'nullable', 'string', 'max:80'],
+            // Who gets a free run worker first when all are busy.
+            'priority' => ['sometimes', Rule::enum(RunPriority::class)],
             'characters' => ['required', 'array', 'min:1'],
             'characters.*' => ['integer', 'exists:characters,id'],
 
@@ -93,8 +97,15 @@ class StoreRunRequest extends FormRequest
             // quest + quest-list: skip steps wanting an item the game only sells
             'skip_shard_quests' => ['sometimes', 'boolean'],
 
-            // quest-list mode
-            'quest_list_id' => ['required_if:mode,quest-list', 'integer', 'exists:quest_lists,id'],
+            // quest-list mode — one or more lists, played back to back in this
+            // order. The single quest_list_id is still accepted from clients
+            // that predate chaining. Ownership is checked in the controller.
+            'quest_list_ids' => [
+                Rule::requiredIf(fn (): bool => $this->input('mode') === RunMode::QuestList->value && ! $this->filled('quest_list_id')),
+                'array', 'min:1', 'max:'.QuestListRunConfig::MAX_LISTS,
+            ],
+            'quest_list_ids.*' => ['integer', 'min:1', 'distinct'],
+            'quest_list_id' => ['sometimes', 'nullable', 'integer', 'min:1'],
 
             // pvp — attack-list mode takes either a saved list or inline names
             'attack_list_id' => ['sometimes', 'nullable', 'integer', 'exists:attack_lists,id'],
@@ -126,6 +137,18 @@ class StoreRunRequest extends FormRequest
             'cooldown_minutes' => ['sometimes', 'integer', 'min:1', 'max:60'],
             'message' => ['sometimes', 'nullable', 'string', 'max:255'],
         ];
+    }
+
+    /**
+     * The lists to play, in order: `quest_list_ids`, or the legacy single id.
+     *
+     * @return list<int>
+     */
+    public function questListIds(): array
+    {
+        $ids = $this->validated('quest_list_ids') ?? array_filter([$this->validated('quest_list_id')]);
+
+        return array_values(array_map(intval(...), $ids));
     }
 
     /**

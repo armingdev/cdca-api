@@ -8,6 +8,7 @@ use App\Game\Engine\QuestListRunConfig;
 use App\Game\Engine\QuestRunConfig;
 use App\Game\Engine\RunLauncher;
 use App\Game\Enums\RunMode;
+use App\Game\Enums\RunPriority;
 use App\Game\Exceptions\CharactersBusyException;
 use App\Models\Character;
 use App\Models\QuestList;
@@ -24,7 +25,7 @@ use Illuminate\Support\Collection;
     {--mob=* : (mob mode) Exact mob name(s) to farm}
     {--npc= : (quest mode) Exact quest-giver mob name}
     {--quest= : (quest mode) Quest id to run}
-    {--list= : (quest-list mode) Quest list name}
+    {--list=* : (quest-list mode) Quest list name(s), played back to back in the given order}
     {--target=* : (pvp mode) Player name(s) to attack}
     {--crew=* : (pvp crew-members mode) Crew id(s) to pull members from}
     {--auto-enter-brawl : (pvp brawl modes) Register for the round if not entered}
@@ -41,7 +42,8 @@ use Illuminate\Support\Collection;
     {--cast-on-start : Cast the character\'s selected skills before the run begins}
     {--require-circ : Only run while Circumspect is active (cast it if possible, else gate off)}
     {--restart-every= : Re-dispatch the run every N minutes after it finishes}
-    {--start-at= : Delay the first start until this time (e.g. "22:57")}')]
+    {--start-at= : Delay the first start until this time (e.g. "22:57")}
+    {--priority=normal : Who gets a free run worker first when all are busy: high, normal, or low}')]
 #[Description('Start a mob or quest run for the selected characters (one queued worker each)')]
 class RunStartCommand extends Command
 {
@@ -59,6 +61,14 @@ class RunStartCommand extends Command
 
         if ($mode === null) {
             $this->error('--mode must be mob, quest, quest-list, or pvp.');
+
+            return self::FAILURE;
+        }
+
+        $priority = RunPriority::tryFrom((string) $this->option('priority'));
+
+        if ($priority === null) {
+            $this->error('--priority must be high, normal, or low.');
 
             return self::FAILURE;
         }
@@ -81,6 +91,7 @@ class RunStartCommand extends Command
                 restartEveryMinutes: $this->option('restart-every') !== null ? (int) $this->option('restart-every') : null,
                 startAt: $startAt,
                 name: $this->option('name'),
+                priority: $priority,
             );
         } catch (CharactersBusyException $exception) {
             $this->error($exception->getMessage());
@@ -196,22 +207,30 @@ class RunStartCommand extends Command
      */
     private function buildQuestListConfig(): ?array
     {
-        if ($this->option('list') === null) {
-            $this->error('Quest-list mode needs --list="List Name".');
+        $names = array_values(array_filter((array) $this->option('list')));
+
+        if ($names === []) {
+            $this->error('Quest-list mode needs --list="List Name" (repeat it to chain lists).');
 
             return null;
         }
 
-        $list = QuestList::named($this->option('list'))->first();
+        $listIds = [];
 
-        if ($list === null) {
-            $this->error("Quest list '{$this->option('list')}' not found.");
+        foreach ($names as $name) {
+            $list = QuestList::named($name)->first();
 
-            return null;
+            if ($list === null) {
+                $this->error("Quest list '{$name}' not found.");
+
+                return null;
+            }
+
+            $listIds[] = $list->id;
         }
 
         return (new QuestListRunConfig(
-            questListId: $list->id,
+            questListIds: $listIds,
             stopRage: (int) $this->option('stop-rage'),
             levelUp: (bool) $this->option('level-up'),
             smart: (bool) $this->option('smart'),

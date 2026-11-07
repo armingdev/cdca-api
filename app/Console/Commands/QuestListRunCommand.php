@@ -46,7 +46,7 @@ class QuestListRunCommand extends Command
 
         try {
             $summary = QuestListRunner::forCharacter($character, new QuestListRunConfig(
-                questListId: $list->id,
+                questListIds: [$list->id],
                 stopRage: (int) $this->option('stop-rage'),
                 levelUp: (bool) $this->option('level-up'),
             ))->run(log: fn (string $message) => $this->line($message));

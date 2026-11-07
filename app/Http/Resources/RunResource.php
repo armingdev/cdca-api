@@ -21,6 +21,7 @@ class RunResource extends JsonResource
             'name' => $this->name,
             'mode' => $this->mode,
             'status' => $this->status,
+            'priority' => $this->priority,
             'config' => $this->config,
             'cast_on_start' => $this->cast_on_start,
             'require_circumspect' => $this->require_circumspect,

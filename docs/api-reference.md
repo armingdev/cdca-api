@@ -480,6 +480,7 @@ Common fields (all modes):
 |---|---|---|
 | `mode` | enum | `mob` · `quest` · `quest-list` · `pvp-attack-list` · `pvp-crew-hitlist` · `pvp-crew-members` · `pvp-brawl` · `pvp-faction-brawl` (required) |
 | `name` | string? | a label for the run, max 80. Rename later with `PATCH /runs/{id}` |
+| `priority` | enum | `high` · `normal` (default) · `low`. When every run worker is busy, waiting participants of higher-priority runs get the next free worker first. It never interrupts a running participant. Change it later with `PATCH /runs/{id}` |
 | `characters` | int[] | your character ids (required, ≥1). `422` if any isn't yours |
 | `stop_rage` | int | rage-pool floor; stop below it (default 2500) |
 | `level_up` | bool | level up (refills rage) instead of stopping when low |
@@ -497,7 +498,7 @@ Mode-specific fields:
 |---|---|
 | `mob` | `mobs`: string[] (exact mob names, required); `max_kills`: int (0 = unlimited, counted across passes); `run_count`: int (full passes per character; 0/absent = farm indefinitely, waiting out respawns — send 1 for a single pass); `attack_interval_seconds`: int 60–86400 (wait between passes); `drop_junk`: bool |
 | `quest` | **either** `catalog_quest_id`: int (a quest `id` from `GET /quests`; the giver and game quest id are taken from the catalog, `422` if the catalog has no giver for it) **or** `npc`: string (giver name) + `quest_id`: int (the *game's* quest id); `respawn_wait_seconds`: int 60–86400 (default 60, wait before retrying an objective whose targets are all dead) |
-| `quest-list` | `quest_list_id`: int (required, must be yours); `respawn_wait_seconds`: int 60–86400 (default 60) |
+| `quest-list` | `quest_list_ids`: int[] (1–10 distinct lists, all yours, **played back to back in this order**; the single `quest_list_id` is still accepted). A quest finished in an earlier list is skipped in a later one (non-repeatable quests). `config.quest_list_id` mirrors the first list and is deprecated. A foreign/unknown list → `422` naming it. `respawn_wait_seconds`: int 60–86400 (default 60) |
 | `pvp-attack-list` | `attack_list_id`: int (yours) **or** `targets`: string[]; `attacks_per_target`, `max_attacks`, `skip_too_strong`, `cooldown_minutes` (1–60), `message` |
 | `pvp-crew-members` | `crew_game_ids`: int[] (1–10 distinct game crew ids — find them with `GET /crews`; the single `crew_game_id` is still accepted). Rosters are attacked in the order given. `config.crew_game_id` mirrors the first id and is deprecated |
 | `pvp-crew-hitlist` · `pvp-brawl` · `pvp-faction-brawl` | no target fields (`auto_enter_brawl`: bool for the brawl modes) |
@@ -524,7 +525,7 @@ Example (mob mode, fleet of 2, cast skills + Circ gate):
   "created_at": "…" } }
 ```
 `progress` fills in as the run cycles: mob → `kills_done`/`cycles_done`;
-quest-list → `position`/`quests_completed`/`quests_skipped`. `resume_at` is
+quest-list → `list_index` (0-based, which of `quest_list_ids`)/`position`/`quests_completed`/`quests_skipped`. `resume_at` is
 set while a participant is `waiting` (Circ cooldown, pass interval, session
 recovery) — that's when the scheduler re-dispatches it.
 
@@ -554,8 +555,12 @@ gate) are re-applied at pickup, so changing the skill selection while paused
 takes effect, and each character continues from its persisted `progress`.
 
 ### `PATCH /runs/{id}`
-`{ "name": "sub85 veldara" }` (or `null` to clear). Allowed in any status;
-`403` if the run is not yours. Nothing else about a run is editable.
+`{ "name": "sub85 veldara" }` (or `null` to clear) and/or
+`{ "priority": "high" }`. Allowed in any status; `403` if the run is not
+yours. A new priority immediately moves the run's `pending` participants
+(waiting for a worker) to the new queue; `waiting` ones use it at their next
+resume; running ones are not touched. The run resource carries `priority`.
+Nothing else about a run is editable.
 
 ### `DELETE /runs/{id}`
 Delete a **finished** run and its participants. `422` while live or parked

@@ -2,6 +2,19 @@
 
 Notes for API consumers (Angular/mobile clients). Newest first.
 
+## 2026-11-07 — Chained quest lists, run priority
+
+Additive; client steps in `docs/frontend-brief-feedback-2026-11.md` §2.
+
+- `POST /runs` (quest-list mode) takes `quest_list_ids` (1–10, played back to
+  back); `quest_list_id` still works and is mirrored in `config`. Progress
+  gains `list_index`.
+- Runs have `priority` (`high` · `normal` · `low`), settable on create and via
+  `PATCH /runs/{id}`; waiting participants of higher-priority runs get the
+  next free worker first. **Deploy:** `php artisan migrate`, then
+  `php artisan horizon:terminate` so the runs supervisor picks up its three
+  queues (`runs-high`, `runs`, `runs-low`).
+
 ## 2026-11-07 — Passwords, sessions, crew groups, challenge tokens
 
 All additive; details and client steps in `docs/frontend-brief-feedback-2026-11.md`.

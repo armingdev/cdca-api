@@ -27,6 +27,7 @@ use App\Models\RunParticipant;
 use App\Models\Skill;
 use Carbon\CarbonInterface;
 use Closure;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Contracts\Queue\Interruptible;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -64,6 +65,13 @@ abstract class RunJob implements Interruptible, ShouldQueue
 
     /** Session-collision re-logins tolerated per cycle before failing loudly. */
     private const int MAX_RELOGIN_ATTEMPTS = 3;
+
+    /**
+     * How long a delivery waits for the character lock before declaring the
+     * character double-driven. Only a superseded delivery stepping aside
+     * should ever be in the way, and it holds the lock for milliseconds.
+     */
+    private const int LOCK_GRACE_SECONDS = 2;
 
     /**
      * Consecutive respawn waits that produce nothing before we accept the
@@ -129,7 +137,8 @@ abstract class RunJob implements Interruptible, ShouldQueue
         public string $dispatchToken,
     ) {
         $this->onConnection('redis-runs');
-        $this->onQueue('runs');
+        // One queue per run priority; the runs supervisor drains them in order.
+        $this->onQueue($participant->run->priority->queue());
     }
 
     public function handle(LoginService $loginService): void
@@ -162,9 +171,14 @@ abstract class RunJob implements Interruptible, ShouldQueue
         // One character, one worker — the enrollment guard makes a second
         // driver near-impossible, so a held lock is a loud failure, not a
         // silent retry. TTL outlives the job so a hard-killed worker frees it.
+        // The short wait covers the one legitimate overlap: a delivery that
+        // was re-queued (priority change) holding the lock for the instant
+        // it takes to find its claim superseded.
         $lock = Cache::lock("character-run:{$character->id}", $this->timeout + 600);
 
-        if (! $lock->get()) {
+        try {
+            $lock->block(self::LOCK_GRACE_SECONDS);
+        } catch (LockTimeoutException) {
             $participant->transition(RunStatus::Failed, 'Character is already driven by another worker.');
             $participant->run->refreshStatus();
 
@@ -172,7 +186,19 @@ abstract class RunJob implements Interruptible, ShouldQueue
         }
 
         try {
-            $this->drive($participant, $character, $loginService);
+            // Claim atomically: only while still Pending under this job's
+            // token. A requeue (RunDispatcher::requeue) that swapped the token
+            // first wins, and this delivery steps aside without a trace.
+            $claimed = RunParticipant::whereKey($participant->id)
+                ->where('dispatch_token', $this->dispatchToken)
+                ->where('status', RunStatus::Pending)
+                ->update(['status' => RunStatus::Running, 'started_at' => now(), 'heartbeat_at' => now()]);
+
+            if ($claimed === 0) {
+                return;
+            }
+
+            $this->drive($participant->refresh(), $character, $loginService);
         } finally {
             $lock->release();
         }
@@ -241,7 +267,7 @@ abstract class RunJob implements Interruptible, ShouldQueue
 
     private function drive(RunParticipant $participant, Character $character, LoginService $loginService): void
     {
-        $participant->update(['status' => RunStatus::Running, 'started_at' => now(), 'heartbeat_at' => now()]);
+        // The participant itself was claimed as Running by handle().
         $character->update(['status' => CharacterActivity::Running]);
 
         $run = $participant->run;

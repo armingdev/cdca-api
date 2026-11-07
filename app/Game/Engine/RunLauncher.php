@@ -3,6 +3,7 @@
 namespace App\Game\Engine;
 
 use App\Game\Enums\RunMode;
+use App\Game\Enums\RunPriority;
 use App\Game\Enums\RunStatus;
 use App\Game\Exceptions\CharactersBusyException;
 use App\Game\Skills\SkillSelection;
@@ -53,6 +54,7 @@ class RunLauncher
         ?string $name = null,
         array $reserveRageFor = [],
         int $reserveRageHours = 12,
+        RunPriority $priority = RunPriority::Normal,
     ): Run {
         if ($startAt !== null && $startAt->isPast()) {
             $startAt = $startAt->addDay();
@@ -78,6 +80,7 @@ class RunLauncher
             'reserve_rage_for' => $reserveRageFor === [] ? null : $reserveRageFor,
             'reserve_rage_hours' => $reserveRageHours,
             'status' => $startAt?->isFuture() ?? false ? RunStatus::Pending : RunStatus::Running,
+            'priority' => $priority,
             'restart_every_minutes' => $restartEveryMinutes,
             'start_at' => $startAt,
             'last_started_at' => $startAt ?? now(),

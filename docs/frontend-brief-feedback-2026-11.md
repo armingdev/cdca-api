@@ -4,8 +4,8 @@ Audience: a Claude session working in `/Users/armingerina/Code/cdca/cdca-client`
 (Angular 22, standalone components, signals + `@angular/forms/signals`, Vitest).
 
 A tester sent a new list of wishes. The API is built phase by phase and this
-brief grows with it. **Phase 1 (accounts and sessions) is done**; the run
-features (multiple quest lists, run priority, potions, spawned mobs) follow in
+brief grows with it. **Phase 1 (accounts and sessions) and Phase 2 (multiple
+quest lists, run priority) are done**; potions and spawned mobs follow in
 later sections once their API lands. Every API change so far is additive:
 nothing in the client breaks if none of this is done yet.
 
@@ -166,6 +166,61 @@ level"). It now works. If the quest finder had a workaround for that, it can go.
 
 ---
 
+## 2. Run orchestration (Phase 2 — API done)
+
+### 2.1 Run several quest lists together
+
+A quest-list run now takes **`quest_list_ids: number[]`** (1–10 distinct
+lists of the user's own), played back to back in the given order. A
+non-repeatable quest finished in an earlier list is skipped in a later one.
+`quest_list_id` (single) is still accepted, and `config.quest_list_id` mirrors
+the first list. Unknown/foreign ids → `422 errors.quest_list_ids` naming them.
+
+Progress gains `list_index` (0-based index into `config.quest_list_ids`) next to
+`position`. The run log (`GET /runs/{id}/events`) gets an `info` event
+"Running quest list 'X' — list 2 of 3 (…)" at each list start, and
+`quest_skipped`/`quest_completed`/`quest_retry_scheduled` contexts now carry
+`quest_list_id` (`position` alone is ambiguous across lists).
+
+Client:
+
+- `features/runs/new-run-page.html:373-395` — replace the single `<select>`
+  with an ordered multi-pick (add list, remove, move up/down; max 10). The
+  crew picker (`features/runs/crew-picker.ts`, `MAX_CREWS`) is the precedent
+  for an ordered id list with a cap. Form model: `quest_list_ids: number[]`
+  instead of `quest_list_id` (`new-run-page.ts:95,275,390,680,843-846`);
+  validation "Choose at least one quest list."
+- Run detail (`features/runs/run-detail-page`): for quest-list runs, show
+  "List 2/3 · <name> · quest 5" from `progress.list_index` / `position`
+  (names from `GET /quest-lists`, matched by `config.quest_list_ids`).
+- `run-activity-log.html:84-85` shows `position #N` for skips — prefix the
+  list name when `context.quest_list_id` is present.
+
+### 2.2 Run priority
+
+Runs have **`priority: 'high' | 'normal' | 'low'`** (default `normal`).
+When every run worker is busy, waiting participants of a higher-priority run
+get the next free worker first. It never interrupts a running character.
+
+- `POST /runs { …, priority }`.
+- `PATCH /runs/{id} { priority }` — any status. Participants still waiting
+  for a worker (`pending`) move to the new queue at once; parked (`waiting`)
+  ones use it at their next resume. `name` and `priority` can be sent
+  together or alone (a PATCH with neither is still a `422` on `name`).
+- `RunResource.priority` is always present.
+
+Client:
+
+- New-run form: a three-way segmented control "Priority: High · Normal · Low"
+  (default Normal) with the hint "Decides who starts first when all run
+  workers are busy."
+- Runs list (`features/runs/runs-page.html:36-60`): a small "High"/"Low" chip
+  next to the status chip (nothing for normal), and a priority menu on each
+  row that PATCHes it. Most useful on `pending` runs — consider surfacing it
+  next to the "starts at" line.
+
+---
+
 ## 4. Type changes checklist (`core/models`)
 
 - `rga.ts`
@@ -181,3 +236,8 @@ level"). It now works. If the quest finder had a workaround for that, it can go.
   `CrewGroupSession` (with `characters: { suid, server_id, name, level }[]`),
   `CrewGroupSessionRead`.
 - `characters-api.ts` — optional `min_level`/`max_level` query params.
+- `run.ts`
+  - `Run` += `priority: RunPriority` (`type RunPriority = 'high' | 'normal' | 'low'`).
+  - quest-list config += `quest_list_ids: number[]` (`quest_list_id` stays, deprecated).
+  - participant progress += `list_index?: number`.
+  - create/update run requests += `priority?: RunPriority`; create += `quest_list_ids?: number[]`.

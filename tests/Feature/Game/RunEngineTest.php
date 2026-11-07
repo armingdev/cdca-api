@@ -232,6 +232,22 @@ it('starts a quest-list run and queues a RunQuestListJob', function () {
     Queue::assertPushed(RunQuestListJob::class, 1);
 });
 
+it('chains quest lists given by repeating --list, in that order', function () {
+    Queue::fake();
+
+    $character = Character::factory()->for(Rga::factory()->withSession())->create();
+    $first = QuestList::create(['name' => 'First']);
+    $second = QuestList::create(['name' => 'Second']);
+
+    $this->artisan('outwar:run-start', [
+        '--characters' => [(string) $character->id],
+        '--mode' => 'quest-list',
+        '--list' => ['Second', 'First'],
+    ])->assertSuccessful();
+
+    expect(Run::first()->config['quest_list_ids'])->toBe([$second->id, $first->id]);
+});
+
 it('executes a quest-list job end to end and completes the run', function () {
     // Rooms 1–2 exist from the combat seed; add the quest giver + objective mob.
     Mob::factory()->create(['name' => 'Stella'])->rooms()->attach(1, ['last_seen_at' => now()]);

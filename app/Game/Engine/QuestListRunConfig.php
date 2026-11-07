@@ -4,11 +4,19 @@ namespace App\Game\Engine;
 
 /**
  * Per-run quest-list options — stored as the run's jsonb config.
+ *
+ * A run plays one or more lists back to back, in the given order.
  */
 final readonly class QuestListRunConfig
 {
+    /** How many lists one run may chain. */
+    public const int MAX_LISTS = 10;
+
+    /**
+     * @param  list<int>  $questListIds  in play order
+     */
     public function __construct(
-        public int $questListId,
+        public array $questListIds,
         public int $stopRage = 2500,
         public bool $levelUp = false,
         public bool $smart = false,
@@ -17,12 +25,20 @@ final readonly class QuestListRunConfig
     ) {}
 
     /**
+     * Runs stored before lists could be chained carry only `quest_list_id`.
+     *
      * @param  array<string, mixed>  $config
      */
     public static function fromArray(array $config): self
     {
+        $legacyId = (int) ($config['quest_list_id'] ?? 0);
+
+        $ids = is_array($config['quest_list_ids'] ?? null)
+            ? array_values(array_map(intval(...), $config['quest_list_ids']))
+            : ($legacyId > 0 ? [$legacyId] : []);
+
         return new self(
-            questListId: (int) ($config['quest_list_id'] ?? 0),
+            questListIds: $ids,
             stopRage: (int) ($config['stop_rage'] ?? 2500),
             levelUp: (bool) ($config['level_up'] ?? false),
             smart: (bool) ($config['smart'] ?? false),
@@ -37,7 +53,9 @@ final readonly class QuestListRunConfig
     public function toArray(): array
     {
         return [
-            'quest_list_id' => $this->questListId,
+            'quest_list_ids' => $this->questListIds,
+            // Mirror of the first list for clients that predate chaining.
+            'quest_list_id' => $this->questListIds[0] ?? null,
             'stop_rage' => $this->stopRage,
             'level_up' => $this->levelUp,
             'smart' => $this->smart,

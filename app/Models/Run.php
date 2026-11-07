@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Game\Enums\RunMode;
+use App\Game\Enums\RunPriority;
 use App\Game\Enums\RunSignal;
 use App\Game\Enums\RunStatus;
 use Database\Factories\RunFactory;
@@ -20,6 +21,16 @@ class Run extends Model
     /** How long a control signal stays readable — outlives the longest job (2h). */
     private const int SIGNAL_TTL_SECONDS = 28800;
 
+    /**
+     * Mirrors the column default: the job constructor reads the priority of a
+     * run that may have just been created without one.
+     *
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'priority' => 'normal',
+    ];
+
     protected $fillable = [
         'user_id',
         'name',
@@ -31,6 +42,7 @@ class Run extends Model
         'reserve_rage_for',
         'reserve_rage_hours',
         'status',
+        'priority',
         'restart_every_minutes',
         'start_at',
         'last_started_at',
@@ -44,6 +56,7 @@ class Run extends Model
         return [
             'mode' => RunMode::class,
             'status' => RunStatus::class,
+            'priority' => RunPriority::class,
             'config' => 'array',
             'cast_on_start' => 'boolean',
             'require_circumspect' => 'boolean',

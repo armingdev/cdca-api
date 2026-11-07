@@ -172,7 +172,7 @@ it('parks a quest and a quest list for a minute when the worker is told to quit'
         ->and($quest->progress)->toBeNull()
         ->and($list->status)->toBe(RunStatus::Waiting)
         ->and($list->resumeAt->toDateTimeString())->toBe('2026-08-27 12:41:00')
-        ->and($list->progress)->toBe(['position' => 5]);
+        ->and($list->progress)->toBe(['list_index' => 0, 'position' => 5]);
 });
 
 it('parks a quest until the next game-clock rage tick when it cannot afford its target', function () {
