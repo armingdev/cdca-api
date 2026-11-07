@@ -1,0 +1,54 @@
+{
+ "error": "",
+ "pic": "enviro_build.jpg",
+ "actionid": "0",
+ "description": "",
+ "name": "Bunker Hill",
+ "mapData": null,
+ "north": "8064",
+ "south": "8079",
+ "east": "8056",
+ "west": "8054",
+ "curRoom": "8055",
+ "roomDetailsNew": [
+  {
+   "name": "Possible Pyrite",
+   "level": "66",
+   "rage": "40",
+   "h": "REDACTED",
+   "encid": "K336D372J336H318Q336",
+   "mobId": "1495",
+   "spawnId": "39303",
+   "image": "coessolo/pyrite.jpg",
+   "spawnedBy": "PLAYER",
+   "killedBy": "PLAYER",
+   "isDead": false,
+   "type": 3
+  },
+  {
+   "name": "A Rock",
+   "level": "65",
+   "rage": "39",
+   "h": "REDACTED",
+   "encid": "A336X372E336F348M318",
+   "mobId": "1492",
+   "spawnId": "39350",
+   "image": "coessolo/rock.jpg",
+   "type": 2
+  },
+  {
+   "name": "A Rock",
+   "level": "65",
+   "rage": "39",
+   "h": "REDACTED",
+   "encid": "E336F372R336X348L354",
+   "mobId": "1492",
+   "spawnId": "39356",
+   "image": "coessolo/rock.jpg",
+   "type": 2
+  }
+ ],
+ "tavernData": "",
+ "doorsData": null,
+ "mapTileTypes": null
+}

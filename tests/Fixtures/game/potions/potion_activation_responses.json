@@ -1,0 +1,11 @@
+{
+  "captured": "2026-11-07",
+  "note": "POST ajax/backpack_action.php action=activate&itemids[]={iid} on the potion tab. The stack's iid changes after every use \u2014 re-read the tab before the next activation.",
+  "activated": "{\"status\":\"Kix Potion activated!<br>\",\"redirectTo\":\"\"}",
+  "rage_potion_activated": "{\"status\":\"Rage Potion activated!<br>\",\"redirectTo\":\"\"}",
+  "already_active": "{\"error\":\"You have already consumed one of these potions, please wait until it wears off\"}",
+  "rage_before_after": {
+    "before": "244,093",
+    "after": "245,093"
+  }
+}

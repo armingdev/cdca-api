@@ -81,6 +81,33 @@ Auth required. Revokes the **current** token. `200 OK`.
 ### `GET /user`
 Auth required. `200 OK` → `{ "user": { id, name, email, created_at } }`.
 
+### `POST /forgot-password`
+Public. Rate-limited (10/min per IP). `{ "email": "armin@example.com" }` →
+`200 { "message": "If that email belongs to an account, a password reset link is on its way." }`.
+The answer is the same for unknown emails (no account discovery). The mail
+(queued, sent via Postmark in production) links to
+`{FRONTEND_URL}/reset-password?token={token}&email={email}`; the link expires
+after 60 minutes.
+
+### `POST /reset-password`
+Public. Rate-limited (10/min per IP).
+```json
+{ "token": "…", "email": "armin@example.com",
+  "password": "new-secret", "password_confirmation": "new-secret" }
+```
+`200 { "message": "Your password has been reset. Sign in with the new password." }`.
+**Every API token of the account is revoked**, so the user must log in again.
+A bad/expired token or an unknown email → `422` with
+`errors.email: ["This password reset link is invalid or has expired."]`.
+
+### `PUT /user/password`
+Auth required. Rate-limited (10/min per IP).
+```json
+{ "current_password": "old-secret", "password": "new-secret", "password_confirmation": "new-secret" }
+```
+`200`. The calling device stays signed in; **every other token is revoked**.
+Wrong `current_password`, or a new password equal to the current one → `422`.
+
 **Unauthenticated requests to protected routes return `401`.**
 
 ---
@@ -140,7 +167,41 @@ Show / delete one of your RGAs. `403` if not yours.
 
 ### `PUT /rgas/{id}`
 Update credentials: `password` and/or `security_answer` (both optional,
-encrypted at rest). `username` is immutable — a different account is a new RGA.
+encrypted at rest), and the `auto_claim_tokens` boolean. `username` is
+immutable — a different account is a new RGA.
+
+The RGA resource also carries `auto_claim_tokens` (default `true`),
+`challenge_tokens`, `challenge_tokens_purchased` and `challenge_claim_at`
+(the last challenge-token reading; `null` until first read).
+
+### Sessions
+- `GET /rgas/{id}/session` — reveal one RGA's stored cookies:
+  `{ data: { rga_id, username, rg_sess_id, token, cuserid2, status, last_login_at } }`;
+  `404` without a captured session.
+- `POST /rgas/{id}/session` — attach a session pasted from a browser
+  (`rg_sess_id` = 32 hex, optional `token`, `cuserid2`); verified live first,
+  `422` if the game rejects it.
+- **`GET /rgas/sessions[?verify=1]`** — "copy all sessions": every RGA of yours
+  with a live session, in one response, ordered by username. Rate-limited
+  (30/min). Each row: `rga_id, username, rg_sess_id, token, cuserid2, status,
+  last_login_at, characters_count, alive`. Without `verify`, `alive` is `null`
+  and the game is not contacted. With `verify=1` each session is checked
+  (one game request per RGA): `true` = works, `false` = the game rejected it
+  (the RGA is marked `invalid` — the client can offer `POST /rgas/{id}/login`),
+  `null` = the game could not be reached (nothing changed). Never logs in.
+
+### Challenge tokens
+3 tokens per day per RGA, at most 30 held (purchased tokens are separate).
+The scheduler claims them every day for each RGA with `auto_claim_tokens`
+on (checked every 30 min; never logs in).
+- `GET /rgas/{id}/challenge-tokens` — live reading:
+  `{ data: { rga_id, auto_claim_tokens, tokens, max_tokens: 30, purchased_tokens,
+  next_claim_at, claimed_at, synced_at } }`.
+- `POST /rgas/{id}/challenge-tokens/claim` — claim now. `200` with
+  `message` (the game's text) + the new reading; `422` with the game's
+  refusal (e.g. "You have reached your max of 30 challenge tokens!") or when
+  today's claim is already used (the message names `next_claim_at`).
+Both need a live session and a synced character (`422` otherwise).
 
 ### `POST /rgas/{id}/login`
 Logs the RGA in to Outwar and captures its session. Synchronous (makes a live
@@ -167,7 +228,9 @@ characters appear under `GET /characters` with live stats filling in.
 ### `GET /characters`
 All your characters (across RGAs), in one stable order: level desc, then
 name, then id (rows with equal levels never swap between two polls). Filters:
-`?server_id=1|2`, `?rga_id={id}`, `?ownership=own|trustee`.
+`?server_id=1|2`, `?rga_id={id}`, `?ownership=own|trustee`,
+`?min_level=` / `?max_level=` (inclusive, 1–95, either alone is fine;
+`max_level < min_level` → `422`).
 
 `is_trustee` marks a character another RGA shared with this one (it shows up
 in the account's roster but is not its own). It is set by the roster sync
@@ -301,6 +364,33 @@ areas no walk reaches.
   `group_by=mob` adds `mob_id` and `mob_name` to each row (both `null` for a
   drop with no source mob, e.g. PvP). Filtering by a character or run that is
   not yours simply yields nothing.
+
+---
+
+## 5b. Crew groups (crew leader mode)
+
+A cdca-side crew (not the game's `GET /crews` data): a leader plus members
+who joined with its invite code. Each member chooses which of **their own**
+RGAs the leader may read; the leader can then copy those sessions in one
+call. Every leader read is recorded and visible to all members.
+
+| Endpoint | Who | What |
+|---|---|---|
+| `GET /crew-groups` | any user | groups you lead or belong to: `{ id, name, leader: {id, name}, is_leader, members_count, created_at }` (+ `invite_code` for the leader) |
+| `POST /crew-groups` `{ name }` | any user | create; you are leader and first member. `201`, includes `invite_code` (10 chars, A–Z/2–9) |
+| `GET /crew-groups/{id}` | member | + `members: [{ id, name, joined_at, shared_rgas_count }]` and `shared_rgas: [{ rga_id, username, shared_by_user_id, shared_at, has_session }]` — **all** shares for the leader, **only your own** for a member. Emails are never shown |
+| `PATCH /crew-groups/{id}` `{ name }` | leader | rename |
+| `DELETE /crew-groups/{id}` | leader | disband (memberships and shares go too) |
+| `POST /crew-groups/{id}/invite-code` | leader | new code; the old one stops working, members stay |
+| `POST /crew-groups/join` `{ invite_code }` | any user | join (case-insensitive). Unknown code → `422 errors.invite_code`. Joining shares nothing. Rate-limited (10/min) |
+| `PUT /crew-groups/{id}/shared-rgas` `{ rga_ids: [] }` | member | replace your share set with exactly these RGAs (your own only — anyone else's → `422` "You can only share your own game accounts."); `[]` withdraws all. Returns your shares |
+| `DELETE /crew-groups/{id}/members/{userId}` | member (self) / leader | leave, or the leader removes a member; their shares are withdrawn. The leader cannot leave (`403`) — disband instead |
+| `GET /crew-groups/{id}/sessions[?verify=1]` | **leader** | every shared RGA: `{ rga_id, username, member: {id, name}, has_session, rg_sess_id, token, cuserid2, status, last_login_at, alive, characters: [{ suid, server_id, name, level }] }`. Cookies are `null` when the RGA has no live session. `verify=1` checks each with the game (a rejected one is marked `invalid` and its cookies hidden). Writes an audit row. Rate-limited (30/min) |
+| `GET /crew-groups/{id}/session-reads?per_page=25` | member | audit trail, newest first: `{ id, reader: {id, name}, rga_ids, verified, read_at }` (paginated) |
+
+Non-members get `403` on every group endpoint. A shared session goes stale
+when its owner's run recovers a session collision by logging in again — the
+leader just reads again.
 
 ---
 

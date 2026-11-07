@@ -20,6 +20,13 @@ Schedule::command('outwar:brawl-sync')->hourly()->withoutOverlapping()->onOneSer
 // rows; without this the table only ever grows.
 Schedule::command('outwar:run-events-prune')->dailyAt('04:10')->withoutOverlapping()->onOneServer();
 
+// Daily challenge tokens (3/day per RGA) for every RGA with auto-claim on.
+// Each RGA stores when it is next due, so most runs queue nothing.
+Schedule::command('outwar:challenge-tokens-claim')->everyThirtyMinutes()->withoutOverlapping()->onOneServer();
+
+// Expired password-reset tokens otherwise accumulate in password_reset_tokens.
+Schedule::command('auth:clear-resets')->dailyAt('04:20')->withoutOverlapping()->onOneServer();
+
 // Horizon's metrics dashboard stays blank unless snapshots are taken. One
 // server only — duplicate snapshots skew the throughput/runtime metrics.
 Schedule::command('horizon:snapshot')->everyFiveMinutes()->withoutOverlapping()->onOneServer();

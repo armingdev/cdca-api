@@ -28,6 +28,11 @@ class RgaResource extends JsonResource
             // Lets the client tell whether the roster it is showing came from
             // the background sync that runs after a CDCA login.
             'characters_synced_at' => $this->characters_synced_at,
+            'auto_claim_tokens' => $this->auto_claim_tokens,
+            // Last reading of the daily challenge tokens (null until first read).
+            'challenge_tokens' => $this->challenge_tokens,
+            'challenge_tokens_purchased' => $this->challenge_tokens_purchased,
+            'challenge_claim_at' => $this->challenge_claim_at,
             'created_at' => $this->created_at,
         ];
     }

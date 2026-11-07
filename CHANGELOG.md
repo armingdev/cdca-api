@@ -2,6 +2,24 @@
 
 Notes for API consumers (Angular/mobile clients). Newest first.
 
+## 2026-11-07 — Passwords, sessions, crew groups, challenge tokens
+
+All additive; details and client steps in `docs/frontend-brief-feedback-2026-11.md`.
+
+- `POST /forgot-password`, `POST /reset-password` (revokes all tokens),
+  `PUT /user/password` (revokes the other devices' tokens). Reset mails link
+  to `{FRONTEND_URL}/reset-password`.
+- `GET /rgas/sessions[?verify=1]` — every live session in one response.
+  `GET /rgas/{id}/session` also returns `rga_id` and `username`.
+- Crew groups (`/crew-groups/*`): invite-code membership, per-RGA opt-in
+  sharing, leader-only `GET /crew-groups/{id}/sessions`, audited.
+- Challenge tokens are claimed daily per RGA (`auto_claim_tokens`, default on);
+  `GET|POST /rgas/{id}/challenge-tokens[/claim]`. `RgaResource` gains
+  `auto_claim_tokens`, `challenge_tokens`, `challenge_tokens_purchased`,
+  `challenge_claim_at`.
+- `GET /characters` accepts `min_level` / `max_level`.
+- Fix: `GET /quests?max_level=` without `min_level` no longer returns `422`.
+
 ## 2026-08-28 — Quest runs park instead of stopping, and skip Quest Shard steps
 
 Four client-visible changes from live-run reports. One new request field;

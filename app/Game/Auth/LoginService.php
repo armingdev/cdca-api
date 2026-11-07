@@ -8,6 +8,7 @@ use App\Game\Http\GameClient;
 use App\Game\Parsers\TrusteeListParser;
 use App\Models\Rga;
 use GuzzleHttp\Cookie\CookieJar;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 
@@ -101,9 +102,41 @@ class LoginService
     }
 
     /**
+     * Ask the game whether the RGA's stored session still works. A rejected
+     * session is marked invalid (the same verdict GameClient::guard reaches
+     * mid-run); an unreachable game answers null and changes nothing, so a
+     * network blip never costs the user a working session. Never logs in.
+     */
+    public function probeSession(Rga $rga): ?bool
+    {
+        $cookies = array_filter(
+            (array) $rga->cookies,
+            fn (mixed $value, string $name): bool => in_array($name, self::SESSION_COOKIES, true) && is_string($value) && $value !== '',
+            ARRAY_FILTER_USE_BOTH,
+        );
+
+        if (empty($cookies['rg_sess_id'])) {
+            return false;
+        }
+
+        try {
+            $this->verifySession($cookies);
+        } catch (LoginFailedException) {
+            $rga->update(['status' => Rga::STATUS_INVALID]);
+
+            return false;
+        } catch (ConnectionException) {
+            return null;
+        }
+
+        return true;
+    }
+
+    /**
      * @param  array<string, string>  $cookies
      *
-     * @throws LoginFailedException
+     * @throws LoginFailedException the game did not recognize the session
+     * @throws ConnectionException the game could not be reached at all
      */
     private function verifySession(array $cookies): void
     {

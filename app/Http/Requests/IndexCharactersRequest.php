@@ -22,6 +22,9 @@ class IndexCharactersRequest extends FormRequest
             'rga_id' => ['sometimes', 'integer', 'min:1'],
             // own = the RGA's own characters, trustee = shared by another RGA.
             'ownership' => ['sometimes', 'in:own,trustee'],
+            // Inclusive level range, e.g. 40–60 to select a band of the fleet.
+            'min_level' => ['sometimes', 'integer', 'min:1', 'max:95'],
+            'max_level' => ['sometimes', 'integer', 'min:1', 'max:95', Rule::when($this->filled('min_level'), ['gte:min_level'])],
         ];
     }
 }

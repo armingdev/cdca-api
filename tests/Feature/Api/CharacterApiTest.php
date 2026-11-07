@@ -301,4 +301,19 @@ it('returns 422 for an ownership filter or server it does not know', function (a
 })->with([
     'unknown ownership' => [['ownership' => 'borrowed'], 'ownership'],
     'unknown server' => [['server_id' => 3], 'server_id'],
+    'max level below min level' => [['min_level' => 60, 'max_level' => 40], 'max_level'],
+]);
+
+it('filters the fleet to an inclusive level range', function (array $query, array $expectedLevels) {
+    foreach ([39, 40, 50, 60, 61] as $level) {
+        Character::factory()->for($this->rga)->create(['level' => $level]);
+    }
+
+    $this->getJson('/api/v1/characters?'.http_build_query($query))
+        ->assertOk()
+        ->assertJsonPath('data.*.level', $expectedLevels);
+})->with([
+    'both bounds' => [['min_level' => 40, 'max_level' => 60], [60, 50, 40]],
+    'min only' => [['min_level' => 60], [61, 60]],
+    'max only' => [['max_level' => 40], [40, 39]],
 ]);
