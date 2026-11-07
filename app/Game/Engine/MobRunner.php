@@ -39,6 +39,15 @@ class MobRunner
     private const int MAX_CONSECUTIVE_ATTACK_FAILURES = 5;
 
     /**
+     * Attacks in a row on one mob that found it already gone ("Invalid mob!")
+     * before it is dropped for the pass. Kept apart from, and above, the
+     * refusal cap: with dozens of our own characters farming the same spawns,
+     * losing the race a few times running is contention, and counting it as a
+     * refusal dropped the only target of a quest and skipped the quest.
+     */
+    private const int MAX_CONSECUTIVE_VANISHED_TARGETS = 10;
+
+    /**
      * Room-mate attacks per spawn room per pass before giving up on the spawn
      * there. Live spawns took 6 and 10 kills (2026-11-07); the cap only has to
      * stop a room that will never deliver from eating the whole rage bar.
@@ -73,6 +82,9 @@ class MobRunner
 
     /** @var array<string, int> mob name => consecutive failed attacks this pass */
     private array $attackFailures = [];
+
+    /** @var array<string, int> mob name => consecutive attacks this pass that found it already gone */
+    private array $vanishedTargets = [];
 
     /** @var array<string, true> mob names whose attacks keep failing — skipped for this pass */
     private array $unattackable = [];
@@ -579,7 +591,9 @@ class MobRunner
      * would otherwise re-read the room and re-attack forever — the shape of
      * every "spamming failed requests" report. A mob that refuses
      * MAX_CONSECUTIVE_ATTACK_FAILURES times in a row is dropped for the rest
-     * of the pass; the streak resets the moment any attack lands.
+     * of the pass; the streak resets the moment any attack lands. A mob that
+     * was simply gone (another player got there first) has its own, longer
+     * streak — see MAX_CONSECUTIVE_VANISHED_TARGETS.
      *
      * Returns true when nothing attackable is left, so the caller can end the
      * pass instead of wandering between rooms it can do nothing with.
@@ -590,19 +604,29 @@ class MobRunner
     {
         if ($event->outcome !== BattleOutcome::Failed) {
             $this->attackFailures[$sighting->name] = 0;
+            $this->vanishedTargets[$sighting->name] = 0;
 
             return false;
         }
 
-        $failures = ($this->attackFailures[$sighting->name] ?? 0) + 1;
-        $this->attackFailures[$sighting->name] = $failures;
+        if ($event->fail_reason === AttackService::TARGET_GONE_ALERT) {
+            $streak = ($this->vanishedTargets[$sighting->name] ?? 0) + 1;
+            $this->vanishedTargets[$sighting->name] = $streak;
+            $limit = self::MAX_CONSECUTIVE_VANISHED_TARGETS;
+            $verdict = "{$streak} attacks in a row found it already gone";
+        } else {
+            $streak = ($this->attackFailures[$sighting->name] ?? 0) + 1;
+            $this->attackFailures[$sighting->name] = $streak;
+            $limit = self::MAX_CONSECUTIVE_ATTACK_FAILURES;
+            $verdict = "{$streak} attacks in a row were refused";
+        }
 
-        if ($failures < self::MAX_CONSECUTIVE_ATTACK_FAILURES) {
+        if ($streak < $limit) {
             return false;
         }
 
         $this->unattackable[$sighting->name] = true;
-        $log("Skipping {$sighting->name} — {$failures} attacks in a row were refused.");
+        $log("Skipping {$sighting->name} — {$verdict}.");
 
         foreach ($this->config->mobNames as $name) {
             if (! isset($this->unattackable[$name])) {

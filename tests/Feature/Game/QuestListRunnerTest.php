@@ -4,6 +4,7 @@ use App\Game\Engine\QuestListRunConfig;
 use App\Game\Engine\RunEndReason;
 use App\Game\Enums\QuestProgressStatus;
 use App\Game\Exceptions\GameException;
+use App\Game\Exceptions\GameServerException;
 use App\Game\Quest\QuestListRunner;
 use App\Models\Character;
 use App\Models\CharacterQuestProgress;
@@ -120,6 +121,26 @@ it('retries a quest whose giver is momentarily absent before writing it off', fu
     expect($summary->completed)->toBeTrue()
         ->and($summary->questsSkipped)->toBe(1)
         ->and($summary->endReason)->toBe(RunEndReason::Completed);
+});
+
+/**
+ * An outage says nothing about the quest. Caught as a GameException anywhere
+ * on the way up — QuestRunner's farming step catches those — it would read as
+ * "no progress possible" and skip a quest the character can finish; it must
+ * reach the job, which parks the list on this quest and retries.
+ */
+it('lets a game server outage mid-quest through instead of skipping the quest', function () {
+    Http::fake(['*somethingelse.php*' => Http::response('error code: 521', 521)]);
+    fakeQuestWorld();
+    $character = Character::factory()->for(Rga::factory()->withSession())->create();
+    $catalog = seedQuestCatalog();
+    $list = QuestList::create(['name' => 'Armins List']);
+    $list->addQuest($catalog[742]->id);
+
+    $run = fn () => QuestListRunner::forCharacter($character, new QuestListRunConfig(questListIds: [$list->id]))
+        ->run(log: fn (string $m) => null);
+
+    expect($run)->toThrow(GameServerException::class, 'HTTP 521');
 });
 
 it('skips a quest it cannot make progress on rather than abandoning the list', function () {

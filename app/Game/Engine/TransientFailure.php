@@ -2,6 +2,7 @@
 
 namespace App\Game\Engine;
 
+use App\Game\Exceptions\GameServerException;
 use App\Game\Exceptions\TransientGameException;
 use Illuminate\Database\LostConnectionDetector;
 use Illuminate\Http\Client\ConnectionException;
@@ -10,9 +11,10 @@ use Throwable;
 
 /**
  * Tells "the world hiccuped" from "this run is broken". A DNS timeout, a game
- * server that would not answer, a Redis or Postgres socket that dropped: none
- * of them say anything about the run, and all of them pass on their own, so a
- * run that meets one parks and retries instead of failing for good.
+ * server that would not answer or answered 5xx (Cloudflare's 502/521 during
+ * an Outwar outage), a Redis or Postgres socket that dropped: none of them
+ * say anything about the run, and all of them pass on their own, so a run
+ * that meets one parks and retries instead of failing for good.
  *
  * Everything else — a parse failure, a game rule, a bug — stays terminal.
  */
@@ -23,6 +25,7 @@ class TransientFailure
     public function matches(Throwable $exception): bool
     {
         return $exception instanceof ConnectionException
+            || $exception instanceof GameServerException
             || $exception instanceof RedisException
             || $exception instanceof TransientGameException
             || $this->lostConnections->causedByLostConnection($exception);

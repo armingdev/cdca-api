@@ -4,6 +4,7 @@ namespace App\Game\Combat;
 
 use App\Game\Data\MobSighting;
 use App\Game\Enums\BattleOutcome;
+use App\Game\Exceptions\GameServerException;
 use App\Game\Http\GameClient;
 use App\Game\Parsers\BattleResultParser;
 use App\Models\BattleEvent;
@@ -12,13 +13,21 @@ use App\Models\Mob;
 
 /**
  * One PvE attack = GET somethingelse.php with the mob's single-use encid.
- * Success is structural: a 302 to /attack/{battleId}/. A 200 with no
- * redirect means the attack never happened — the body carries the reason
- * (stale encid, contention, out of rage) and the engine re-plans instead of
- * depending on any single sentinel string.
+ * Success is structural: a 302 to /attack/{battleId}/. Anything else means the
+ * attack never happened — a 200 whose body carries the reason (stale encid,
+ * contention, out of rage), or a 500 carrying the game's own alert — and the
+ * engine re-plans instead of depending on any single sentinel string.
  */
 class AttackService
 {
+    /**
+     * The game's alert, served as an HTTP 500, for a mob that was gone by the
+     * time the attack landed: killed by someone else between our room load and
+     * the click. Contention, not a mob that refuses — MobRunner budgets it
+     * separately from refusals.
+     */
+    public const string TARGET_GONE_ALERT = 'Invalid mob!';
+
     public function __construct(
         private readonly Character $character,
         private readonly GameClient $client,
@@ -30,13 +39,26 @@ class AttackService
         return new self($character, GameClient::forCharacter($character), app(BattleResultParser::class));
     }
 
+    /**
+     * @throws GameServerException when the 5xx is an outage, not the game's answer
+     */
     public function attack(MobSighting $sighting): BattleEvent
     {
-        $response = $this->client->get('somethingelse.php', [
-            'lightbox' => 1,
-            'attackid' => $sighting->encid,
-            'r' => 'world',
-        ]);
+        try {
+            $response = $this->client->get('somethingelse.php', [
+                'lightbox' => 1,
+                'attackid' => $sighting->encid,
+                'r' => 'world',
+            ]);
+        } catch (GameServerException $exception) {
+            $alert = $exception->gameAlert();
+
+            if ($alert === null) {
+                throw $exception;
+            }
+
+            return $this->recordFailure($sighting, $alert);
+        }
 
         $location = (string) $response->header('Location');
 
