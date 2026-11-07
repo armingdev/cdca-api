@@ -8,6 +8,9 @@ namespace App\Game\Data;
  */
 final readonly class MobSighting
 {
+    /** roomDetailsNew `type`: 1 raid/god, 2 ordinary mob, 3 spawned mob (VERIFIED 2026-11-07). */
+    public const int TYPE_SPAWN = 3;
+
     public function __construct(
         public string $name,
         public int $level,
@@ -21,6 +24,10 @@ final readonly class MobSighting
         public int $type,
         public bool $canForm,
         public ?string $lastKilledBy,
+        /** A talk-only NPC: rendered with an encid, but the game refuses the attack. */
+        public bool $noAttack = false,
+        /** Spawned mobs only (type 3): the player whose kill drew it out. */
+        public ?string $spawnedBy = null,
     ) {}
 
     /**
@@ -41,11 +48,22 @@ final readonly class MobSighting
             type: (int) ($data['type'] ?? 0),
             canForm: (bool) ($data['canForm'] ?? false),
             lastKilledBy: $data['lastKilledBy'] ?? null,
+            noAttack: (bool) ($data['noAttack'] ?? false),
+            spawnedBy: isset($data['spawnedBy']) ? (string) $data['spawnedBy'] : null,
         );
     }
 
     public function isRaid(): bool
     {
         return $this->type === 1 || $this->canForm;
+    }
+
+    /**
+     * A mob that only exists once spawned — drawn out by killing its
+     * room-mates. It stays listed after death (isDead), unlike ordinary mobs.
+     */
+    public function isSpawn(): bool
+    {
+        return $this->type === self::TYPE_SPAWN || $this->spawnedBy !== null;
     }
 }

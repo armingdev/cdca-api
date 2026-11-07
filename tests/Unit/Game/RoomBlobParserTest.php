@@ -67,3 +67,30 @@ it('reads the quest-helper compass direction while help is on', function () {
         ->and($arrived->questHelpDirection)->toBeNull()
         ->and($arrived->curRoom)->toBe(61);
 });
+
+it('marks a spawned mob and who spawned it, and leaves the ordinary ones alone', function () {
+    $blob = new RoomBlobParser()->parse(gameFixture('spawn/room_blob_spawn_live.json'));
+
+    [$pyrite, $rock] = $blob->mobs;
+
+    expect($pyrite->name)->toBe('Possible Pyrite')
+        ->and($pyrite->isSpawn())->toBeTrue()
+        ->and($pyrite->spawnedBy)->toBe('PLAYER')
+        ->and($pyrite->isDead)->toBeFalse()
+        ->and($rock->name)->toBe('A Rock')
+        ->and($rock->isSpawn())->toBeFalse()
+        ->and($rock->spawnedBy)->toBeNull();
+});
+
+it('keeps a killed spawn listed as dead', function () {
+    $pyrite = new RoomBlobParser()->parse(gameFixture('spawn/room_blob_spawn_dead.json'))->mobs[0];
+
+    expect($pyrite->isSpawn())->toBeTrue()
+        ->and($pyrite->isDead)->toBeTrue();
+});
+
+it('reads talk-only NPCs as not attackable', function () {
+    $mobs = new RoomBlobParser()->parse(gameFixture('room_blob_questhelp_pointing.json'))->mobs;
+
+    expect(collect($mobs)->every(fn ($mob) => $mob->noAttack))->toBeTrue();
+});

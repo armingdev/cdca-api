@@ -34,7 +34,16 @@ it('searches mobs by name', function () {
     $this->getJson('/api/v1/world/mobs?q=harvester')
         ->assertOk()
         ->assertJsonCount(1, 'data')
-        ->assertJsonPath('data.0.name', 'Kix Harvester');
+        ->assertJsonPath('data.0.name', 'Kix Harvester')
+        ->assertJsonPath('data.0.spawnable', false);
+});
+
+it('flags mobs that have to be spawned', function () {
+    Mob::factory()->create(['name' => 'Possible Pyrite', 'spawnable' => true]);
+
+    $this->getJson('/api/v1/world/mobs?q=pyrite')
+        ->assertOk()
+        ->assertJsonPath('data.0.spawnable', true);
 });
 
 it('caps how many rows a client can demand per page', function () {

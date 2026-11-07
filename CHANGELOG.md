@@ -2,6 +2,18 @@
 
 Notes for API consumers (Angular/mobile clients). Newest first.
 
+## 2026-11-07 — Spawned mobs
+
+- Mob runs and quest objectives now draw out **spawnable** mobs by farming
+  their room-mates until the spawn appears, then kill it (up to 40 room-mate
+  attacks per room per pass; only the spawned mob counts as a kill). Before,
+  a quest needing one just waited in the room.
+- `GET /world/mobs` items gain `spawnable`.
+- No new endpoints or run fields; the run's `last_activity` shows the hunt
+  ("Possible Pyrite needs to be spawned — farming its room-mates.", "Beat A
+  Rock to draw out Possible Pyrite (3/40).", "Possible Pyrite steps out of
+  the shadows!").
+
 ## 2026-11-07 — Potions
 
 Additive; client steps in `docs/frontend-brief-feedback-2026-11.md` §3.

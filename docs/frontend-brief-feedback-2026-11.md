@@ -4,9 +4,8 @@ Audience: a Claude session working in `/Users/armingerina/Code/cdca/cdca-client`
 (Angular 22, standalone components, signals + `@angular/forms/signals`, Vitest).
 
 A tester sent a new list of wishes. The API is built phase by phase and this
-brief grows with it. **Phase 1 (accounts and sessions), Phase 2 (multiple
-quest lists, run priority) and Phase 3 (potions) are done**; spawned mobs
-follow once their API lands. Every API change so far is additive:
+brief grows with it. **All four phases are done**: accounts and sessions,
+multiple quest lists and run priority, potions, and spawned mobs. Every API change so far is additive:
 nothing in the client breaks if none of this is done yet.
 
 Full endpoint shapes: `cdca-api/docs/api-reference.md` (§2 auth, §4 RGAs →
@@ -266,6 +265,27 @@ Client:
 
 ---
 
+## 3b. Spawned mobs (Phase 4 — API done, almost nothing for the client)
+
+Some mobs only exist once spawned: killing their room-mates draws them out
+("{Mob} steps out of the shadows!"). Runs now handle it themselves, both in
+mob mode (pick the spawnable mob as a farm target) and for quest objectives;
+before, a quest needing one just waited in the room. No new request fields.
+
+- `GET /world/mobs` items gain `spawnable: boolean`. In the mob picker of
+  the new-run form (`features/runs/new-run-page`, the mob search), show a
+  small "spawn" badge with the tooltip "Appears only after its room-mates are
+  killed — the run farms them for you."
+- While hunting, `last_activity` reads "Possible Pyrite needs to be spawned —
+  farming its room-mates.", then "Beat A Rock to draw out Possible Pyrite
+  (3/40).", then "Possible Pyrite steps out of the shadows!". Nothing to
+  build; it shows in the existing activity line.
+- `participant.wins` counts every won fight, room-mates included;
+  `progress.kills_done` (mob mode) and quest progress count only the target.
+  If the run detail shows "kills / max_kills", use `kills_done`.
+
+---
+
 ## 4. Type changes checklist (`core/models`)
 
 - `rga.ts`
@@ -290,3 +310,4 @@ Client:
   - participant progress += `rage_potions_used?: number`.
 - New `potion.ts` — `Potion { id; game_item_id; name; image: string | null; level; player_bound; description; kind: 'buff' | 'rage' | 'other'; duration_minutes: number | null; rage_amount: number | null }`, `CharacterPotion { potion_id; potion?: Potion; quantity; active; active_until; active_synced_at; last_activated_at; refused_until; synced_at }`, `PotionActivationResult { outcome: 'activated' | 'already_active' | 'out_of_stock' | 'refused'; message; data: CharacterPotion | null }`.
 - `run-event.ts` — `RunEventType` += `'potion_used' | 'potion_skipped'`.
+- `world.ts` — mob search item += `spawnable: boolean`.

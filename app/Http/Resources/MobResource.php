@@ -24,6 +24,8 @@ class MobResource extends JsonResource
             'rage_cost' => $this->rage_cost,
             'type' => $this->type,
             'can_form' => $this->can_form,
+            // Only exists once its room-mates are farmed; runs do that by themselves.
+            'spawnable' => (bool) $this->spawnable,
             'room_ids' => $this->when($this->relationLoaded('rooms'), fn () => $this->rooms->pluck('id')),
         ];
     }

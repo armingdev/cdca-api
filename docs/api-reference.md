@@ -429,7 +429,9 @@ only. `image` is relative to `https://{server}.outwar.com/images/`.
   `id` is the game's cast id. Circumspect = `3008`, Street Smarts = `25`,
   Circle of Protection = `14`.
 - `GET /world/mobs?q={name}&per_page=50` — search known mobs by name
-  (paginated), for picking farm/attack targets. Each item includes `room_ids`.
+  (paginated), for picking farm/attack targets. Each item includes `room_ids`
+  and `spawnable` (only exists once its room-mates are farmed — runs do that
+  themselves).
 - `GET /crews?search={name or game crew id}&server_id=1|2&per_page=25` — crews
   the app has seen so far (a crew is recorded the first time a run reads its
   roster), for picking `crew_game_ids`. Game-world data, the same for every
@@ -527,7 +529,7 @@ Common fields (all modes):
 Mode-specific fields:
 | Mode | Fields |
 |---|---|
-| `mob` | `mobs`: string[] (exact mob names, required); `max_kills`: int (0 = unlimited, counted across passes); `run_count`: int (full passes per character; 0/absent = farm indefinitely, waiting out respawns — send 1 for a single pass); `attack_interval_seconds`: int 60–86400 (wait between passes); `drop_junk`: bool |
+| `mob` | `mobs`: string[] (exact mob names, required; a **spawnable** mob — `spawnable: true` in `GET /world/mobs` — is drawn out automatically by farming its room-mates, up to 40 attacks per room per pass, and only the spawned mob counts toward `max_kills`. Quest objectives on spawnable mobs work the same way); `max_kills`: int (0 = unlimited, counted across passes); `run_count`: int (full passes per character; 0/absent = farm indefinitely, waiting out respawns — send 1 for a single pass); `attack_interval_seconds`: int 60–86400 (wait between passes); `drop_junk`: bool |
 | `quest` | **either** `catalog_quest_id`: int (a quest `id` from `GET /quests`; the giver and game quest id are taken from the catalog, `422` if the catalog has no giver for it) **or** `npc`: string (giver name) + `quest_id`: int (the *game's* quest id); `respawn_wait_seconds`: int 60–86400 (default 60, wait before retrying an objective whose targets are all dead) |
 | `quest-list` | `quest_list_ids`: int[] (1–10 distinct lists, all yours, **played back to back in this order**; the single `quest_list_id` is still accepted). A quest finished in an earlier list is skipped in a later one (non-repeatable quests). `config.quest_list_id` mirrors the first list and is deprecated. A foreign/unknown list → `422` naming it. `respawn_wait_seconds`: int 60–86400 (default 60) |
 | `pvp-attack-list` | `attack_list_id`: int (yours) **or** `targets`: string[]; `attacks_per_target`, `max_attacks`, `skip_too_strong`, `cooldown_minutes` (1–60), `message` |
