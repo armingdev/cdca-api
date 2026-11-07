@@ -2,6 +2,18 @@
 
 Notes for API consumers (Angular/mobile clients). Newest first.
 
+## 2026-11-07 — Potions
+
+Additive; client steps in `docs/frontend-brief-feedback-2026-11.md` §3.
+
+- `GET /potions` — the 139-potion catalog (`kind`: `buff` · `rage` · `other`).
+- `GET /characters/{id}/potions`, `POST …/potions/sync`,
+  `POST …/potions/{potion}/activate`.
+- `POST /runs` accepts `buff_potion_ids` (kept active before combat),
+  `rage_potion_ids` + `max_rage_potions` (drunk instead of parking for rage).
+- Run events `potion_used` and `potion_skipped`.
+- **Deploy:** `php artisan migrate` and `php artisan db:seed --class=PotionSeeder`.
+
 ## 2026-11-07 — Chained quest lists, run priority
 
 Additive; client steps in `docs/frontend-brief-feedback-2026-11.md` §2.

@@ -7,6 +7,7 @@ use App\Jobs\RunPvpJob;
 use App\Jobs\RunQuestListJob;
 use App\Models\Character;
 use App\Models\CharacterSkill;
+use App\Models\Potion;
 use App\Models\Quest;
 use App\Models\QuestList;
 use App\Models\Rga;
@@ -726,4 +727,44 @@ describe('run priority', function () {
             ->and($participant->fresh()->dispatch_token)->toBe($oldToken);
         Queue::assertNothingPushed();
     });
+});
+
+describe('run potions', function () {
+    beforeEach(function () {
+        $this->buff = Potion::factory()->create(['name' => 'Kix Potion']);
+        $this->rage = Potion::factory()->rage()->create(['name' => 'Rage Potion']);
+        $this->character = Character::factory()->for($this->rga)->create();
+    });
+
+    it('stores the buff potions to keep active and the rage potions to drink', function () {
+        Queue::fake();
+
+        $this->postJson('/api/v1/runs', [
+            'mode' => 'mob',
+            'characters' => [$this->character->id],
+            'mobs' => ['Kix Harvester'],
+            'buff_potion_ids' => [$this->buff->id],
+            'rage_potion_ids' => [$this->rage->id],
+            'max_rage_potions' => 3,
+        ])
+            ->assertCreated()
+            ->assertJsonPath('data.buff_potion_ids', [$this->buff->id])
+            ->assertJsonPath('data.rage_potion_ids', [$this->rage->id])
+            ->assertJsonPath('data.max_rage_potions', 3);
+    });
+
+    it('refuses a potion of the wrong kind, and rage potions without a cap', function (Closure $payload, string $field, string $message) {
+        $this->postJson('/api/v1/runs', [
+            'mode' => 'mob',
+            'characters' => [$this->character->id],
+            'mobs' => ['Kix Harvester'],
+            ...$payload($this->buff, $this->rage),
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors([$field => $message]);
+    })->with([
+        'rage potion as a buff' => [fn ($buff, $rage) => ['buff_potion_ids' => [$rage->id]], 'buff_potion_ids.0', 'Only potions with a lasting effect can be kept active.'],
+        'buff potion for rage' => [fn ($buff, $rage) => ['rage_potion_ids' => [$buff->id], 'max_rage_potions' => 1], 'rage_potion_ids.0', 'Only rage potions can be drunk to refill rage.'],
+        'no cap' => [fn ($buff, $rage) => ['rage_potion_ids' => [$rage->id]], 'max_rage_potions', 'The max rage potions field is required.'],
+    ]);
 });

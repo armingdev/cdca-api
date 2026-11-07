@@ -49,6 +49,17 @@ class RunPvpJob extends RunJob
             return $this->waitForWorkerRestart();
         }
 
+        // Out of rage below the floor: a selected rage potion lets the run
+        // carry on. Targets already hit are on the game's own 60-minute
+        // cooldown, so the resumed pass never attacks anyone twice.
+        if ($summary->endReason === RunEndReason::RageExhausted) {
+            $drank = $this->drinkRagePotionInstead($summary->stopReason, []);
+
+            if ($drank !== null) {
+                return $drank;
+            }
+        }
+
         $status = match ($summary->endReason) {
             RunEndReason::ExternalStop => RunStatus::Stopped,
             RunEndReason::ExternalPause => RunStatus::Paused,

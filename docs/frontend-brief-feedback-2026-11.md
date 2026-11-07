@@ -4,9 +4,9 @@ Audience: a Claude session working in `/Users/armingerina/Code/cdca/cdca-client`
 (Angular 22, standalone components, signals + `@angular/forms/signals`, Vitest).
 
 A tester sent a new list of wishes. The API is built phase by phase and this
-brief grows with it. **Phase 1 (accounts and sessions) and Phase 2 (multiple
-quest lists, run priority) are done**; potions and spawned mobs follow in
-later sections once their API lands. Every API change so far is additive:
+brief grows with it. **Phase 1 (accounts and sessions), Phase 2 (multiple
+quest lists, run priority) and Phase 3 (potions) are done**; spawned mobs
+follow once their API lands. Every API change so far is additive:
 nothing in the client breaks if none of this is done yet.
 
 Full endpoint shapes: `cdca-api/docs/api-reference.md` (§2 auth, §4 RGAs →
@@ -221,6 +221,51 @@ Client:
 
 ---
 
+## 3. Potions (Phase 3 — API done)
+
+Potions are drunk like teleport items are activated. A run can (a) keep
+selected **buff** potions active, like cast-on-start skills, and (b) drink
+selected **rage** potions instead of parking for the hourly rage tick, up to
+a cap per run cycle. Shapes in api-reference §5 "Per-character potions", §6
+`GET /potions`, §8 `POST /runs`.
+
+- Catalog: `GET /potions?kind=buff|rage|other&search=` — 139 rows, not
+  paginated. `kind` decides where a potion may be picked: `buff` for keep-active,
+  `rage` for rage refills, `other` only for manual use. Images:
+  `https://sigil.outwar.com/images/{image}`.
+- Character: `GET /characters/{id}/potions` (stored), `POST …/potions/sync`
+  (live), `POST …/potions/{potionId}/activate` (drink now; `200` drank, `422`
+  with `outcome` = `already_active` | `out_of_stock` | `refused` + `message`).
+- Run fields: `buff_potion_ids: number[]`, `rage_potion_ids: number[]`
+  (order = try order), `max_rage_potions: number` (1–50, required with rage
+  potions). Echoed on `RunResource` (`[]`/`0` when unused).
+- Run log: new event types `potion_used` (context `potion`, `kind`,
+  `quantity_left`, plus `rage_potions_used`/`max_rage_potions` for rage) and
+  `potion_skipped` (warning; context `reason` = `out_of_stock` | `refused` |
+  `read_failed`). A rage refill also shows in `last_activity`: "… Drank Rage
+  Potion for rage (1/3) instead of waiting for the rage tick."
+
+Client:
+
+- New-run form (`features/runs/new-run-page`): a "Potions" section next to
+  the skill picker (`new-run-page.html:759` area).
+  - "Keep active": a multi-select of `kind=buff` potions.
+  - "When out of rage": an ordered multi-select of `kind=rage` potions, plus
+    "at most N per run" (shown only when a rage potion is picked).
+  - Nice to have: annotate each option with how many of the selected
+    characters hold it (`GET /characters/{id}/potions`, `quantity > 0`).
+- Character page (`features/characters/character-page`): a "Potions" panel
+  like `travel-panel` — the held stacks with quantity, an "active, 42 min
+  left" badge from `active_until`, a "Drink" button per row (shows the
+  returned `message`; disable while `refused_until` is in the future), and
+  "Refresh" → `POST …/potions/sync`. `other`-kind potions can be shown
+  collapsed.
+- `core/models/run-event.ts` — add `'potion_used' | 'potion_skipped'` to
+  `RunEventType` and render them in `run-activity-log` (potion name + quantity
+  left; warnings for skipped).
+
+---
+
 ## 4. Type changes checklist (`core/models`)
 
 - `rga.ts`
@@ -241,3 +286,7 @@ Client:
   - quest-list config += `quest_list_ids: number[]` (`quest_list_id` stays, deprecated).
   - participant progress += `list_index?: number`.
   - create/update run requests += `priority?: RunPriority`; create += `quest_list_ids?: number[]`.
+  - `Run` += `buff_potion_ids: number[]`, `rage_potion_ids: number[]`, `max_rage_potions: number`; create request the same (optional).
+  - participant progress += `rage_potions_used?: number`.
+- New `potion.ts` — `Potion { id; game_item_id; name; image: string | null; level; player_bound; description; kind: 'buff' | 'rage' | 'other'; duration_minutes: number | null; rage_amount: number | null }`, `CharacterPotion { potion_id; potion?: Potion; quantity; active; active_until; active_synced_at; last_activated_at; refused_until; synced_at }`, `PotionActivationResult { outcome: 'activated' | 'already_active' | 'out_of_stock' | 'refused'; message; data: CharacterPotion | null }`.
+- `run-event.ts` — `RunEventType` += `'potion_used' | 'potion_skipped'`.

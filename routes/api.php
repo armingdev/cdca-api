@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\V1\AttackListController;
 use App\Http\Controllers\Api\V1\AttackListTargetController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CharacterController;
+use App\Http\Controllers\Api\V1\CharacterPotionController;
 use App\Http\Controllers\Api\V1\CharacterQuestProgressController;
 use App\Http\Controllers\Api\V1\CharacterSkillController;
 use App\Http\Controllers\Api\V1\CharacterTeleportController;
@@ -15,6 +16,7 @@ use App\Http\Controllers\Api\V1\CrewGroupSessionController;
 use App\Http\Controllers\Api\V1\CrewGroupSessionReadController;
 use App\Http\Controllers\Api\V1\CrewGroupSharedRgaController;
 use App\Http\Controllers\Api\V1\PasswordController;
+use App\Http\Controllers\Api\V1\PotionController;
 use App\Http\Controllers\Api\V1\QuestController;
 use App\Http\Controllers\Api\V1\QuestListController;
 use App\Http\Controllers\Api\V1\QuestListItemController;
@@ -70,6 +72,11 @@ Route::prefix('v1')->group(function () {
         Route::post('characters/{character}/cast', [CharacterSkillController::class, 'cast']);
         Route::post('characters/{character}/refresh-stats', [CharacterController::class, 'refreshStats']);
 
+        // Potions: what the character holds, what is active, drinking one.
+        Route::get('characters/{character}/potions', [CharacterPotionController::class, 'index']);
+        Route::post('characters/{character}/potions/sync', [CharacterPotionController::class, 'sync']);
+        Route::post('characters/{character}/potions/{potion}/activate', [CharacterPotionController::class, 'activate']);
+
         // Teleports: anchors the character can jump with, and travelling.
         Route::get('characters/{character}/teleports', [CharacterTeleportController::class, 'index']);
         Route::post('characters/{character}/teleports/sync', [CharacterTeleportController::class, 'sync']);
@@ -87,6 +94,9 @@ Route::prefix('v1')->group(function () {
 
         // Skill catalog (read-only).
         Route::get('skills', [SkillController::class, 'index']);
+
+        // Potion catalog (read-only).
+        Route::get('potions', [PotionController::class, 'index']);
 
         // Quest catalog (read-only, crawled from the game).
         Route::get('quests', [QuestController::class, 'index']);

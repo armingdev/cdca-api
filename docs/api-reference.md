@@ -345,6 +345,25 @@ that teleports logs it to `last_activity` ("Teleporting with {anchor}…"), so
 keeping anchors synced makes runs measurably faster, especially for targets in
 areas no walk reaches.
 
+### Per-character potions
+A character's potions as last read from its potion tab and the Current
+Effects panel (an active potion shows there next to the skills, with the
+game's own time left — it can run past the catalog duration).
+- `GET /characters/{id}/potions` — stored reading, no game request:
+  `{ data: [{ potion_id, potion: Potion, quantity, active, active_until,
+  active_synced_at, last_activated_at, refused_until, synced_at }] }`,
+  ordered by potion name. A potion the character ran out of stays listed
+  at `quantity: 0`.
+- `POST /characters/{id}/potions/sync` — read the game now (2 requests),
+  same shape. Unknown potions in the tab are added to the catalog.
+- `POST /characters/{id}/potions/{potionId}/activate` — drink one now (any
+  kind, including instant ones a run never uses). `200 { outcome:
+  "activated", message: "Kix Potion activated!", data: CharacterPotion }`;
+  otherwise `422` with `outcome` `already_active` (nothing consumed — the
+  game says it is still running; `active_until` is refreshed),
+  `out_of_stock`, or `refused` (backed off: 5 min, 1 h, then a day). All
+  three need a live session (`422` otherwise).
+
 ### Character stats
 
 - `GET /characters/{id}/battles?per_page=50` — recent battle events (paginated,
@@ -395,6 +414,15 @@ leader just reads again.
 ---
 
 ## 6. Skills catalog & World (read-only reference data)
+
+### `GET /potions[?kind=buff|rage|other][&search=]`
+The 139-potion catalog harvested from the game's item database (+ any
+learned from backpacks), ordered by name, not paginated:
+`{ id, game_item_id, name, image, level, player_bound, description, kind,
+duration_minutes, rage_amount }`. `kind`: `buff` = has a duration, a run can
+keep it active; `rage` = instant rage, a run can drink it instead of waiting
+for the rage tick; `other` = quest/novelty/PvP-immunity potions, manual use
+only. `image` is relative to `https://{server}.outwar.com/images/`.
 
 - `GET /skills` — the 43-skill catalog. Filter `?school=ferocity`. Each item:
   `{ id, name, school, rage_cost, cooldown_minutes, duration_minutes, description }`.
@@ -488,6 +516,9 @@ Common fields (all modes):
 | `cast_on_start` | bool | keep the characters' selected skills active for the run |
 | `skill_ids` | int[] | **replaces every listed character's cast-on-start selection**, then runs with it. Omit to let each character keep its own set. `[]` clears them all. A non-empty list turns `cast_on_start` on by itself; sending it alongside an explicit `cast_on_start: false` is a `422` on `cast_on_start`. Echoed back on the run as `skill_ids` (null when omitted) |
 | `require_circumspect` | bool | run on the Circumspect cycle: cast it when possible, otherwise park `waiting` and auto-resume when its cooldown ends |
+| `buff_potion_ids` | int[] | potions (`kind: buff`, max 20) kept active for the run: just before combat, any that is not active is drunk (re-drunk 2 min before it ends). None left → a `potion_skipped` event, the run carries on. Wrong kind → `422` |
+| `rage_potion_ids` | int[] | potions (`kind: rage`, max 10), tried in this order: when a participant would park for rage (or, in mob/PvP mode, stop at its rage floor) it drinks one and resumes within a minute instead. Wrong kind → `422` |
+| `max_rage_potions` | int | 1–50, required with `rage_potion_ids`: how many rage potions one run cycle may drink (counted in `progress.rage_potions_used`; a restart starts over) |
 | `restart_every_minutes` | int? | re-dispatch this run every N minutes after it **completes** |
 | `start_at` | datetime? | delay the first start until this time (run stays `pending` until then) |
 | `reserve_rage_for` | string[] | `pvp-brawl` · `faction-brawl`. Within `reserve_rage_hours` of that event on the character's server the participant parks `waiting` ("Saving rage for the PvP Brawl …") and resumes when the event window closes. Ignored by the two brawl modes. Event times come from the hourly brawl sync |

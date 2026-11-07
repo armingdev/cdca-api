@@ -25,5 +25,6 @@ class DatabaseSeeder extends Seeder
         $this->call(BossSeeder::class);
         $this->call(QuestListSeeder::class);
         $this->call(TeleportAnchorSeeder::class);
+        $this->call(PotionSeeder::class);
     }
 }

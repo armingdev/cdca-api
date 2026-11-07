@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Game\Engine\QuestListRunConfig;
+use App\Game\Enums\PotionKind;
 use App\Game\Enums\RageReserveEvent;
 use App\Game\Enums\RunMode;
 use App\Game\Enums\RunPriority;
@@ -65,6 +66,19 @@ class StoreRunRequest extends FormRequest
             'skill_ids.*' => ['integer'],
 
             'require_circumspect' => ['sometimes', 'boolean'],
+
+            // Potions (any mode): buff potions are kept active like
+            // cast-on-start skills; rage potions are drunk, in the given
+            // order, instead of parking for the hourly rage tick — at most
+            // max_rage_potions per run cycle.
+            'buff_potion_ids' => ['sometimes', 'array', 'max:20'],
+            'buff_potion_ids.*' => ['integer', 'distinct', Rule::exists('potions', 'id')->where('kind', PotionKind::Buff->value)],
+            'rage_potion_ids' => ['sometimes', 'array', 'max:10'],
+            'rage_potion_ids.*' => ['integer', 'distinct', Rule::exists('potions', 'id')->where('kind', PotionKind::Rage->value)],
+            'max_rage_potions' => [
+                Rule::requiredIf(fn (): bool => ! empty($this->input('rage_potion_ids'))),
+                'integer', 'min:1', 'max:50',
+            ],
 
             // Park ahead of these events so the rage bar is full for them.
             'reserve_rage_for' => ['sometimes', 'array'],
@@ -136,6 +150,17 @@ class StoreRunRequest extends FormRequest
             'auto_enter_brawl' => ['sometimes', 'boolean'],
             'cooldown_minutes' => ['sometimes', 'integer', 'min:1', 'max:60'],
             'message' => ['sometimes', 'nullable', 'string', 'max:255'],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'buff_potion_ids.*.exists' => 'Only potions with a lasting effect can be kept active.',
+            'rage_potion_ids.*.exists' => 'Only rage potions can be drunk to refill rage.',
         ];
     }
 

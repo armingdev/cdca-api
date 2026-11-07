@@ -133,6 +133,12 @@ class RunMobJob extends RunJob
                 return $this->waitForCircumspect($character, $summary->stopReason, $progress);
             }
 
+            $drank = $this->drinkRagePotionInstead($summary->stopReason, $progress);
+
+            if ($drank !== null) {
+                return $drank;
+            }
+
             $waitSeconds = max($config->attackIntervalSeconds ?? 0, self::RAGE_REGEN_WAIT_SECONDS);
             $resumeAt = now()->addSeconds($waitSeconds);
 

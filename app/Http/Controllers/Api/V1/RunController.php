@@ -86,6 +86,9 @@ class RunController extends Controller
                 reserveRageFor: array_values($request->validated('reserve_rage_for') ?? []),
                 reserveRageHours: $request->integer('reserve_rage_hours', 12),
                 priority: $request->enum('priority', RunPriority::class) ?? RunPriority::Normal,
+                buffPotionIds: array_values(array_map(intval(...), $request->validated('buff_potion_ids') ?? [])),
+                ragePotionIds: array_values(array_map(intval(...), $request->validated('rage_potion_ids') ?? [])),
+                maxRagePotions: $request->integer('max_rage_potions'),
             );
         } catch (CharactersBusyException $exception) {
             throw ValidationException::withMessages(['characters' => [$exception->getMessage()]]);

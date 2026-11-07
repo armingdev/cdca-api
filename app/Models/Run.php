@@ -29,6 +29,7 @@ class Run extends Model
      */
     protected $attributes = [
         'priority' => 'normal',
+        'max_rage_potions' => 0,
     ];
 
     protected $fillable = [
@@ -39,6 +40,9 @@ class Run extends Model
         'cast_on_start',
         'require_circumspect',
         'skill_ids',
+        'buff_potion_ids',
+        'rage_potion_ids',
+        'max_rage_potions',
         'reserve_rage_for',
         'reserve_rage_hours',
         'status',
@@ -61,6 +65,9 @@ class Run extends Model
             'cast_on_start' => 'boolean',
             'require_circumspect' => 'boolean',
             'skill_ids' => 'array',
+            'buff_potion_ids' => 'array',
+            'rage_potion_ids' => 'array',
+            'max_rage_potions' => 'integer',
             'reserve_rage_for' => 'array',
             'reserve_rage_hours' => 'integer',
             'restart_every_minutes' => 'integer',
