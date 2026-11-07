@@ -2,6 +2,8 @@
 
 namespace App\Game\Quest;
 
+use App\Game\Combat\StatsService;
+use App\Game\Engine\QuestListProgress;
 use App\Game\Engine\QuestListRunConfig;
 use App\Game\Engine\QuestListRunSummary;
 use App\Game\Engine\QuestRunConfig;
@@ -15,16 +17,27 @@ use App\Game\Exceptions\ParseException;
 use App\Game\Exceptions\QuestNotAvailableException;
 use App\Game\Exceptions\SessionCollisionException;
 use App\Game\Exceptions\TransientGameException;
+use App\Game\World\GatedRooms;
 use App\Models\BattleEvent;
 use App\Models\Character;
+use App\Models\Quest;
 use App\Models\QuestList;
 use App\Models\QuestListItem;
 use App\Models\RunEvent;
 use Closure;
+use Illuminate\Support\Collection;
 
 /**
  * Runs a run's quest lists back to back, each in order: for each quest, run
  * it via QuestRunner.
+ *
+ * A quest the character is not ready for is deferred, not walked to: below
+ * its required level (after levelling from banked exp, when the run may), or
+ * behind a prerequisite that was itself deferred. A list ordered top level
+ * first used to send a level-83 character to every level-90 giver, read each
+ * one's silence as "unavailable", and report the list complete with nothing
+ * done. When a pass ends and the character has grown into a deferred quest,
+ * another pass replays the lists running only the deferred ones.
  *
  * A quest the list cannot finish is skipped, not fatal — already completed,
  * giver unknown or unreachable, objective unfulfillable, or wanting an item
@@ -33,9 +46,9 @@ use Closure;
  * pause, a lapsed Circumspect buff, or rage the character cannot rebuild
  * without waiting — and the last three park rather than stop.
  *
- * A start list index + position lets a paused or parked participant resume
- * mid-list; the settle callback reports each processed item (and each list
- * finished) so the caller can persist that cursor.
+ * Where the run stands travels in a QuestListProgress, so a paused or parked
+ * participant resumes mid-list, mid-pass, with its tallies intact; the
+ * progress callback reports each change so the caller can persist it.
  */
 class QuestListRunner
 {
@@ -47,9 +60,33 @@ class QuestListRunner
      */
     public const int MAX_QUEST_RETRIES = 2;
 
+    /**
+     * Passes one run may make: the full first one plus re-passes over the
+     * deferred quests. Each re-pass needs the character to have grown into a
+     * deferred quest, so this is only a backstop.
+     */
+    private const int MAX_PASSES = 10;
+
+    /** Run-wide tallies, carried over from earlier jobs. */
     private int $completed = 0;
 
     private int $skipped = 0;
+
+    /** This invocation's share of the tallies — what "this pass made progress" means to the job. */
+    private int $completedNow = 0;
+
+    private int $skippedNow = 0;
+
+    /** @var array<string, int> skip reason => count */
+    private array $skippedByReason = [];
+
+    /** @var array<int, string> quest id => QuestListProgress::DEFERRED_* reason */
+    private array $deferred = [];
+
+    private int $pass = 1;
+
+    /** @var list<int>|null quest ids this re-pass replays; null on the first pass */
+    private ?array $retrying = null;
 
     private int $kills = 0;
 
@@ -73,47 +110,58 @@ class QuestListRunner
     /** @var list<int> */
     private array $skippableQuestIds = [];
 
+    /** Whether the level has been read from the game this run, rather than trusted from the database. */
+    private bool $levelConfirmed = false;
+
+    /** The exp held when the game last refused a level-up: no point asking again until it moves. */
+    private ?int $levelUpRefusedAtExp = null;
+
     public function __construct(
         private readonly Character $character,
         private readonly QuestListRunConfig $config,
         private readonly QuestProgressLedger $ledger,
+        private readonly StatsService $stats,
+        private readonly GatedRooms $gates,
     ) {}
 
     public static function forCharacter(Character $character, QuestListRunConfig $config): self
     {
-        return new self($character, $config, app(QuestProgressLedger::class));
+        return new self(
+            $character,
+            $config,
+            app(QuestProgressLedger::class),
+            StatsService::forCharacter($character),
+            app(GatedRooms::class),
+        );
     }
 
     /**
-     * Play the run's lists back to back, starting at ($startListIndex,
-     * $startPosition). Quests completed in an earlier list are recorded in
-     * the ledger as they finish, so a later list that repeats them skips
-     * them like any other settled quest.
+     * Play the run's lists back to back from where $from stands, then replay
+     * deferred quests while the character keeps growing into them. Quests
+     * completed in an earlier list are recorded in the ledger as they finish,
+     * so a later list that repeats them skips them like any other settled
+     * quest.
      *
      * @param  Closure(string): void|null  $log
      * @param  Closure(): RunSignal|null  $signal
      * @param  Closure(BattleEvent): void|null  $onBattle
      * @param  Closure(): void|null  $ensureBuffs  just-in-time buff top-up, forwarded to each quest
-     * @param  int  $startPosition  skip items below this position in the start list (resume support)
-     * @param  Closure(int, int, int, int): void|null  $onQuestSettled  (nextPosition, completed, skipped, listIndex) after each settled item and each finished list
-     * @param  RunEventRecorder|null  $events  durable log for skip/complete decisions
-     * @param  int  $questRetries  parked retries already spent on the quest at $startPosition
+     * @param  QuestListProgress  $from  where a resumed run left off; a fresh run starts at the top
+     * @param  Closure(QuestListProgress): void|null  $onProgress  after each settled item, each finished list and each new pass
+     * @param  RunEventRecorder|null  $events  durable log for skip/defer/complete decisions
      * @param  int|null  $runId  provenance for anything written to the progress ledger
-     * @param  int  $startListIndex  which of the run's lists to resume in (0-based)
      */
     public function run(
         ?Closure $log = null,
         ?Closure $signal = null,
         ?Closure $onBattle = null,
         ?Closure $ensureBuffs = null,
-        int $startPosition = 0,
-        ?Closure $onQuestSettled = null,
+        QuestListProgress $from = new QuestListProgress,
+        ?Closure $onProgress = null,
         ?RunEventRecorder $events = null,
-        int $questRetries = 0,
         ?int $runId = null,
-        int $startListIndex = 0,
     ): QuestListRunSummary {
-        $this->questRetries = $questRetries;
+        $this->resumeFrom($from);
         $this->events = $events;
         $this->runId = $runId;
         $log ??= fn (string $message) => null;
@@ -125,6 +173,68 @@ class QuestListRunner
             throw new GameException('Quest list #'.implode(', #', $listIds).' not found.');
         }
 
+        $startListIndex = $from->listIndex;
+        $startPosition = $from->position;
+
+        while (true) {
+            $outcome = $this->playLists($listIds, $lists, $startListIndex, $startPosition, $log, $signal, $onBattle, $ensureBuffs, $onProgress);
+
+            if ($outcome !== null) {
+                return $outcome;
+            }
+
+            if (! $this->startNextPass($this->questsOf($lists), $log)) {
+                break;
+            }
+
+            $startListIndex = 0;
+            $startPosition = 0;
+            $onProgress?->__invoke($this->progress());
+        }
+
+        return $this->summary(
+            completed: true,
+            reason: $this->finishedReason(count($listIds), $this->questsOf($lists)),
+            endReason: RunEndReason::Completed,
+        );
+    }
+
+    private function resumeFrom(QuestListProgress $from): void
+    {
+        $this->listIndex = $from->listIndex;
+        $this->nextPosition = $from->position;
+        $this->questRetries = $from->questRetries;
+        $this->completed = $from->completed;
+        $this->skipped = $from->skipped;
+        $this->skippedByReason = $from->skippedByReason;
+        $this->deferred = $from->deferred;
+        $this->pass = $from->pass;
+        $this->retrying = $from->retrying;
+    }
+
+    /**
+     * One pass over every list, from ($startListIndex, $startPosition). Null
+     * when it ran to the end; a summary when the run has to stop or park.
+     *
+     * @param  list<int>  $listIds
+     * @param  Collection<int, QuestList>  $lists
+     * @param  Closure(string): void  $log
+     * @param  Closure(): RunSignal|null  $signal
+     * @param  Closure(BattleEvent): void|null  $onBattle
+     * @param  Closure(): void|null  $ensureBuffs
+     * @param  Closure(QuestListProgress): void|null  $onProgress
+     */
+    private function playLists(
+        array $listIds,
+        Collection $lists,
+        int $startListIndex,
+        int $startPosition,
+        Closure $log,
+        ?Closure $signal,
+        ?Closure $onBattle,
+        ?Closure $ensureBuffs,
+        ?Closure $onProgress,
+    ): ?QuestListRunSummary {
         for ($index = $startListIndex; $index < count($listIds); $index++) {
             $this->listIndex = $index;
             $position = $index === $startListIndex ? $startPosition : 0;
@@ -133,12 +243,12 @@ class QuestListRunner
             if ($list === null) {
                 // Deleted after the run started: the remaining lists still run.
                 $log("Quest list #{$listIds[$index]} no longer exists — skipping it.");
-                $events?->record(RunEventType::Info, "Quest list #{$listIds[$index]} no longer exists — skipped.", [
+                $this->events?->record(RunEventType::Info, "Quest list #{$listIds[$index]} no longer exists — skipped.", [
                     'quest_list_id' => $listIds[$index],
                     'list_index' => $index,
                 ], RunEvent::LEVEL_WARNING);
             } else {
-                $outcome = $this->runList($list, $index, count($listIds), $position, $log, $signal, $onBattle, $ensureBuffs, $onQuestSettled);
+                $outcome = $this->runList($list, $index, count($listIds), $position, $log, $signal, $onBattle, $ensureBuffs, $onProgress);
 
                 if ($outcome !== null) {
                     return $outcome;
@@ -151,26 +261,22 @@ class QuestListRunner
             if ($index + 1 < count($listIds)) {
                 $this->listIndex = $index + 1;
                 $this->nextPosition = 0;
-                $onQuestSettled?->__invoke($this->nextPosition, $this->completed, $this->skipped, $this->listIndex);
+                $onProgress?->__invoke($this->progress());
             }
         }
 
-        return $this->summary(
-            completed: true,
-            reason: count($listIds) > 1 ? 'All quest lists complete.' : 'Quest list complete.',
-            endReason: RunEndReason::Completed,
-        );
+        return null;
     }
 
     /**
-     * One list of the run, from $startPosition. Null when it ran to its end;
+     * One list of the pass, from $startPosition. Null when it ran to its end;
      * a summary when the whole run has to stop or park on one of its quests.
      *
      * @param  Closure(string): void  $log
      * @param  Closure(): RunSignal|null  $signal
      * @param  Closure(BattleEvent): void|null  $onBattle
      * @param  Closure(): void|null  $ensureBuffs
-     * @param  Closure(int, int, int, int): void|null  $onQuestSettled
+     * @param  Closure(QuestListProgress): void|null  $onProgress
      */
     private function runList(
         QuestList $list,
@@ -181,11 +287,17 @@ class QuestListRunner
         ?Closure $signal,
         ?Closure $onBattle,
         ?Closure $ensureBuffs,
-        ?Closure $onQuestSettled,
+        ?Closure $onProgress,
     ): ?QuestListRunSummary {
         $this->currentListId = $list->id;
-        $items = $list->items->where('position', '>=', $startPosition)->values();
         $this->nextPosition = $startPosition;
+
+        // A re-pass plays only the quests it was started for; the rest of the
+        // list was settled one way or another on the first pass.
+        $items = $list->items
+            ->where('position', '>=', $startPosition)
+            ->when($this->retrying !== null, fn (Collection $items) => $items->whereIn('quest_id', $this->retrying))
+            ->values();
 
         // Read once per list, before walking anywhere: what this character has
         // already settled with the game. Re-deriving it by visiting all 200
@@ -196,9 +308,10 @@ class QuestListRunner
         );
 
         $message = sprintf(
-            "Running quest list '%s'%s (%d quest(s)%s).",
+            "Running quest list '%s'%s%s (%d quest(s)%s).",
             $list->name,
             $listCount > 1 ? ' — list '.($index + 1)." of {$listCount}" : '',
+            $this->pass > 1 ? " — pass {$this->pass}, deferred quests only" : '',
             $items->count(),
             $startPosition > 0 ? ", resuming from position {$startPosition}" : '',
         );
@@ -209,10 +322,11 @@ class QuestListRunner
                 'quest_list_id' => $list->id,
                 'list_index' => $index,
                 'list_count' => $listCount,
+                'pass' => $this->pass,
             ]);
         }
 
-        if ($this->skippableQuestIds !== []) {
+        if ($this->skippableQuestIds !== [] && $this->retrying === null) {
             $recorded = count($this->skippableQuestIds);
             $log("Skipping {$recorded} quest(s) already recorded for this character.");
             $this->events?->record(
@@ -249,8 +363,15 @@ class QuestListRunner
                 return $outcome;
             }
 
+            // Settling an item clears the retry budget: it belongs to the
+            // quest that was stuck, not to the list.
             $this->nextPosition = $item->position + 1;
-            $onQuestSettled?->__invoke($this->nextPosition, $this->completed, $this->skipped, $this->listIndex);
+            $this->questRetries = 0;
+            $onProgress?->__invoke($this->progress());
+        }
+
+        if ($this->pass === 1) {
+            $this->recordDeferrals($list);
         }
 
         return null;
@@ -277,15 +398,22 @@ class QuestListRunner
         if (in_array($quest?->id, $this->skippableQuestIds, true)) {
             // Already settled for this character — the summary event above
             // covers the whole batch, so this one stays silent.
-            $this->skipped++;
+            $this->countSkip('recorded');
 
             return null;
         }
 
         if ($quest->giver === null) {
-            $this->skipped++;
-            $log("No known giver — skipping {$item->displayName()}.");
-            $this->recordSkip($item, 'no_giver', 'No known giver.');
+            $this->skip($item, 'no_giver', 'No known giver.', $log);
+
+            return null;
+        }
+
+        $deferral = $this->deferralFor($quest, $log);
+
+        if ($deferral !== null) {
+            $this->deferred[$quest->id] = $deferral;
+            $log("Deferring {$item->displayName()}: ".$this->deferralLine($quest, $deferral));
 
             return null;
         }
@@ -306,16 +434,14 @@ class QuestListRunner
             $summary = QuestRunner::forCharacter($this->character, $questConfig)
                 ->run(log: $log, signal: $signal, onBattle: $onBattle, ensureBuffs: $ensureBuffs, events: $this->events);
         } catch (QuestNotAvailableException) {
-            // Not in the character's tracker and offered by nobody: either
-            // finished long ago or gated behind something unmet. A quest that
-            // is merely *under way* never reaches here — QuestRunner raises a
-            // plain GameException for that, so no guess lands in the ledger.
-            $this->skipped++;
-            $log("No mob offers {$item->displayName()} and it is not in progress — skipping.");
-            $this->recordSkip($item, 'not_available', 'No mob offers this quest and it is not in progress.');
+            // Not in the character's tracker and offered by nobody, at a level
+            // the character meets: finished long ago, or behind a prerequisite.
+            // A quest that is merely *under way* never reaches here —
+            // QuestRunner raises a plain GameException for that, so no guess
+            // lands in the ledger.
+            $this->skip($item, 'not_available', 'No mob offers this quest and it is not in progress.', $log);
             // Remember it, so the next run does not walk here to be told the
-            // same thing. Clearable, because the giver is equally silent about
-            // a quest whose prerequisites are simply not met yet.
+            // same thing. Cleared once its prerequisite is seen to finish.
             $this->ledger->recordUnavailable($this->character, $quest, $this->runId);
 
             return null;
@@ -332,10 +458,9 @@ class QuestListRunner
         } catch (GameException $exception) {
             // An unmapped giver or a world with no path to it is a real
             // property of this quest, and waiting will not change it — but the
-            // remaining quests are still perfectly runnable.
-            $this->skipped++;
-            $log("Skipping {$item->displayName()}: {$exception->getMessage()}");
-            $this->recordSkip($item, 'unreachable', $exception->getMessage());
+            // remaining quests are still perfectly runnable. (A server outage
+            // is not a GameException and passes straight through to the job.)
+            $this->skip($item, 'unreachable', $exception->getMessage(), $log);
 
             return null;
         }
@@ -364,9 +489,7 @@ class QuestListRunner
             || $summary->endReason === RunEndReason::Stuck
             || $summary->endReason === RunEndReason::Outmatched
         ) {
-            $this->skipped++;
-            $log("Skipping {$item->displayName()}: {$summary->stopReason}");
-            $this->recordSkip($item, $summary->endReason->value, $summary->stopReason);
+            $this->skip($item, $summary->endReason->value, $summary->stopReason, $log);
 
             return null;
         }
@@ -388,8 +511,11 @@ class QuestListRunner
         }
 
         $this->completed++;
+        $this->completedNow++;
         $this->questRetries = 0;
         $this->ledger->recordCompleted($this->character, $quest, $this->runId);
+        // A finished quest may have handed out the very key a gate wanted.
+        $this->gates->forget($this->character);
 
         $this->events?->record(RunEventType::QuestCompleted, "Completed {$item->displayName()}.", [
             'quest_id' => $quest->game_quest_id,
@@ -398,6 +524,195 @@ class QuestListRunner
         ]);
 
         return null;
+    }
+
+    /**
+     * Why the character is not ready for this quest yet, or null when it is.
+     */
+    private function deferralFor(Quest $quest, Closure $log): ?string
+    {
+        if ($quest->required_level !== null && ! $this->reachesLevel($quest->required_level, $log)) {
+            return QuestListProgress::DEFERRED_LEVEL;
+        }
+
+        if ($quest->prerequisite_quest_id !== null && isset($this->deferred[$quest->prerequisite_quest_id])) {
+            return QuestListProgress::DEFERRED_PREREQUISITE;
+        }
+
+        return null;
+    }
+
+    /**
+     * Whether the character is — or, when the run may level, can now be
+     * levelled to — $required. The stored level can lag the game, so it is
+     * read once before any quest is deferred on it; later fights keep the
+     * shared character record current.
+     */
+    private function reachesLevel(int $required, Closure $log): bool
+    {
+        if ($this->character->level >= $required) {
+            return true;
+        }
+
+        if (! $this->levelConfirmed) {
+            $this->stats->refresh();
+            $this->levelConfirmed = true;
+        }
+
+        if (! $this->config->levelUp && ! $this->config->smart) {
+            return $this->character->level >= $required;
+        }
+
+        $before = $this->character->level;
+
+        // One attempt per missing level at most; a refusal (not enough exp)
+        // holds until the character's exp moves.
+        for ($attempts = $required - $before; $attempts > 0 && $this->character->level < $required; $attempts--) {
+            $refusedAtThisExp = $this->levelUpRefusedAtExp !== null && $this->levelUpRefusedAtExp === $this->character->exp;
+
+            if ($refusedAtThisExp || ! $this->stats->tryLevelUp()) {
+                $this->levelUpRefusedAtExp = $this->character->exp;
+
+                break;
+            }
+        }
+
+        if ($this->character->level > $before) {
+            $log("Levelled up to {$this->character->level}.");
+        }
+
+        return $this->character->level >= $required;
+    }
+
+    private function deferralLine(Quest $quest, string $reason): string
+    {
+        return $reason === QuestListProgress::DEFERRED_LEVEL
+            ? "needs level {$quest->required_level}, character is {$this->character->level}."
+            : 'waits on '.($quest->prerequisite !== null ? "'{$quest->prerequisite}'" : 'its prerequisite').', which is itself deferred.';
+    }
+
+    /**
+     * One event per list for everything it put off, rather than one per quest:
+     * a level-83 character on an endgame list defers dozens at a time.
+     */
+    private function recordDeferrals(QuestList $list): void
+    {
+        $quests = $list->items->pluck('quest')->filter()->keyBy('id');
+        $deferred = array_intersect_key($this->deferred, $quests->all());
+
+        if ($deferred === []) {
+            return;
+        }
+
+        $levels = $quests->only(array_keys($deferred, QuestListProgress::DEFERRED_LEVEL, true))->pluck('required_level');
+        $behindPrerequisite = count(array_keys($deferred, QuestListProgress::DEFERRED_PREREQUISITE, true));
+
+        $this->events?->record(
+            RunEventType::QuestDeferred,
+            sprintf(
+                "Deferred %d quest(s) in '%s' until the character is ready%s%s.",
+                count($deferred),
+                $list->name,
+                $levels->isEmpty() ? '' : ": {$levels->count()} need level ".$this->levelRange($levels),
+                $behindPrerequisite === 0 ? '' : ($levels->isEmpty() ? ': ' : ', ')."{$behindPrerequisite} wait on a deferred prerequisite",
+            ),
+            [
+                'quest_list_id' => $list->id,
+                'level' => $this->character->level,
+                'quest_ids' => $quests->only(array_keys($deferred))->pluck('game_quest_id')->values()->all(),
+            ],
+        );
+    }
+
+    /**
+     * After a full pass: replay the deferred quests if the character has grown
+     * into at least one of them — by playing the list, or by a level-up the
+     * run may now afford. Nothing to gain otherwise, so the run ends.
+     *
+     * @param  Collection<int, Quest>  $quests  every quest of the run's lists, by id
+     */
+    private function startNextPass(Collection $quests, Closure $log): bool
+    {
+        if ($this->deferred === [] || $this->pass >= self::MAX_PASSES) {
+            return false;
+        }
+
+        $lowest = $quests->only(array_keys($this->deferred, QuestListProgress::DEFERRED_LEVEL, true))
+            ->pluck('required_level')
+            ->min();
+
+        if ($lowest === null) {
+            return false;
+        }
+
+        // One read per finished pass: the level may have moved in ways this
+        // run did not see (levelled for rage mid-fight, or by hand).
+        $this->stats->refresh();
+
+        if (! $this->reachesLevel($lowest, $log)) {
+            return false;
+        }
+
+        $this->retrying = array_keys($this->deferred);
+        $this->deferred = [];
+        $this->pass++;
+        $this->listIndex = 0;
+        $this->nextPosition = 0;
+        $this->questRetries = 0;
+
+        $message = sprintf(
+            'Pass %d: the character is level %d now, so %d deferred quest(s) get another try.',
+            $this->pass,
+            $this->character->level,
+            count($this->retrying),
+        );
+        $log($message);
+        $this->events?->record(RunEventType::Info, $message, ['pass' => $this->pass, 'level' => $this->character->level]);
+
+        return true;
+    }
+
+    /**
+     * The end of the run, told straight: how much got done, how much waits for
+     * the character to level, how much was written off.
+     *
+     * @param  Collection<int, Quest>  $quests
+     */
+    private function finishedReason(int $listCount, Collection $quests): string
+    {
+        $parts = ["{$this->completed} completed"];
+
+        if ($this->deferred !== []) {
+            $levels = $quests->only(array_keys($this->deferred, QuestListProgress::DEFERRED_LEVEL, true))->pluck('required_level');
+            $parts[] = count($this->deferred).' deferred'.($levels->isEmpty()
+                ? ' behind unfinished prerequisites'
+                : ' until level '.$this->levelRange($levels));
+        }
+
+        if ($this->skipped > 0) {
+            $parts[] = "{$this->skipped} skipped";
+        }
+
+        $what = $listCount > 1 ? 'All quest lists' : 'Quest list';
+
+        return ($this->deferred === [] ? "{$what} complete: " : "{$what} done for now: ").implode(', ', $parts).'.';
+    }
+
+    /**
+     * @param  Collection<int, int>  $levels
+     */
+    private function levelRange(Collection $levels): string
+    {
+        return $levels->min() === $levels->max() ? (string) $levels->min() : "{$levels->min()}–{$levels->max()}";
+    }
+
+    /**
+     * @param  Collection<int, QuestList>  $lists
+     * @return Collection<int, Quest>
+     */
+    private function questsOf(Collection $lists): Collection
+    {
+        return $lists->flatMap(fn (QuestList $list) => $list->items->pluck('quest'))->filter()->keyBy('id');
     }
 
     /**
@@ -410,10 +725,8 @@ class QuestListRunner
     {
         if ($this->questRetries >= self::MAX_QUEST_RETRIES) {
             $attempts = $this->questRetries;
-            $this->skipped++;
             $this->questRetries = 0;
-            $log("Skipping {$item->displayName()} after {$attempts} retries: {$message}");
-            $this->recordSkip($item, 'transient_exhausted', $message);
+            $this->skip($item, 'transient_exhausted', $message, $log, "Skipping {$item->displayName()} after {$attempts} retries: {$message}");
 
             return null;
         }
@@ -439,8 +752,14 @@ class QuestListRunner
         );
     }
 
-    private function recordSkip(QuestListItem $item, string $reason, string $message): void
+    /**
+     * @param  Closure(string): void  $log
+     */
+    private function skip(QuestListItem $item, string $reason, string $message, Closure $log, ?string $logLine = null): void
     {
+        $this->countSkip($reason);
+        $log($logLine ?? "Skipping {$item->displayName()}: {$message}");
+
         $this->events?->record(
             RunEventType::QuestSkipped,
             "Skipped {$item->displayName()}: {$message}",
@@ -454,18 +773,38 @@ class QuestListRunner
         );
     }
 
+    private function countSkip(string $reason): void
+    {
+        $this->skipped++;
+        $this->skippedNow++;
+        $this->skippedByReason[$reason] = ($this->skippedByReason[$reason] ?? 0) + 1;
+    }
+
+    private function progress(): QuestListProgress
+    {
+        return new QuestListProgress(
+            listIndex: $this->listIndex,
+            position: $this->nextPosition,
+            questRetries: $this->questRetries,
+            completed: $this->completed,
+            skipped: $this->skipped,
+            skippedByReason: $this->skippedByReason,
+            deferred: $this->deferred,
+            pass: $this->pass,
+            retrying: $this->retrying,
+        );
+    }
+
     private function summary(bool $completed, string $reason, RunEndReason $endReason): QuestListRunSummary
     {
         return new QuestListRunSummary(
             completed: $completed,
-            questsCompleted: $this->completed,
-            questsSkipped: $this->skipped,
+            questsCompleted: $this->completedNow,
+            questsSkipped: $this->skippedNow,
             kills: $this->kills,
             stopReason: $reason,
             endReason: $endReason,
-            nextPosition: $this->nextPosition,
-            questRetries: $this->questRetries,
-            nextListIndex: $this->listIndex,
+            progress: $this->progress(),
         );
     }
 }

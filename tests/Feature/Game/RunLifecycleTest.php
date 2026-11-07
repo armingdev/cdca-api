@@ -2,11 +2,13 @@
 
 use App\Game\Auth\LoginService;
 use App\Game\Enums\CharacterActivity;
+use App\Game\Enums\RunEventType;
 use App\Game\Enums\RunMode;
 use App\Game\Enums\RunSignal;
 use App\Game\Enums\RunStatus;
 use App\Models\Character;
 use App\Models\Mob;
+use App\Models\Quest;
 use App\Models\QuestList;
 use App\Models\Rga;
 use App\Models\Run;
@@ -249,6 +251,50 @@ it('resumes a paused quest list from its persisted position', function () {
     expect($participant->status)->toBe(RunStatus::Completed)
         ->and($participant->progress['position'])->toBe($list->items->last()->position + 1)
         ->and($participant->wins)->toBe(5);
+});
+
+/**
+ * The user-facing end of the Nov 2026 report: a list that put endgame quests
+ * first used to read "Quest list complete." with almost nothing done.
+ */
+it('ends a quest-list run with an honest tally, keeping the deferred quests in its progress', function () {
+    Mob::factory()->create(['name' => 'Stella'])->rooms()->attach(1, ['last_seen_at' => now()]);
+    Mob::factory()->create(['name' => 'Street Crawler'])->rooms()->attach(2, ['last_seen_at' => now()]);
+    fakeQuestWorld(level: 20);
+
+    $catalog = seedQuestCatalog();
+    $endgame = Quest::factory()->create(['game_quest_id' => 2630, 'name' => 'Intergalactic Union', 'giver' => 'Zugas', 'required_level' => 90]);
+    $list = QuestList::create(['name' => '80-95 GOOD']);
+    $list->addQuest($endgame->id);
+    $list->addQuest($catalog[742]->id);
+
+    $character = Character::factory()->for(Rga::factory()->withSession())->create(['level' => 20]);
+    $participant = RunParticipant::factory()
+        ->for(Run::factory()->state([
+            'mode' => RunMode::QuestList,
+            'config' => ['quest_list_ids' => [$list->id], 'stop_rage' => 2500],
+            'status' => RunStatus::Running,
+        ]))
+        ->for($character)
+        ->create();
+
+    makeRunJob($participant)->handle(app(LoginService::class));
+
+    $participant->refresh();
+
+    expect($participant->status)->toBe(RunStatus::Completed)
+        ->and($participant->last_activity)->toBe('Quest list done for now: 1 completed, 1 deferred until level 90.')
+        ->and($participant->progress)->toMatchArray([
+            'quests_completed' => 1,
+            'quests_skipped' => 0,
+            'quests_deferred' => 1,
+            'deferred' => [$endgame->id => 'level_too_low'],
+        ]);
+    $this->assertDatabaseHas('run_events', [
+        'run_participant_id' => $participant->id,
+        'type' => RunEventType::QuestDeferred->value,
+        'message' => "Deferred 1 quest(s) in '80-95 GOOD' until the character is ready: 1 need level 90.",
+    ]);
 });
 
 it('resumes a chained quest-list run in the list it stopped in', function () {

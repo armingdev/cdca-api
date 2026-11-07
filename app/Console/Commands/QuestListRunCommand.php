@@ -58,9 +58,10 @@ class QuestListRunCommand extends Command
 
         $this->info($summary->stopReason);
         $this->info(sprintf(
-            '%s — %d completed, %d skipped, %d kill(s).',
+            '%s — %d completed, %d deferred, %d skipped, %d kill(s).',
             $summary->completed ? 'List complete' : 'Stopped',
             $summary->questsCompleted,
+            $summary->questsDeferred(),
             $summary->questsSkipped,
             $summary->kills,
         ));

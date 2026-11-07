@@ -64,3 +64,19 @@ it('grows as rooms are added', function () {
         ->and($graph->neighbors(11))->toBe(['north' => 12, 'south' => 40])
         ->and($graph->count())->toBe(1);
 });
+
+it('routes around rooms it is told to avoid, and finds nothing when they are the only way', function () {
+    // A square with two routes to room 4: 1 –E– 2 –S– 4 and 1 –S– 3 –E– 4.
+    $graph = new RoomGraph([
+        1 => ['east' => 2, 'south' => 3],
+        2 => ['west' => 1, 'south' => 4],
+        3 => ['north' => 1, 'east' => 4],
+        4 => ['north' => 2, 'west' => 3],
+    ]);
+    $isRoomFour = fn (int $roomId): bool => $roomId === 4;
+
+    expect($graph->pathToNearest(1, $isRoomFour))->toBe([1, 2, 4])
+        ->and($graph->pathToNearest(1, $isRoomFour, avoid: [2 => 'Gate Key']))->toBe([1, 3, 4])
+        ->and($graph->pathToNearest(1, $isRoomFour, avoid: [2 => 'Gate Key', 3 => 'Gate Key']))->toBeNull()
+        ->and($graph->pathToNearest(1, fn (int $roomId): bool => $roomId === 2, avoid: [2 => 'Gate Key']))->toBeNull();
+});

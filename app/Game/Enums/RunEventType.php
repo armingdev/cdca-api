@@ -24,6 +24,9 @@ enum RunEventType: string
     case QuestStarted = 'quest_started';
     case QuestCompleted = 'quest_completed';
     case QuestSkipped = 'quest_skipped';
+
+    /** Quests a list put off until the character reaches their level or prerequisite — retried, unlike a skip. */
+    case QuestDeferred = 'quest_deferred';
     case QuestRetryScheduled = 'quest_retry_scheduled';
     case ObjectiveProgress = 'objective_progress';
 

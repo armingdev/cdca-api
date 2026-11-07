@@ -14,6 +14,7 @@ use App\Game\Exceptions\RunInterruptedException;
 use App\Game\Exceptions\SessionCollisionException;
 use App\Game\Items\GearManager;
 use App\Game\Items\JunkDropper;
+use App\Game\World\GatedRooms;
 use App\Game\World\Navigator;
 use App\Game\World\RoomGraph;
 use App\Game\World\TeleportPlanner;
@@ -101,6 +102,9 @@ class MobRunner
     /** Room-mates killed to draw out spawnable targets — never counted as target wins. */
     private int $triggerKills = 0;
 
+    /**
+     * @param  array<int, string>  $gatedRooms  rooms the game turned this character away from (GatedRooms), kept off every path
+     */
     public function __construct(
         private readonly MobRunConfig $config,
         private readonly Navigator $navigator,
@@ -109,6 +113,7 @@ class MobRunner
         private readonly ?JunkDropper $junkDropper = null,
         private readonly ?GearManager $gearManager = null,
         private readonly ?TeleportService $teleports = null,
+        private readonly array $gatedRooms = [],
     ) {}
 
     public static function forCharacter(Character $character, MobRunConfig $config): self
@@ -121,6 +126,7 @@ class MobRunner
             JunkDropper::forCharacter($character),
             GearManager::forCharacter($character),
             TeleportService::forCharacter($character),
+            app(GatedRooms::class)->for($character),
         );
     }
 
@@ -324,6 +330,7 @@ class MobRunner
                 $blob->curRoom,
                 fn (int $roomId): bool => $targetRooms->contains($roomId) && ! isset($exhausted[$roomId]),
                 $anchors,
+                avoid: $this->gatedRooms,
             );
 
             if ($plan === null) {

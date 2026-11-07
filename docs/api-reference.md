@@ -558,7 +558,10 @@ Example (mob mode, fleet of 2, cast skills + Circ gate):
   "created_at": "…" } }
 ```
 `progress` fills in as the run cycles: mob → `kills_done`/`cycles_done`;
-quest-list → `list_index` (0-based, which of `quest_list_ids`)/`position`/`quests_completed`/`quests_skipped`. `resume_at` is
+quest-list → `list_index` (0-based, which of `quest_list_ids`)/`position`/`quests_completed`/`quests_skipped`
+(run-wide, they accumulate across parks)/`quests_deferred`/`deferred` (`{questId: "level_too_low" | "prerequisite_pending"}`
+— quests the character is not ready for, retried automatically)/`skipped_by_reason` (`{reason: count}`)/`pass`
+(1 = the full first pass, 2+ = a re-pass over deferred quests only)/`retrying` (quest ids that re-pass replays, else `null`). `resume_at` is
 set while a participant is `waiting` (Circ cooldown, pass interval, session
 recovery) — that's when the scheduler re-dispatches it.
 
@@ -613,8 +616,10 @@ A participant can park `waiting` for reasons that have nothing to do with the
 game: "The worker driving this run died / stopped responding. Resuming
 shortly." (a worker was killed; bounded by `progress.worker_deaths`, fails
 after 3 in a row) and "Connection trouble — retrying at HH:MM: …" (network,
-Redis or database blip; bounded by `progress.transient_failures`, fails after
-5 in a row). Both counters reset after any pass that ends cleanly.
+Redis or database blip, or Outwar answering 5xx — e.g. "Game server answered
+HTTP 521 for …"; bounded by `progress.transient_failures`, waiting 2, 4, 8,
+16, 32, 60 and 60 minutes, then failing on the 8th in a row). Both counters
+reset after any pass that ends cleanly.
 
 **Participant status lifecycle:** `pending` → `running` → terminal
 (`completed` | `stopped` | `failed`) or parked (`waiting` with `resume_at`,

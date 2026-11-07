@@ -22,8 +22,10 @@ use App\Game\Exceptions\GameException;
 use App\Game\Exceptions\QuestNotAvailableException;
 use App\Game\Exceptions\RunInterruptedException;
 use App\Game\Exceptions\TransientGameException;
+use App\Game\World\GatedRooms;
 use App\Game\World\Navigator;
 use App\Game\World\RoomGraph;
+use App\Game\World\TeleportPlan;
 use App\Game\World\TeleportPlanner;
 use App\Game\World\TeleportService;
 use App\Models\BattleEvent;
@@ -84,6 +86,7 @@ class QuestRunner
         private readonly RoomGraph $graph,
         private readonly StatsService $stats,
         private readonly PurchasedQuestItems $purchasedItems,
+        private readonly GatedRooms $gates,
         private readonly ?TeleportService $teleports = null,
     ) {
         $this->currentNpcName = $config->npcName;
@@ -99,6 +102,7 @@ class QuestRunner
             app(RoomGraph::class),
             StatsService::forCharacter($character),
             app(PurchasedQuestItems::class),
+            app(GatedRooms::class),
             TeleportService::forCharacter($character),
         );
     }
@@ -865,14 +869,14 @@ class QuestRunner
         if (! $rooms->contains($blob->curRoom)) {
             // Free item anchors only — a quest run must not spend rage or the
             // Teleport skill's cooldown just to reach the giver.
-            $plan = new TeleportPlanner($this->graph)->planToNearest(
-                $blob->curRoom,
-                fn (int $roomId): bool => $rooms->contains($roomId),
-                $this->teleports?->freeAnchors() ?? [],
-            );
+            $planner = new TeleportPlanner($this->graph);
+            $isGiverRoom = fn (int $roomId): bool => $rooms->contains($roomId);
+            $anchors = $this->teleports?->freeAnchors() ?? [];
+            $gates = $this->gates->for($this->character);
+            $plan = $planner->planToNearest($blob->curRoom, $isGiverRoom, $anchors, avoid: $gates);
 
             if ($plan === null) {
-                throw new GameException("No path to quest-giver '{$npcName}'.");
+                throw new GameException($this->unreachableGiver($npcName, $planner->planToNearest($blob->curRoom, $isGiverRoom, $anchors), $gates));
             }
 
             $blob = $this->teleports !== null
@@ -889,6 +893,24 @@ class QuestRunner
         // The giver is mapped and we are standing in its room — it simply is
         // not rendered this instant. Nothing about the quest is wrong.
         throw new TransientGameException("Quest-giver '{$npcName}' is not present in its room right now.");
+    }
+
+    /**
+     * Why there is no way to the giver. When a path exists once the
+     * character's known gates are ignored, a gate is the reason, and saying
+     * which one tells the user what to fetch where "no path" tells them
+     * nothing.
+     *
+     * @param  array<int, string>  $gates  room id => what entering it wants
+     */
+    private function unreachableGiver(string $npcName, ?TeleportPlan $ungatedPlan, array $gates): string
+    {
+        $blocking = $ungatedPlan === null ? [] : array_intersect_key($gates, array_flip($ungatedPlan->walkPath));
+        $roomId = array_key_first($blocking);
+
+        return $roomId === null
+            ? "No path to quest-giver '{$npcName}'."
+            : "Quest-giver '{$npcName}' is past gated room {$roomId} ({$blocking[$roomId]}).";
     }
 
     private function completionLine(int $stepId, QuestStepPage $finished): string

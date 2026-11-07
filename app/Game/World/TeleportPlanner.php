@@ -36,22 +36,25 @@ class TeleportPlanner
     /**
      * The cheapest way to reach *any* room matching the predicate — what the
      * runners need, since a farm target or quest-giver usually lives in
-     * several rooms. Same rules as plan().
+     * several rooms. Same rules as plan(). Walks never enter a room in
+     * $avoid; a teleport may still land past one, which is the point of
+     * carrying the item.
      *
      * @param  Closure(int): bool  $predicate
      * @param  list<TeleportAnchor>  $anchors
+     * @param  array<int, mixed>  $avoid  rooms keyed by id (see RoomGraph::pathToNearest)
      */
-    public function planToNearest(int $from, Closure $predicate, array $anchors, ?int $homeTavernRoomId = null): ?TeleportPlan
+    public function planToNearest(int $from, Closure $predicate, array $anchors, ?int $homeTavernRoomId = null, array $avoid = []): ?TeleportPlan
     {
         $best = null;
-        $walk = $this->graph->pathToNearest($from, $predicate);
+        $walk = $this->graph->pathToNearest($from, $predicate, $avoid);
 
         if ($walk !== null) {
             $best = new TeleportPlan(anchor: null, walkPath: $walk);
         }
 
         if ($homeTavernRoomId !== null) {
-            $best = $this->better($best, $this->viaRoom($homeTavernRoomId, $predicate, null, true));
+            $best = $this->better($best, $this->viaRoom($homeTavernRoomId, $predicate, null, true, $avoid));
         }
 
         foreach ($anchors as $anchor) {
@@ -59,7 +62,7 @@ class TeleportPlanner
                 continue;
             }
 
-            $candidate = $this->viaRoom($anchor->room_id, $predicate, $anchor, false);
+            $candidate = $this->viaRoom($anchor->room_id, $predicate, $anchor, false, $avoid);
 
             if ($candidate === null) {
                 continue;
@@ -77,10 +80,11 @@ class TeleportPlanner
 
     /**
      * @param  Closure(int): bool  $predicate
+     * @param  array<int, mixed>  $avoid
      */
-    private function viaRoom(int $landing, Closure $predicate, ?TeleportAnchor $anchor, bool $useHomeTavern): ?TeleportPlan
+    private function viaRoom(int $landing, Closure $predicate, ?TeleportAnchor $anchor, bool $useHomeTavern, array $avoid): ?TeleportPlan
     {
-        $path = $this->graph->pathToNearest($landing, $predicate);
+        $path = $this->graph->pathToNearest($landing, $predicate, $avoid);
 
         if ($path === null) {
             return null;

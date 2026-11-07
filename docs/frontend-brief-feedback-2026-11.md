@@ -284,6 +284,38 @@ before, a quest needing one just waited in the room. No new request fields.
   `progress.kills_done` (mob mode) and quest progress count only the target.
   If the run detail shows "kills / max_kills", use `kills_done`.
 
+## 3c. Quest lists that tell the truth (stability work — API done)
+
+Testers saw lists end "complete" (or "error") with most quests undone. A list
+that puts level-90 quests first used to walk a level-83 character to every
+level-90 giver, skip each one, and call the list complete. Now:
+
+- A quest above the character's level is **deferred**, not attempted (the run
+  levels into it first when `level_up` or `smart` is on). A quest whose
+  prerequisite was deferred is deferred too. When a pass over the list ends
+  and the character has grown into a deferred quest, the run automatically
+  replays the lists running only the deferred quests ("pass 2", "pass 3"…).
+- The participant can finish `completed` with quests still deferred.
+  `last_activity` says so: "Quest list done for now: 12 completed, 70 deferred
+  until level 85–92, 6 skipped." versus "Quest list complete: 40 completed,
+  3 skipped." when nothing is left waiting.
+- `progress` (quest-list) now carries, all run-wide: `quests_completed`,
+  `quests_skipped`, `quests_deferred`, `deferred` (`{questId: reason}`),
+  `skipped_by_reason` (`{reason: count}`), `pass`, `retrying`.
+- Suggested UI, run detail participant row: "12 done · 70 waiting · 6 skipped"
+  from those counters. Tooltip on "waiting": "Above this character's level (or
+  behind a quest that is) — retried automatically as it levels." A small
+  "pass 2" chip when `pass > 1`.
+- New run event type `quest_deferred` (info): one per list, e.g. "Deferred 80
+  quest(s) in '80-95 GOOD' until the character is ready: 78 need level 85–92,
+  2 wait on a deferred prerequisite." Show it like `quest_skipped` but neutral
+  (not a warning colour).
+- Gate refusals now read cleanly ("Entry to room 42622 refused: To enter this
+  room you must be carrying Triworld Teleporter." — no stray HTML), and a
+  quest whose giver is past a gate the character was already turned away
+  from is skipped without walking there: "Quest-giver 'Trelon' is past gated
+  room 42622 (Triworld Teleporter)."
+
 ---
 
 ## 4. Type changes checklist (`core/models`)
@@ -308,6 +340,10 @@ before, a quest needing one just waited in the room. No new request fields.
   - create/update run requests += `priority?: RunPriority`; create += `quest_list_ids?: number[]`.
   - `Run` += `buff_potion_ids: number[]`, `rage_potion_ids: number[]`, `max_rage_potions: number`; create request the same (optional).
   - participant progress += `rage_potions_used?: number`.
+  - quest-list participant progress += `quests_deferred?: number`,
+    `deferred?: Record<number, 'level_too_low' | 'prerequisite_pending'>`,
+    `skipped_by_reason?: Record<string, number>`, `pass?: number`,
+    `retrying?: number[] | null`.
 - New `potion.ts` — `Potion { id; game_item_id; name; image: string | null; level; player_bound; description; kind: 'buff' | 'rage' | 'other'; duration_minutes: number | null; rage_amount: number | null }`, `CharacterPotion { potion_id; potion?: Potion; quantity; active; active_until; active_synced_at; last_activated_at; refused_until; synced_at }`, `PotionActivationResult { outcome: 'activated' | 'already_active' | 'out_of_stock' | 'refused'; message; data: CharacterPotion | null }`.
-- `run-event.ts` — `RunEventType` += `'potion_used' | 'potion_skipped'`.
+- `run-event.ts` — `RunEventType` += `'potion_used' | 'potion_skipped' | 'quest_deferred'`.
 - `world.ts` — mob search item += `spawnable: boolean`.

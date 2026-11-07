@@ -20,7 +20,9 @@ class QuestFactory extends Factory
         return [
             'game_quest_id' => fake()->unique()->numberBetween(1, 5000),
             'name' => fake()->unique()->words(3, true),
-            'required_level' => fake()->numberBetween(1, 95),
+            // Any character qualifies: quest lists defer quests above the
+            // character's level, so a random one made list tests flaky.
+            'required_level' => 1,
             'prerequisite' => null,
             'giver' => fake()->name(),
             'steps_count' => 1,

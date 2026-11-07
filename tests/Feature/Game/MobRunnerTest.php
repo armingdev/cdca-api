@@ -3,6 +3,8 @@
 use App\Game\Engine\MobRunConfig;
 use App\Game\Engine\MobRunner;
 use App\Game\Engine\RunEndReason;
+use App\Game\Exceptions\GatedRoomException;
+use App\Game\World\GatedRooms;
 use App\Models\Character;
 use App\Models\Rga;
 use Illuminate\Support\Facades\Http;
@@ -49,3 +51,14 @@ it('drops a mob whose attacks keep failing once its own streak cap is reached', 
     'refused with an empty 200' => ['', 200, 5],
     'already gone every time' => [gameFixture('attack_invalid_mob_500.html'), 500, 10],
 ]);
+
+it('keeps off a room the game has turned the character away from', function () {
+    fakeCombatWorld();
+    $character = Character::factory()->for(Rga::factory()->withSession())->create();
+    app(GatedRooms::class)->remember($character, new GatedRoomException(2, 'To enter this room you must be carrying Harvest Pass.'));
+
+    $summary = MobRunner::forCharacter($character, new MobRunConfig(mobNames: ['Kix Harvester'], maxKills: 1))->run();
+
+    expect($summary->wins)->toBe(0);
+    Http::assertNotSent(fn ($request) => str_contains($request->url(), 'ajax_changeroomb.php') && $request['room'] === '2');
+});

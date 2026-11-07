@@ -1,17 +1,21 @@
 <?php
 
+use App\Game\Engine\QuestListProgress;
 use App\Game\Engine\QuestListRunConfig;
 use App\Game\Engine\RunEndReason;
 use App\Game\Enums\QuestProgressStatus;
 use App\Game\Exceptions\GameException;
 use App\Game\Exceptions\GameServerException;
+use App\Game\Exceptions\GatedRoomException;
 use App\Game\Quest\QuestListRunner;
+use App\Game\World\GatedRooms;
 use App\Models\Character;
 use App\Models\CharacterQuestProgress;
 use App\Models\Mob;
 use App\Models\Quest;
 use App\Models\QuestList;
 use App\Models\Rga;
+use App\Models\Room;
 use Illuminate\Support\Facades\Http;
 
 // Shared fake quest world (fakeQuestWorld / seedQuestWorld) lives in tests/Pest.php.
@@ -38,7 +42,7 @@ it('runs the list in order: completes available quests, skips already-completed 
         ->and($summary->questsCompleted)->toBe(1)
         ->and($summary->questsSkipped)->toBe(1)
         ->and($summary->kills)->toBe(5)
-        ->and($summary->stopReason)->toBe('Quest list complete.');
+        ->and($summary->stopReason)->toBe('Quest list complete: 1 completed, 1 skipped.');
 });
 
 it('parks the whole list when a quest hits the rage floor', function () {
@@ -86,7 +90,7 @@ it('skips a quest wanting a purchased item and carries on with the rest of the l
     expect($summary->completed)->toBeTrue()
         ->and($summary->questsSkipped)->toBe(2)
         ->and($summary->questsCompleted)->toBe(0)
-        ->and($summary->stopReason)->toBe('Quest list complete.');
+        ->and($summary->stopReason)->toBe('Quest list complete: 0 completed, 2 skipped.');
 });
 
 it('retries a quest whose giver is momentarily absent before writing it off', function () {
@@ -103,16 +107,16 @@ it('retries a quest whose giver is momentarily absent before writing it off', fu
     $item = $list->addQuest($quest->id);
 
     $runner = fn (int $retries) => QuestListRunner::forCharacter($character, new QuestListRunConfig(questListIds: [$list->id]))
-        ->run(log: fn (string $m) => null, questRetries: $retries);
+        ->run(log: fn (string $m) => null, from: new QuestListProgress(questRetries: $retries));
 
     foreach ([0, 1] as $spent) {
         $summary = $runner($spent);
 
         expect($summary->endReason)->toBe(RunEndReason::TransientError)
             ->and($summary->questsSkipped)->toBe(0)
-            ->and($summary->questRetries)->toBe($spent + 1)
+            ->and($summary->progress->questRetries)->toBe($spent + 1)
             // Parked on the same item, so the resume re-enters this quest.
-            ->and($summary->nextPosition)->toBe($item->position);
+            ->and($summary->progress->position)->toBe($item->position);
     }
 
     // Budget spent: now it is written off and the list moves on.
@@ -161,7 +165,7 @@ it('skips a quest it cannot make progress on rather than abandoning the list', f
 
     expect($summary->completed)->toBeTrue()
         ->and($summary->questsSkipped)->toBe(2)
-        ->and($summary->stopReason)->toBe('Quest list complete.');
+        ->and($summary->stopReason)->toBe('Quest list complete: 0 completed, 2 skipped.');
 });
 
 it('drives the whole list through the outwar:questlist-run command', function () {
@@ -326,8 +330,8 @@ describe('chained lists', function () {
         $summary = QuestListRunner::forCharacter($character, new QuestListRunConfig(questListIds: [$first->id, $second->id]))
             ->run(
                 log: fn (string $m) => null,
-                onQuestSettled: function (int $position, int $completed, int $skipped, int $listIndex) use (&$settled): void {
-                    $settled[] = [$listIndex, $position];
+                onProgress: function (QuestListProgress $progress) use (&$settled): void {
+                    $settled[] = [$progress->listIndex, $progress->position];
                 },
             );
 
@@ -335,8 +339,8 @@ describe('chained lists', function () {
             ->and($summary->questsCompleted)->toBe(1)
             ->and($summary->questsSkipped)->toBe(2)
             ->and($summary->kills)->toBe(5)
-            ->and($summary->stopReason)->toBe('All quest lists complete.')
-            ->and($summary->nextListIndex)->toBe(1)
+            ->and($summary->stopReason)->toBe('All quest lists complete: 1 completed, 2 skipped.')
+            ->and($summary->progress->listIndex)->toBe(1)
             // Each item of the first list, the hop to the second, then its item.
             ->and($settled)->toBe([[0, 2], [0, 3], [1, 0], [1, 2]]);
     });
@@ -352,7 +356,7 @@ describe('chained lists', function () {
         $second->addQuest($catalog[743]->id);
 
         $summary = QuestListRunner::forCharacter($character, new QuestListRunConfig(questListIds: [$first->id, $second->id]))
-            ->run(log: fn (string $m) => null, startListIndex: 1);
+            ->run(log: fn (string $m) => null, from: new QuestListProgress(listIndex: 1));
 
         expect($summary->completed)->toBeTrue()
             ->and($summary->questsCompleted)->toBe(0)
@@ -387,4 +391,149 @@ describe('chained lists', function () {
 
         QuestListRunner::forCharacter($character, new QuestListRunConfig(questListIds: [999998, 999999]))->run();
     })->throws(GameException::class, 'Quest list #999998, #999999 not found.');
+});
+
+/**
+ * A list ordered top level first sent a level-83 character to every level-90
+ * giver, read each silence as "unavailable", and reported the list complete
+ * with nothing done (prod run 107, Nov 2026).
+ */
+describe('quests the character is not ready for', function () {
+    it('defers a quest above the character level without walking to its giver', function () {
+        fakeQuestWorld(level: 20);
+        $character = Character::factory()->for(Rga::factory()->withSession())->create(['level' => 20]);
+        $quest = Quest::factory()->create(['game_quest_id' => 742, 'name' => 'Street Crawler', 'giver' => 'Stella', 'required_level' => 90]);
+        $list = QuestList::create(['name' => 'Endgame First']);
+        $list->addQuest($quest->id);
+
+        $summary = QuestListRunner::forCharacter($character, new QuestListRunConfig(questListIds: [$list->id]))->run();
+
+        expect($summary->completed)->toBeTrue()
+            ->and($summary->questsSkipped)->toBe(0)
+            ->and($summary->progress->deferred)->toBe([$quest->id => QuestListProgress::DEFERRED_LEVEL])
+            ->and($summary->stopReason)->toBe('Quest list done for now: 0 completed, 1 deferred until level 90.');
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), 'world_questHelper.php'));
+        $this->assertDatabaseCount('character_quest_progress', 0);
+    });
+
+    it('levels the character into a quest when the run may level', function () {
+        fakeQuestWorld(level: 20, levelUps: 1);
+        $character = Character::factory()->for(Rga::factory()->withSession())->create(['level' => 20]);
+        $quest = Quest::factory()->create(['game_quest_id' => 742, 'name' => 'Street Crawler', 'giver' => 'Stella', 'required_level' => 21]);
+        $list = QuestList::create(['name' => 'Just Above']);
+        $list->addQuest($quest->id);
+
+        $summary = QuestListRunner::forCharacter($character, new QuestListRunConfig(questListIds: [$list->id], levelUp: true))->run();
+
+        expect($summary->questsCompleted)->toBe(1)
+            ->and($summary->progress->deferred)->toBe([])
+            ->and($character->fresh()->level)->toBe(21);
+    });
+
+    it('defers a quest whose prerequisite is itself deferred', function () {
+        fakeQuestWorld(level: 20);
+        $character = Character::factory()->for(Rga::factory()->withSession())->create(['level' => 20]);
+        $keyQuest = Quest::factory()->create(['game_quest_id' => 2630, 'name' => 'Intergalactic Union', 'giver' => 'Zugas', 'required_level' => 90]);
+        $behindIt = Quest::factory()->create([
+            'game_quest_id' => 742,
+            'name' => 'Street Crawler',
+            'giver' => 'Stella',
+            'prerequisite' => 'Intergalactic Union',
+            'prerequisite_quest_id' => $keyQuest->id,
+        ]);
+        $list = QuestList::create(['name' => 'Triworld']);
+        $list->addQuest($keyQuest->id);
+        $list->addQuest($behindIt->id);
+
+        $summary = QuestListRunner::forCharacter($character, new QuestListRunConfig(questListIds: [$list->id]))->run();
+
+        expect($summary->progress->deferred)->toBe([
+            $keyQuest->id => QuestListProgress::DEFERRED_LEVEL,
+            $behindIt->id => QuestListProgress::DEFERRED_PREREQUISITE,
+        ])->and($summary->questsSkipped)->toBe(0);
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), 'world_questHelper.php'));
+    });
+
+    it('replays a deferred quest once the character has grown into it', function () {
+        // The level the quest is deferred on, then the level read when the
+        // pass ends — the character levelled while the list played.
+        $statsReads = 0;
+        Http::fake(function ($request) use (&$statsReads) {
+            if (! str_contains($request->url(), 'userstats.php')) {
+                return null;
+            }
+
+            $statsReads++;
+
+            return Http::response(json_encode(['exp' => '1,000', 'rage' => '50,000', 'level' => $statsReads === 1 ? '20' : '21', 'width' => 0]));
+        });
+        fakeQuestWorld();
+        $character = Character::factory()->for(Rga::factory()->withSession())->create(['level' => 20]);
+        $quest = Quest::factory()->create(['game_quest_id' => 742, 'name' => 'Street Crawler', 'giver' => 'Stella', 'required_level' => 21]);
+        $list = QuestList::create(['name' => 'Just Above']);
+        $list->addQuest($quest->id);
+
+        $summary = QuestListRunner::forCharacter($character, new QuestListRunConfig(questListIds: [$list->id]))->run();
+
+        expect($summary->completed)->toBeTrue()
+            ->and($summary->questsCompleted)->toBe(1)
+            ->and($summary->progress->pass)->toBe(2)
+            ->and($summary->progress->deferred)->toBe([])
+            ->and($summary->stopReason)->toBe('Quest list complete: 1 completed.');
+    });
+
+    it('plays only the deferred quests when a re-pass resumes, carrying the run tallies on', function () {
+        fakeQuestWorld();
+        $character = Character::factory()->for(Rga::factory()->withSession())->create();
+        $catalog = seedQuestCatalog();
+        $list = QuestList::create(['name' => 'Second Pass']);
+        $list->addQuest($catalog[743]->id);   // settled on pass 1 — must not be replayed
+        $list->addQuest($catalog[742]->id);   // deferred on pass 1
+
+        $summary = QuestListRunner::forCharacter($character, new QuestListRunConfig(questListIds: [$list->id]))
+            ->run(from: new QuestListProgress(completed: 4, skipped: 3, pass: 2, retrying: [$catalog[742]->id]));
+
+        expect($summary->questsCompleted)->toBe(1)
+            ->and($summary->questsSkipped)->toBe(0)
+            ->and($summary->progress->completed)->toBe(5)
+            ->and($summary->progress->skipped)->toBe(3);
+    });
+});
+
+describe('gates the character was turned away from', function () {
+    it('skips a quest whose giver is past a known gate without walking to it', function () {
+        Room::whereKey(2)->update(['east' => 3]);
+        Room::factory()->create(['id' => 3, 'west' => 2]);
+        Mob::factory()->create(['name' => 'Trelon'])->rooms()->attach(3, ['last_seen_at' => now()]);
+        $quest = Quest::factory()->create(['game_quest_id' => 2631, 'name' => 'Triworld Sanctuary', 'giver' => 'Trelon']);
+        $list = QuestList::create(['name' => 'Triworld']);
+        $list->addQuest($quest->id);
+        fakeQuestWorld();
+        $character = Character::factory()->for(Rga::factory()->withSession())->create();
+        app(GatedRooms::class)->remember($character, new GatedRoomException(2, 'To enter this room you must be carrying Triworld Teleporter.'));
+        $log = [];
+
+        $summary = QuestListRunner::forCharacter($character, new QuestListRunConfig(questListIds: [$list->id]))
+            ->run(log: function (string $m) use (&$log): void {
+                $log[] = $m;
+            });
+
+        expect($summary->questsSkipped)->toBe(1)
+            ->and($summary->progress->skippedByReason)->toBe(['unreachable' => 1])
+            ->and($log)->toContain("Skipping Triworld Sanctuary: Quest-giver 'Trelon' is past gated room 2 (Triworld Teleporter).");
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), 'ajax_changeroomb.php') && $request['room'] === '2');
+    });
+
+    it('forgets them once a quest completes, since it may have handed out the key', function () {
+        fakeQuestWorld();
+        $character = Character::factory()->for(Rga::factory()->withSession())->create();
+        app(GatedRooms::class)->remember($character, new GatedRoomException(99, 'To enter this room you must be carrying Triworld Teleporter.'));
+        $catalog = seedQuestCatalog();
+        $list = QuestList::create(['name' => 'Key Giver']);
+        $list->addQuest($catalog[742]->id);
+
+        QuestListRunner::forCharacter($character, new QuestListRunConfig(questListIds: [$list->id]))->run();
+
+        expect(app(GatedRooms::class)->for($character))->toBe([]);
+    });
 });
