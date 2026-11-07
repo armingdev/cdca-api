@@ -81,6 +81,33 @@ Auth required. Revokes the **current** token. `200 OK`.
 ### `GET /user`
 Auth required. `200 OK` → `{ "user": { id, name, email, created_at } }`.
 
+### `POST /forgot-password`
+Public. Rate-limited (10/min per IP). `{ "email": "armin@example.com" }` →
+`200 { "message": "If that email belongs to an account, a password reset link is on its way." }`.
+The answer is the same for unknown emails (no account discovery). The mail
+(queued, sent via Postmark in production) links to
+`{FRONTEND_URL}/reset-password?token={token}&email={email}`; the link expires
+after 60 minutes.
+
+### `POST /reset-password`
+Public. Rate-limited (10/min per IP).
+```json
+{ "token": "…", "email": "armin@example.com",
+  "password": "new-secret", "password_confirmation": "new-secret" }
+```
+`200 { "message": "Your password has been reset. Sign in with the new password." }`.
+**Every API token of the account is revoked**, so the user must log in again.
+A bad/expired token or an unknown email → `422` with
+`errors.email: ["This password reset link is invalid or has expired."]`.
+
+### `PUT /user/password`
+Auth required. Rate-limited (10/min per IP).
+```json
+{ "current_password": "old-secret", "password": "new-secret", "password_confirmation": "new-secret" }
+```
+`200`. The calling device stays signed in; **every other token is revoked**.
+Wrong `current_password`, or a new password equal to the current one → `422`.
+
 **Unauthenticated requests to protected routes return `401`.**
 
 ---
@@ -140,7 +167,41 @@ Show / delete one of your RGAs. `403` if not yours.
 
 ### `PUT /rgas/{id}`
 Update credentials: `password` and/or `security_answer` (both optional,
-encrypted at rest). `username` is immutable — a different account is a new RGA.
+encrypted at rest), and the `auto_claim_tokens` boolean. `username` is
+immutable — a different account is a new RGA.
+
+The RGA resource also carries `auto_claim_tokens` (default `true`),
+`challenge_tokens`, `challenge_tokens_purchased` and `challenge_claim_at`
+(the last challenge-token reading; `null` until first read).
+
+### Sessions
+- `GET /rgas/{id}/session` — reveal one RGA's stored cookies:
+  `{ data: { rga_id, username, rg_sess_id, token, cuserid2, status, last_login_at } }`;
+  `404` without a captured session.
+- `POST /rgas/{id}/session` — attach a session pasted from a browser
+  (`rg_sess_id` = 32 hex, optional `token`, `cuserid2`); verified live first,
+  `422` if the game rejects it.
+- **`GET /rgas/sessions[?verify=1]`** — "copy all sessions": every RGA of yours
+  with a live session, in one response, ordered by username. Rate-limited
+  (30/min). Each row: `rga_id, username, rg_sess_id, token, cuserid2, status,
+  last_login_at, characters_count, alive`. Without `verify`, `alive` is `null`
+  and the game is not contacted. With `verify=1` each session is checked
+  (one game request per RGA): `true` = works, `false` = the game rejected it
+  (the RGA is marked `invalid` — the client can offer `POST /rgas/{id}/login`),
+  `null` = the game could not be reached (nothing changed). Never logs in.
+
+### Challenge tokens
+3 tokens per day per RGA, at most 30 held (purchased tokens are separate).
+The scheduler claims them every day for each RGA with `auto_claim_tokens`
+on (checked every 30 min; never logs in).
+- `GET /rgas/{id}/challenge-tokens` — live reading:
+  `{ data: { rga_id, auto_claim_tokens, tokens, max_tokens: 30, purchased_tokens,
+  next_claim_at, claimed_at, synced_at } }`.
+- `POST /rgas/{id}/challenge-tokens/claim` — claim now. `200` with
+  `message` (the game's text) + the new reading; `422` with the game's
+  refusal (e.g. "You have reached your max of 30 challenge tokens!") or when
+  today's claim is already used (the message names `next_claim_at`).
+Both need a live session and a synced character (`422` otherwise).
 
 ### `POST /rgas/{id}/login`
 Logs the RGA in to Outwar and captures its session. Synchronous (makes a live
@@ -167,7 +228,9 @@ characters appear under `GET /characters` with live stats filling in.
 ### `GET /characters`
 All your characters (across RGAs), in one stable order: level desc, then
 name, then id (rows with equal levels never swap between two polls). Filters:
-`?server_id=1|2`, `?rga_id={id}`, `?ownership=own|trustee`.
+`?server_id=1|2`, `?rga_id={id}`, `?ownership=own|trustee`,
+`?min_level=` / `?max_level=` (inclusive, 1–95, either alone is fine;
+`max_level < min_level` → `422`).
 
 `is_trustee` marks a character another RGA shared with this one (it shows up
 in the account's roster but is not its own). It is set by the roster sync
@@ -282,6 +345,25 @@ that teleports logs it to `last_activity` ("Teleporting with {anchor}…"), so
 keeping anchors synced makes runs measurably faster, especially for targets in
 areas no walk reaches.
 
+### Per-character potions
+A character's potions as last read from its potion tab and the Current
+Effects panel (an active potion shows there next to the skills, with the
+game's own time left — it can run past the catalog duration).
+- `GET /characters/{id}/potions` — stored reading, no game request:
+  `{ data: [{ potion_id, potion: Potion, quantity, active, active_until,
+  active_synced_at, last_activated_at, refused_until, synced_at }] }`,
+  ordered by potion name. A potion the character ran out of stays listed
+  at `quantity: 0`.
+- `POST /characters/{id}/potions/sync` — read the game now (2 requests),
+  same shape. Unknown potions in the tab are added to the catalog.
+- `POST /characters/{id}/potions/{potionId}/activate` — drink one now (any
+  kind, including instant ones a run never uses). `200 { outcome:
+  "activated", message: "Kix Potion activated!", data: CharacterPotion }`;
+  otherwise `422` with `outcome` `already_active` (nothing consumed — the
+  game says it is still running; `active_until` is refreshed),
+  `out_of_stock`, or `refused` (backed off: 5 min, 1 h, then a day). All
+  three need a live session (`422` otherwise).
+
 ### Character stats
 
 - `GET /characters/{id}/battles?per_page=50` — recent battle events (paginated,
@@ -304,14 +386,52 @@ areas no walk reaches.
 
 ---
 
+## 5b. Crew groups (crew leader mode)
+
+A cdca-side crew (not the game's `GET /crews` data): a leader plus members
+who joined with its invite code. Each member chooses which of **their own**
+RGAs the leader may read; the leader can then copy those sessions in one
+call. Every leader read is recorded and visible to all members.
+
+| Endpoint | Who | What |
+|---|---|---|
+| `GET /crew-groups` | any user | groups you lead or belong to: `{ id, name, leader: {id, name}, is_leader, members_count, created_at }` (+ `invite_code` for the leader) |
+| `POST /crew-groups` `{ name }` | any user | create; you are leader and first member. `201`, includes `invite_code` (10 chars, A–Z/2–9) |
+| `GET /crew-groups/{id}` | member | + `members: [{ id, name, joined_at, shared_rgas_count }]` and `shared_rgas: [{ rga_id, username, shared_by_user_id, shared_at, has_session }]` — **all** shares for the leader, **only your own** for a member. Emails are never shown |
+| `PATCH /crew-groups/{id}` `{ name }` | leader | rename |
+| `DELETE /crew-groups/{id}` | leader | disband (memberships and shares go too) |
+| `POST /crew-groups/{id}/invite-code` | leader | new code; the old one stops working, members stay |
+| `POST /crew-groups/join` `{ invite_code }` | any user | join (case-insensitive). Unknown code → `422 errors.invite_code`. Joining shares nothing. Rate-limited (10/min) |
+| `PUT /crew-groups/{id}/shared-rgas` `{ rga_ids: [] }` | member | replace your share set with exactly these RGAs (your own only — anyone else's → `422` "You can only share your own game accounts."); `[]` withdraws all. Returns your shares |
+| `DELETE /crew-groups/{id}/members/{userId}` | member (self) / leader | leave, or the leader removes a member; their shares are withdrawn. The leader cannot leave (`403`) — disband instead |
+| `GET /crew-groups/{id}/sessions[?verify=1]` | **leader** | every shared RGA: `{ rga_id, username, member: {id, name}, has_session, rg_sess_id, token, cuserid2, status, last_login_at, alive, characters: [{ suid, server_id, name, level }] }`. Cookies are `null` when the RGA has no live session. `verify=1` checks each with the game (a rejected one is marked `invalid` and its cookies hidden). Writes an audit row. Rate-limited (30/min) |
+| `GET /crew-groups/{id}/session-reads?per_page=25` | member | audit trail, newest first: `{ id, reader: {id, name}, rga_ids, verified, read_at }` (paginated) |
+
+Non-members get `403` on every group endpoint. A shared session goes stale
+when its owner's run recovers a session collision by logging in again — the
+leader just reads again.
+
+---
+
 ## 6. Skills catalog & World (read-only reference data)
+
+### `GET /potions[?kind=buff|rage|other][&search=]`
+The 139-potion catalog harvested from the game's item database (+ any
+learned from backpacks), ordered by name, not paginated:
+`{ id, game_item_id, name, image, level, player_bound, description, kind,
+duration_minutes, rage_amount }`. `kind`: `buff` = has a duration, a run can
+keep it active; `rage` = instant rage, a run can drink it instead of waiting
+for the rage tick; `other` = quest/novelty/PvP-immunity potions, manual use
+only. `image` is relative to `https://{server}.outwar.com/images/`.
 
 - `GET /skills` — the 43-skill catalog. Filter `?school=ferocity`. Each item:
   `{ id, name, school, rage_cost, cooldown_minutes, duration_minutes, description }`.
   `id` is the game's cast id. Circumspect = `3008`, Street Smarts = `25`,
   Circle of Protection = `14`.
 - `GET /world/mobs?q={name}&per_page=50` — search known mobs by name
-  (paginated), for picking farm/attack targets. Each item includes `room_ids`.
+  (paginated), for picking farm/attack targets. Each item includes `room_ids`
+  and `spawnable` (only exists once its room-mates are farmed — runs do that
+  themselves).
 - `GET /crews?search={name or game crew id}&server_id=1|2&per_page=25` — crews
   the app has seen so far (a crew is recorded the first time a run reads its
   roster), for picking `crew_game_ids`. Game-world data, the same for every
@@ -390,6 +510,7 @@ Common fields (all modes):
 |---|---|---|
 | `mode` | enum | `mob` · `quest` · `quest-list` · `pvp-attack-list` · `pvp-crew-hitlist` · `pvp-crew-members` · `pvp-brawl` · `pvp-faction-brawl` (required) |
 | `name` | string? | a label for the run, max 80. Rename later with `PATCH /runs/{id}` |
+| `priority` | enum | `high` · `normal` (default) · `low`. When every run worker is busy, waiting participants of higher-priority runs get the next free worker first. It never interrupts a running participant. Change it later with `PATCH /runs/{id}` |
 | `characters` | int[] | your character ids (required, ≥1). `422` if any isn't yours |
 | `stop_rage` | int | rage-pool floor; stop below it (default 2500) |
 | `level_up` | bool | level up (refills rage) instead of stopping when low |
@@ -397,6 +518,9 @@ Common fields (all modes):
 | `cast_on_start` | bool | keep the characters' selected skills active for the run |
 | `skill_ids` | int[] | **replaces every listed character's cast-on-start selection**, then runs with it. Omit to let each character keep its own set. `[]` clears them all. A non-empty list turns `cast_on_start` on by itself; sending it alongside an explicit `cast_on_start: false` is a `422` on `cast_on_start`. Echoed back on the run as `skill_ids` (null when omitted) |
 | `require_circumspect` | bool | run on the Circumspect cycle: cast it when possible, otherwise park `waiting` and auto-resume when its cooldown ends |
+| `buff_potion_ids` | int[] | potions (`kind: buff`, max 20) kept active for the run: just before combat, any that is not active is drunk (re-drunk 2 min before it ends). None left → a `potion_skipped` event, the run carries on. Wrong kind → `422` |
+| `rage_potion_ids` | int[] | potions (`kind: rage`, max 10), tried in this order: when a participant would park for rage (or, in mob/PvP mode, stop at its rage floor) it drinks one and resumes within a minute instead. Wrong kind → `422` |
+| `max_rage_potions` | int | 1–50, required with `rage_potion_ids`: how many rage potions one run cycle may drink (counted in `progress.rage_potions_used`; a restart starts over) |
 | `restart_every_minutes` | int? | re-dispatch this run every N minutes after it **completes** |
 | `start_at` | datetime? | delay the first start until this time (run stays `pending` until then) |
 | `reserve_rage_for` | string[] | `pvp-brawl` · `faction-brawl`. Within `reserve_rage_hours` of that event on the character's server the participant parks `waiting` ("Saving rage for the PvP Brawl …") and resumes when the event window closes. Ignored by the two brawl modes. Event times come from the hourly brawl sync |
@@ -405,9 +529,9 @@ Common fields (all modes):
 Mode-specific fields:
 | Mode | Fields |
 |---|---|
-| `mob` | `mobs`: string[] (exact mob names, required); `max_kills`: int (0 = unlimited, counted across passes); `run_count`: int (full passes per character; 0/absent = farm indefinitely, waiting out respawns — send 1 for a single pass); `attack_interval_seconds`: int 60–86400 (wait between passes); `drop_junk`: bool |
+| `mob` | `mobs`: string[] (exact mob names, required; a **spawnable** mob — `spawnable: true` in `GET /world/mobs` — is drawn out automatically by farming its room-mates, up to 40 attacks per room per pass, and only the spawned mob counts toward `max_kills`. Quest objectives on spawnable mobs work the same way); `max_kills`: int (0 = unlimited, counted across passes); `run_count`: int (full passes per character; 0/absent = farm indefinitely, waiting out respawns — send 1 for a single pass); `attack_interval_seconds`: int 60–86400 (wait between passes); `drop_junk`: bool |
 | `quest` | **either** `catalog_quest_id`: int (a quest `id` from `GET /quests`; the giver and game quest id are taken from the catalog, `422` if the catalog has no giver for it) **or** `npc`: string (giver name) + `quest_id`: int (the *game's* quest id); `respawn_wait_seconds`: int 60–86400 (default 60, wait before retrying an objective whose targets are all dead) |
-| `quest-list` | `quest_list_id`: int (required, must be yours); `respawn_wait_seconds`: int 60–86400 (default 60) |
+| `quest-list` | `quest_list_ids`: int[] (1–10 distinct lists, all yours, **played back to back in this order**; the single `quest_list_id` is still accepted). A quest finished in an earlier list is skipped in a later one (non-repeatable quests). `config.quest_list_id` mirrors the first list and is deprecated. A foreign/unknown list → `422` naming it. `respawn_wait_seconds`: int 60–86400 (default 60) |
 | `pvp-attack-list` | `attack_list_id`: int (yours) **or** `targets`: string[]; `attacks_per_target`, `max_attacks`, `skip_too_strong`, `cooldown_minutes` (1–60), `message` |
 | `pvp-crew-members` | `crew_game_ids`: int[] (1–10 distinct game crew ids — find them with `GET /crews`; the single `crew_game_id` is still accepted). Rosters are attacked in the order given. `config.crew_game_id` mirrors the first id and is deprecated |
 | `pvp-crew-hitlist` · `pvp-brawl` · `pvp-faction-brawl` | no target fields (`auto_enter_brawl`: bool for the brawl modes) |
@@ -434,7 +558,7 @@ Example (mob mode, fleet of 2, cast skills + Circ gate):
   "created_at": "…" } }
 ```
 `progress` fills in as the run cycles: mob → `kills_done`/`cycles_done`;
-quest-list → `position`/`quests_completed`/`quests_skipped`. `resume_at` is
+quest-list → `list_index` (0-based, which of `quest_list_ids`)/`position`/`quests_completed`/`quests_skipped`. `resume_at` is
 set while a participant is `waiting` (Circ cooldown, pass interval, session
 recovery) — that's when the scheduler re-dispatches it.
 
@@ -464,8 +588,12 @@ gate) are re-applied at pickup, so changing the skill selection while paused
 takes effect, and each character continues from its persisted `progress`.
 
 ### `PATCH /runs/{id}`
-`{ "name": "sub85 veldara" }` (or `null` to clear). Allowed in any status;
-`403` if the run is not yours. Nothing else about a run is editable.
+`{ "name": "sub85 veldara" }` (or `null` to clear) and/or
+`{ "priority": "high" }`. Allowed in any status; `403` if the run is not
+yours. A new priority immediately moves the run's `pending` participants
+(waiting for a worker) to the new queue; `waiting` ones use it at their next
+resume; running ones are not touched. The run resource carries `priority`.
+Nothing else about a run is editable.
 
 ### `DELETE /runs/{id}`
 Delete a **finished** run and its participants. `422` while live or parked

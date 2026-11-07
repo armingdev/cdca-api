@@ -44,6 +44,19 @@ it('filters by level range and giver, and sorts by exp descending', function () 
         ->assertJsonCount(3, 'data');
 });
 
+it('accepts a one-sided level range', function () {
+    Quest::factory()->create(['name' => 'Low', 'required_level' => 10]);
+    Quest::factory()->create(['name' => 'High', 'required_level' => 80]);
+
+    $this->getJson('/api/v1/quests?max_level=30')
+        ->assertOk()
+        ->assertJsonPath('data.*.name', ['Low']);
+
+    $this->getJson('/api/v1/quests?min_level=50&max_level=30')
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('max_level');
+});
+
 it('searches by name or giver, case-insensitively', function () {
     Quest::factory()->create(['name' => 'Primal Elemental Rune', 'giver' => 'Rune Master of Resplendency']);
     Quest::factory()->create(['name' => 'Street Crawler', 'giver' => 'Stella']);

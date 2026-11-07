@@ -3,6 +3,7 @@
 use App\Game\Engine\QuestListRunConfig;
 use App\Game\Engine\RunEndReason;
 use App\Game\Enums\QuestProgressStatus;
+use App\Game\Exceptions\GameException;
 use App\Game\Quest\QuestListRunner;
 use App\Models\Character;
 use App\Models\CharacterQuestProgress;
@@ -29,7 +30,7 @@ it('runs the list in order: completes available quests, skips already-completed 
     $list->addQuest($catalog[742]->id);   // available → runs to completion
     $list->addQuest($catalog[743]->id);   // not offered → skipped
 
-    $summary = QuestListRunner::forCharacter($character, new QuestListRunConfig(questListId: $list->id))
+    $summary = QuestListRunner::forCharacter($character, new QuestListRunConfig(questListIds: [$list->id]))
         ->run(log: fn (string $m) => null);
 
     expect($summary->completed)->toBeTrue()
@@ -48,7 +49,7 @@ it('parks the whole list when a quest hits the rage floor', function () {
     $list = QuestList::create(['name' => 'Armins List']);
     $list->addQuest($catalog[742]->id);
 
-    $summary = QuestListRunner::forCharacter($character, new QuestListRunConfig(questListId: $list->id, stopRage: 2500))
+    $summary = QuestListRunner::forCharacter($character, new QuestListRunConfig(questListIds: [$list->id], stopRage: 2500))
         ->run(log: fn (string $m) => null);
 
     // Rage comes back on its own, so the list waits on this quest rather than
@@ -78,7 +79,7 @@ it('skips a quest wanting a purchased item and carries on with the rest of the l
     $list->addQuest($shardQuest->id);
     $list->addQuest($giverlessQuest->id);
 
-    $summary = QuestListRunner::forCharacter($character, new QuestListRunConfig(questListId: $list->id))
+    $summary = QuestListRunner::forCharacter($character, new QuestListRunConfig(questListIds: [$list->id]))
         ->run(log: fn (string $m) => null);
 
     expect($summary->completed)->toBeTrue()
@@ -100,7 +101,7 @@ it('retries a quest whose giver is momentarily absent before writing it off', fu
     $list = QuestList::create(['name' => 'Retry List']);
     $item = $list->addQuest($quest->id);
 
-    $runner = fn (int $retries) => QuestListRunner::forCharacter($character, new QuestListRunConfig(questListId: $list->id))
+    $runner = fn (int $retries) => QuestListRunner::forCharacter($character, new QuestListRunConfig(questListIds: [$list->id]))
         ->run(log: fn (string $m) => null, questRetries: $retries);
 
     foreach ([0, 1] as $spent) {
@@ -134,7 +135,7 @@ it('skips a quest it cannot make progress on rather than abandoning the list', f
     $list->addQuest($catalog[742]->id);
     $list->addQuest($catalog[743]->id);
 
-    $summary = QuestListRunner::forCharacter($character, new QuestListRunConfig(questListId: $list->id))
+    $summary = QuestListRunner::forCharacter($character, new QuestListRunConfig(questListIds: [$list->id]))
         ->run(log: fn (string $m) => null);
 
     expect($summary->completed)->toBeTrue()
@@ -163,7 +164,7 @@ it('remembers a completed quest and walks straight past it next run', function (
     $list = QuestList::create(['name' => 'Memory List']);
     $list->addQuest($quest->id);
 
-    $first = QuestListRunner::forCharacter($character, new QuestListRunConfig(questListId: $list->id))->run();
+    $first = QuestListRunner::forCharacter($character, new QuestListRunConfig(questListIds: [$list->id]))->run();
 
     expect($first->questsCompleted)->toBe(1)
         ->and(CharacterQuestProgress::where('character_id', $character->id)->where('quest_id', $quest->id)->value('status'))
@@ -173,7 +174,7 @@ it('remembers a completed quest and walks straight past it next run', function (
 
     // A second run must not walk to the giver at all — that walk, repeated for
     // every settled quest, is what made a 200-quest list restart so slow.
-    $second = QuestListRunner::forCharacter($character, new QuestListRunConfig(questListId: $list->id))->run();
+    $second = QuestListRunner::forCharacter($character, new QuestListRunConfig(questListIds: [$list->id]))->run();
 
     expect($second->completed)->toBeTrue()
         ->and($second->questsSkipped)->toBe(1)
@@ -199,7 +200,7 @@ it('still runs a repeatable quest it has already completed', function () {
     $list = QuestList::create(['name' => 'Daily List']);
     $list->addQuest($quest->id);
 
-    $summary = QuestListRunner::forCharacter($character, new QuestListRunConfig(questListId: $list->id))->run();
+    $summary = QuestListRunner::forCharacter($character, new QuestListRunConfig(questListIds: [$list->id]))->run();
 
     expect($summary->questsCompleted)->toBe(1)
         ->and($summary->questsSkipped)->toBe(0);
@@ -214,14 +215,14 @@ it('records a quest the giver does not offer, and runs it again once cleared', f
     $list = QuestList::create(['name' => 'Phantom List']);
     $list->addQuest($quest->id);
 
-    QuestListRunner::forCharacter($character, new QuestListRunConfig(questListId: $list->id))->run();
+    QuestListRunner::forCharacter($character, new QuestListRunConfig(questListIds: [$list->id]))->run();
 
     expect(CharacterQuestProgress::where('character_id', $character->id)->value('status'))
         ->toBe(QuestProgressStatus::Unavailable);
 
     $before = count(Http::recorded());
 
-    QuestListRunner::forCharacter($character, new QuestListRunConfig(questListId: $list->id))->run();
+    QuestListRunner::forCharacter($character, new QuestListRunConfig(questListIds: [$list->id]))->run();
 
     expect(count(Http::recorded()))->toBe($before);
 
@@ -229,7 +230,7 @@ it('records a quest the giver does not offer, and runs it again once cleared', f
     // makes the run ask the giver again.
     CharacterQuestProgress::where('character_id', $character->id)->delete();
 
-    QuestListRunner::forCharacter($character, new QuestListRunConfig(questListId: $list->id))->run();
+    QuestListRunner::forCharacter($character, new QuestListRunConfig(questListIds: [$list->id]))->run();
 
     expect(count(Http::recorded()))->toBeGreaterThan($before);
 });
@@ -251,7 +252,7 @@ it('skips an in-progress quest no mob will open without recording it as unavaila
     $list->addQuest($quest->id);
 
     $log = [];
-    $summary = QuestListRunner::forCharacter($character, new QuestListRunConfig(questListId: $list->id))
+    $summary = QuestListRunner::forCharacter($character, new QuestListRunConfig(questListIds: [$list->id]))
         ->run(log: function (string $m) use (&$log) {
             $log[] = $m;
         });
@@ -276,7 +277,7 @@ it('runs a quest whose step has moved past its giver instead of skipping it', fu
     $list = QuestList::create(['name' => 'Armins List']);
     $list->addQuest($quest->id);
 
-    $summary = QuestListRunner::forCharacter($character, new QuestListRunConfig(questListId: $list->id))
+    $summary = QuestListRunner::forCharacter($character, new QuestListRunConfig(questListIds: [$list->id]))
         ->run(log: fn (string $m) => null);
 
     expect($summary->questsCompleted)->toBe(1)
@@ -285,4 +286,84 @@ it('runs a quest whose step has moved past its giver instead of skipping it', fu
     $progress = CharacterQuestProgress::first();
 
     expect($progress->status)->toBe(QuestProgressStatus::Completed);
+});
+
+describe('chained lists', function () {
+    it('plays several lists back to back, skipping in a later list what an earlier one finished', function () {
+        fakeQuestWorld();
+
+        $character = Character::factory()->for(Rga::factory()->withSession())->create();
+        $catalog = seedQuestCatalog();
+        $first = QuestList::create(['name' => 'First']);
+        $first->addQuest($catalog[742]->id);   // completes
+        $first->addQuest($catalog[743]->id);   // not offered → skipped
+        $second = QuestList::create(['name' => 'Second']);
+        $second->addQuest($catalog[742]->id);  // done in the first list → ledger skip
+
+        $settled = [];
+
+        $summary = QuestListRunner::forCharacter($character, new QuestListRunConfig(questListIds: [$first->id, $second->id]))
+            ->run(
+                log: fn (string $m) => null,
+                onQuestSettled: function (int $position, int $completed, int $skipped, int $listIndex) use (&$settled): void {
+                    $settled[] = [$listIndex, $position];
+                },
+            );
+
+        expect($summary->completed)->toBeTrue()
+            ->and($summary->questsCompleted)->toBe(1)
+            ->and($summary->questsSkipped)->toBe(2)
+            ->and($summary->kills)->toBe(5)
+            ->and($summary->stopReason)->toBe('All quest lists complete.')
+            ->and($summary->nextListIndex)->toBe(1)
+            // Each item of the first list, the hop to the second, then its item.
+            ->and($settled)->toBe([[0, 2], [0, 3], [1, 0], [1, 2]]);
+    });
+
+    it('resumes inside a later list without replaying the earlier ones', function () {
+        fakeQuestWorld();
+
+        $character = Character::factory()->for(Rga::factory()->withSession())->create();
+        $catalog = seedQuestCatalog();
+        $first = QuestList::create(['name' => 'First']);
+        $first->addQuest($catalog[742]->id);
+        $second = QuestList::create(['name' => 'Second']);
+        $second->addQuest($catalog[743]->id);
+
+        $summary = QuestListRunner::forCharacter($character, new QuestListRunConfig(questListIds: [$first->id, $second->id]))
+            ->run(log: fn (string $m) => null, startListIndex: 1);
+
+        expect($summary->completed)->toBeTrue()
+            ->and($summary->questsCompleted)->toBe(0)
+            ->and($summary->questsSkipped)->toBe(1)
+            ->and($summary->kills)->toBe(0);
+    });
+
+    it('carries on past a list deleted after the run started', function () {
+        fakeQuestWorld();
+
+        $character = Character::factory()->for(Rga::factory()->withSession())->create();
+        $catalog = seedQuestCatalog();
+        $gone = QuestList::create(['name' => 'Gone']);
+        $kept = QuestList::create(['name' => 'Kept']);
+        $kept->addQuest($catalog[742]->id);
+        $goneId = $gone->id;
+        $gone->delete();
+
+        $log = [];
+        $summary = QuestListRunner::forCharacter($character, new QuestListRunConfig(questListIds: [$goneId, $kept->id]))
+            ->run(log: function (string $m) use (&$log): void {
+                $log[] = $m;
+            });
+
+        expect($summary->completed)->toBeTrue()
+            ->and($summary->questsCompleted)->toBe(1)
+            ->and($log)->toContain("Quest list #{$goneId} no longer exists — skipping it.");
+    });
+
+    it('fails when none of its lists exist', function () {
+        $character = Character::factory()->for(Rga::factory()->withSession())->create();
+
+        QuestListRunner::forCharacter($character, new QuestListRunConfig(questListIds: [999998, 999999]))->run();
+    })->throws(GameException::class, 'Quest list #999998, #999999 not found.');
 });

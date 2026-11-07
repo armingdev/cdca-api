@@ -1,0 +1,1114 @@
+[
+  {
+    "game_item_id": 6536,
+    "name": "20 Year Aged Whiskey",
+    "image": "items/whiskeypot.png",
+    "level": 0,
+    "player_bound": true,
+    "description": "+2020 ATK+2020 HP+20% Critical+20% Rampage+200 Original Elemental Damages Duration: 20 hours"
+  },
+  {
+    "game_item_id": 2160,
+    "name": "Alpha Rage Potion",
+    "image": "items/20k Rage potion.jpg",
+    "level": 20,
+    "player_bound": true,
+    "description": "Warning: Awards 20,000 Rage upon consumption. User will become extremely re-energized."
+  },
+  {
+    "game_item_id": 7583,
+    "name": "Alpha Rage Tonic",
+    "image": "items/20kragetonic.png",
+    "level": 20,
+    "player_bound": true,
+    "description": "Awards 20,000 Rage upon consumption."
+  },
+  {
+    "game_item_id": 1491,
+    "name": "Arcane Liquid",
+    "image": "potion_yellow.gif",
+    "level": 40,
+    "player_bound": true,
+    "description": "Increases your damage against certain Guardians."
+  },
+  {
+    "game_item_id": 729,
+    "name": "Arcane Potion",
+    "image": "potion_yellow.gif",
+    "level": 40,
+    "player_bound": false,
+    "description": "Used to kill Lord Narada and other Potion Gods."
+  },
+  {
+    "game_item_id": 3128,
+    "name": "Blazing Holiday Sauce",
+    "image": "items/emblemPotion2.jpg",
+    "level": 0,
+    "player_bound": true,
+    "description": "+350 atk, +350 Hp, +10% crit, +100 exp/turn, +100 rage/turn, +50 all Original Elemental Damages. 60 Minute Duration."
+  },
+  {
+    "game_item_id": 3352,
+    "name": "Blood of the Alpha",
+    "image": "potion_green.gif",
+    "level": 0,
+    "player_bound": true,
+    "description": "+750 Atk, +5% crit. 2 Hour Duration."
+  },
+  {
+    "game_item_id": 1516,
+    "name": "Blue Green Potion",
+    "image": "halloween/Pblugre.gif",
+    "level": 0,
+    "player_bound": false,
+    "description": "Fluffy like clouds."
+  },
+  {
+    "game_item_id": 1515,
+    "name": "Blue Potion",
+    "image": "halloween/Pblu.gif",
+    "level": 0,
+    "player_bound": false,
+    "description": "It's a sad affair."
+  },
+  {
+    "game_item_id": 1517,
+    "name": "Blue Violet Potion",
+    "image": "halloween/Pbluvio.gif",
+    "level": 0,
+    "player_bound": false,
+    "description": "Royal splendor."
+  },
+  {
+    "game_item_id": 1606,
+    "name": "Boost of Arcane Resistance",
+    "image": "items/holypotion.gif",
+    "level": 1,
+    "player_bound": true,
+    "description": "This potion gives +150 Arcane resistance. (60 minute duration)"
+  },
+  {
+    "game_item_id": 1607,
+    "name": "Boost of Fire Resistance",
+    "image": "LF/firepotion.gif",
+    "level": 1,
+    "player_bound": true,
+    "description": "This potion will give +150 Fire resistance (60 minute duration)"
+  },
+  {
+    "game_item_id": 1608,
+    "name": "Boost of Holy Resistance",
+    "image": "items/kineticpotion.gif",
+    "level": 1,
+    "player_bound": true,
+    "description": "This potion gives +150 Holy Resistance. (60 minute duration)"
+  },
+  {
+    "game_item_id": 1609,
+    "name": "Boost of Kinetic Resistance",
+    "image": "items/arcanepotion.gif",
+    "level": 1,
+    "player_bound": true,
+    "description": "This potion gives +150 Kinetic Resistance. (60 minute duration)"
+  },
+  {
+    "game_item_id": 1610,
+    "name": "Boost of Shadow Resistance",
+    "image": "LF/shadowpotion.gif",
+    "level": 1,
+    "player_bound": true,
+    "description": "This potion gives +150 Shadow Resistance. (60 minute duration)"
+  },
+  {
+    "game_item_id": 1664,
+    "name": "Bottle of Holy Slaughter",
+    "image": "potion26.jpg",
+    "level": 25,
+    "player_bound": true,
+    "description": "Grants your character +750HP and +400 Holy Damage.(60 minute duration)"
+  },
+  {
+    "game_item_id": 2555,
+    "name": "Bottle of Holy Water",
+    "image": "items/Bottle-of-Holy-Water.gif",
+    "level": 0,
+    "player_bound": true,
+    "description": "Minor holy boost: +30 HP +25 Shadow Resist +20 Holy Damage Duration: 30 minutes"
+  },
+  {
+    "game_item_id": 3622,
+    "name": "Brew of Precision",
+    "image": "items/potion3.gif",
+    "level": 0,
+    "player_bound": false,
+    "description": "This Brew will grant you +200 to All Original Resists, +300 ATK and +500 HP for 1 hour."
+  },
+  {
+    "game_item_id": 1518,
+    "name": "Bright Potion",
+    "image": "halloween/Pbrigt.gif",
+    "level": 0,
+    "player_bound": false,
+    "description": "NO not the lava... I'm allergic to the magma!"
+  },
+  {
+    "game_item_id": 616,
+    "name": "Brutality Potion",
+    "image": "potion1.jpg",
+    "level": 10,
+    "player_bound": false,
+    "description": "For the next 3 successful attacks you will double strip/steal your targets experience."
+  },
+  {
+    "game_item_id": 1487,
+    "name": "Brutality Tonic",
+    "image": "potion1.jpg",
+    "level": 10,
+    "player_bound": true,
+    "description": "For the next 3 successful attacks you will double strip/steal your targets experience."
+  },
+  {
+    "game_item_id": 5147,
+    "name": "Damned Element Shot",
+    "image": "items/h16_Pot6.png",
+    "level": 75,
+    "player_bound": true,
+    "description": "+200 All Original Elemental Damages Duration: 1 hour"
+  },
+  {
+    "game_item_id": 7123,
+    "name": "Demonic Madness",
+    "image": "items/vaultpot2.png",
+    "level": 90,
+    "player_bound": false,
+    "description": "+1500 ATK+3000 HP+1000 Original Elemental Damages Duration: 1 hour"
+  },
+  {
+    "game_item_id": 1488,
+    "name": "Dose of Destruction",
+    "image": "pot2.jpg",
+    "level": 0,
+    "player_bound": true,
+    "description": "Gives your character +350 ATK, 8% critical, and 25% rampage. Lasts 10 mins."
+  },
+  {
+    "game_item_id": 2399,
+    "name": "Elementalidation",
+    "image": "items/uber_pot.gif",
+    "level": 40,
+    "player_bound": false,
+    "description": "A consolidated potion with the power of five separate potions.Increases your damage against certain guardians."
+  },
+  {
+    "game_item_id": 3494,
+    "name": "Elixir of Darkness",
+    "image": "items/pot2.jpg",
+    "level": 0,
+    "player_bound": true,
+    "description": "1000 atk, 1500 hp, 500 Arcane Damage, 10% Critical HitDuration: 240 mins"
+  },
+  {
+    "game_item_id": 1670,
+    "name": "Evil Scream",
+    "image": "potion25.jpg",
+    "level": 50,
+    "player_bound": true,
+    "description": "Gives your character +1,000 ATK, +150 Shadow Damage, and 4,000 Rage. Lasts 1 hour."
+  },
+  {
+    "game_item_id": 3519,
+    "name": "Exalted Brew",
+    "image": "items/exalted brew.jpg",
+    "level": 0,
+    "player_bound": true,
+    "description": "1100 atk, 1600 hp, 600 Kinetic Damage, 10% Critical HitDuration: 240 mins"
+  },
+  {
+    "game_item_id": 2158,
+    "name": "Extra Rage Potion",
+    "image": "items/2500 Rage potion.jpg",
+    "level": 10,
+    "player_bound": true,
+    "description": "Warning: Awards 2,500 Rage upon consumption."
+  },
+  {
+    "game_item_id": 3638,
+    "name": "Fiery Brew",
+    "image": "items/fieryBrew.jpg",
+    "level": 0,
+    "player_bound": true,
+    "description": "1100 ATK, 1600 HP, 600 Arcane Damage, 10% Critical HitDuration: 240 mins"
+  },
+  {
+    "game_item_id": 1493,
+    "name": "Fire Liquid",
+    "image": "potion_red.gif",
+    "level": 40,
+    "player_bound": true,
+    "description": "Increases your damage against certain guardians."
+  },
+  {
+    "game_item_id": 731,
+    "name": "Fire Potion",
+    "image": "potion_red.gif",
+    "level": 40,
+    "player_bound": false,
+    "description": "Used to kill Lord Suka and other Potion Gods."
+  },
+  {
+    "game_item_id": 2108,
+    "name": "Fire Water",
+    "image": "potion22.jpg",
+    "level": 0,
+    "player_bound": true,
+    "description": "+750 HP +3% Crit +400 Fire Damage Duration: 1 hour"
+  },
+  {
+    "game_item_id": 1317,
+    "name": "Flask of Burning Souls",
+    "image": "items/basicflask1.gif",
+    "level": 45,
+    "player_bound": true,
+    "description": "+750 HP +300 Holy Resist +300 Fire Resist +150 Holy Damage +150 Fire Damage (8 hour duration)"
+  },
+  {
+    "game_item_id": 1322,
+    "name": "Flask of Conjured Lightning",
+    "image": "basicflask4.gif",
+    "level": 45,
+    "player_bound": true,
+    "description": "+750 HP +300 Arcane Resist +300 Kinetic Resist +150 Arcane Damage +150 Kinetic Damage (8 hour duration)"
+  },
+  {
+    "game_item_id": 4990,
+    "name": "Flask of Endurance",
+    "image": "items/itemz28.jpg",
+    "level": 60,
+    "player_bound": true,
+    "description": "+750 ATK+1500 HP+200 Rage Per Turn+200 Vile Energy+100 all Original Elemental Damages Duration: 7 days"
+  },
+  {
+    "game_item_id": 1318,
+    "name": "Flask of Flaming Death",
+    "image": "basicflask2.gif",
+    "level": 45,
+    "player_bound": true,
+    "description": "+750 HP +300 Holy Resist +300 Shadow Resist +150 Holy Damage +150 Shadow Damage (8 hour duration)"
+  },
+  {
+    "game_item_id": 1319,
+    "name": "Flask of Forbidden Knowledge",
+    "image": "basicflask3.gif",
+    "level": 45,
+    "player_bound": true,
+    "description": "+750 HP +300 Shadow Resist +300 Arcane Resist +150 Shadow Damage +150 Arcane Damage (8 hour duration)"
+  },
+  {
+    "game_item_id": 1321,
+    "name": "Flask of Super Nova",
+    "image": "basicflask5.gif",
+    "level": 45,
+    "player_bound": true,
+    "description": "+750 HP +300 Kinetic Resist +400 Kinetic Damage (8 hour duration)"
+  },
+  {
+    "game_item_id": 2930,
+    "name": "Flask of the Flame",
+    "image": "basicflask2.gif",
+    "level": 45,
+    "player_bound": true,
+    "description": "+200 HP +100 Holy Resist +100 Shadow Resist +50 Holy Damage +50 Shadow Damage (8 hour duration)"
+  },
+  {
+    "game_item_id": 903,
+    "name": "Funny Little Mushroom",
+    "image": "mushroom.jpg",
+    "level": 0,
+    "player_bound": true,
+    "description": "+100 Attack +500 HP +5% Crit Duration: 2 hours"
+  },
+  {
+    "game_item_id": 1975,
+    "name": "Ghoulish Potion",
+    "image": "items/ghoulishpotion.gif",
+    "level": 0,
+    "player_bound": true,
+    "description": "It seems to have strong Holy and Kinetic Power. Gives +100 rage/turn and 125 attack power. Lasts two hours..."
+  },
+  {
+    "game_item_id": 2536,
+    "name": "Glass of Sherry",
+    "image": "items/sherry.gif",
+    "level": 25,
+    "player_bound": true,
+    "description": "Although sherry isn't your favorite, it gives a rush when you take a sip. +1000 EXP +600 rage"
+  },
+  {
+    "game_item_id": 1457,
+    "name": "God Juice",
+    "image": "TG/Flask.gif",
+    "level": 0,
+    "player_bound": true,
+    "description": "This will make you powerful."
+  },
+  {
+    "game_item_id": 2301,
+    "name": "Gold Digger",
+    "image": "items/golddigger.jpg",
+    "level": 0,
+    "player_bound": true,
+    "description": "Consume this potion to steal gold when attacking another player for the next 60 minutes."
+  },
+  {
+    "game_item_id": 2159,
+    "name": "Grand Rage Potion",
+    "image": "items/10k Rage potion.jpg",
+    "level": 15,
+    "player_bound": true,
+    "description": "Warning: Awards 10,000 Rage upon consumption."
+  },
+  {
+    "game_item_id": 7584,
+    "name": "Grand Rage Tonic",
+    "image": "items/10kragetonic.png",
+    "level": 20,
+    "player_bound": true,
+    "description": "Awards 10,000 Rage upon consumption."
+  },
+  {
+    "game_item_id": 1519,
+    "name": "Green Potion",
+    "image": "halloween/Pgre.gif",
+    "level": 0,
+    "player_bound": false,
+    "description": "Like a Granny Smith Apple."
+  },
+  {
+    "game_item_id": 1520,
+    "name": "Grey Potion",
+    "image": "halloween/Pgry.gif",
+    "level": 0,
+    "player_bound": false,
+    "description": "Dull Potion."
+  },
+  {
+    "game_item_id": 2196,
+    "name": "Griznix Potion",
+    "image": "items/purepwnagepotion.png",
+    "level": 0,
+    "player_bound": true,
+    "description": "+750 HP, +300 Arcane Damage, +400 Arcane Resistance, +25 Kinetic Damage, +25 Kinetic Resistance, +2% Critical Hit (Duration: 8 hours)"
+  },
+  {
+    "game_item_id": 7740,
+    "name": "Halloween Potion",
+    "image": "items/itemz27.jpg",
+    "level": 0,
+    "player_bound": false,
+    "description": "+3125 ATK +5275 HP +13% Critical +400 Vile +575 Rage Per Turn Duration: 4 hours"
+  },
+  {
+    "game_item_id": 1983,
+    "name": "Haste Potion",
+    "image": "items/haste.png",
+    "level": 0,
+    "player_bound": true,
+    "description": "Your actions become lightning fast, time speeds up with your every move. Respawn times on DC mobs are reduced by 11%."
+  },
+  {
+    "game_item_id": 1490,
+    "name": "Holy Liquid",
+    "image": "potion_blue.gif",
+    "level": 40,
+    "player_bound": true,
+    "description": "Increases your damage against certain guardians."
+  },
+  {
+    "game_item_id": 728,
+    "name": "Holy Potion",
+    "image": "potion_blue.gif",
+    "level": 40,
+    "player_bound": false,
+    "description": "Used to kill Lord Varan and Potion Gods."
+  },
+  {
+    "game_item_id": 2935,
+    "name": "Holy Vile",
+    "image": "items/Pot_HolyVile.jpg",
+    "level": 0,
+    "player_bound": true,
+    "description": "+500 HP, +200 Holy Damage, +200 Holy Resist. Lasts 90 minutes."
+  },
+  {
+    "game_item_id": 4013,
+    "name": "Inner Realm Elixer",
+    "image": "items/InnerRealmElixer.png",
+    "level": 50,
+    "player_bound": false,
+    "description": "Duration 1 Hour +325 Attack +625 HP"
+  },
+  {
+    "game_item_id": 1904,
+    "name": "Invisibility Potion",
+    "image": "pot16.jpg",
+    "level": 0,
+    "player_bound": true,
+    "description": "Allows access to the Tree Village of Buburore in Bacaba."
+  },
+  {
+    "game_item_id": 3047,
+    "name": "Jabberwocky Blood",
+    "image": "items/Item_JabberwockyBlood.jpg",
+    "level": 0,
+    "player_bound": false,
+    "description": "+1100 Atk, +1800 HP, +5 Crit, +2 Block, +1 Ramp Duration: 2 hours"
+  },
+  {
+    "game_item_id": 3362,
+    "name": "Jar of Clarity",
+    "image": "items/purepwnagepotion.png",
+    "level": 0,
+    "player_bound": true,
+    "description": "500 exp/hr (Duration: 8 hours)"
+  },
+  {
+    "game_item_id": 1494,
+    "name": "Kinetic Liquid",
+    "image": "potion_green.gif",
+    "level": 40,
+    "player_bound": true,
+    "description": "Increases your damage against certain guardians."
+  },
+  {
+    "game_item_id": 4299,
+    "name": "Kinetic Potency",
+    "image": "items/KineticShot.jpg",
+    "level": 0,
+    "player_bound": true,
+    "description": "1100 ATK1250 HP12% CritDuration: 120 mins"
+  },
+  {
+    "game_item_id": 732,
+    "name": "Kinetic Potion",
+    "image": "potion_green.gif",
+    "level": 40,
+    "player_bound": false,
+    "description": "Used to kill Great Lord Ganeshan and other Potion Gods."
+  },
+  {
+    "game_item_id": 4300,
+    "name": "Kinetic Strength",
+    "image": "items/Woz13r1Pot2.jpg",
+    "level": 0,
+    "player_bound": true,
+    "description": "900 ATK750 HP9% CritDuration: 60 mins"
+  },
+  {
+    "game_item_id": 2063,
+    "name": "Kix Potion",
+    "image": "potion28.jpg",
+    "level": 0,
+    "player_bound": false,
+    "description": "Gives your character + 425 ATK, 1,250 HP and 5% Crit for 60 mins."
+  },
+  {
+    "game_item_id": 2377,
+    "name": "Kombucha",
+    "image": "items/Putrid Power Clusters.jpg",
+    "level": 0,
+    "player_bound": false,
+    "description": "These magical bulbs award 2000 extra rage and +750 HP, +250 ATK, +5% Crit, +350 Holy Damage, +400 Shadow Resist for four hours if you can stomach the taste. Or is it the seeds?"
+  },
+  {
+    "game_item_id": 3133,
+    "name": "Liquid Bone Juice",
+    "image": "items/Item_JabberwockyBlood.jpg",
+    "level": 0,
+    "player_bound": true,
+    "description": "+150 atk, +100 arcane damage and resistance. Lasts 2 hours."
+  },
+  {
+    "game_item_id": 6109,
+    "name": "Major Chaos Philter",
+    "image": "items/itemz82.jpg",
+    "level": 80,
+    "player_bound": false,
+    "description": "+50 Chaos Damage Duration: 60 minutes"
+  },
+  {
+    "game_item_id": 1525,
+    "name": "Major Experience Boost",
+    "image": "potions/exppot2.gif",
+    "level": 0,
+    "player_bound": true,
+    "description": "Double your experience from DC mobs for 30 minutes. (Does not affect Auto Attacks)."
+  },
+  {
+    "game_item_id": 1922,
+    "name": "Marsh Water",
+    "image": "potion24.jpg",
+    "level": 50,
+    "player_bound": true,
+    "description": "Gives you +250 ATK, 150 Kinetic Damage, and 150 Kinetic Resistance! Duration: 1 hour"
+  },
+  {
+    "game_item_id": 4732,
+    "name": "Master Brutality Potion",
+    "image": "items/masterbrut.jpg",
+    "level": 10,
+    "player_bound": false,
+    "description": "For the next 1 hour you will double strip/steal your targets experience."
+  },
+  {
+    "game_item_id": 1339,
+    "name": "Mega Rage Potion",
+    "image": "items/15k Rage potion.jpg",
+    "level": 15,
+    "player_bound": true,
+    "description": "Warning: Awards 15,000 Rage upon consumption."
+  },
+  {
+    "game_item_id": 6108,
+    "name": "Minor Chaos Philter",
+    "image": "items/itemz91.jpg",
+    "level": 80,
+    "player_bound": false,
+    "description": "+25 Chaos Damage Duration: 60 minutes"
+  },
+  {
+    "game_item_id": 1524,
+    "name": "Minor Experience Boost",
+    "image": "potions/exppot.gif",
+    "level": 0,
+    "player_bound": true,
+    "description": "Double your experience from DC mobs for 15 minutes. (Does not affect Auto Attacks)."
+  },
+  {
+    "game_item_id": 2001,
+    "name": "Olympian Juicebox",
+    "image": "items/lesserolympian.png",
+    "level": 0,
+    "player_bound": true,
+    "description": "Drink this from a straw to receive: +250 Atk +80 Arcane Damage +80 Kinetic Damage +40 Arcane Resist +40 Kinetic Resist (60 minute duration)"
+  },
+  {
+    "game_item_id": 1953,
+    "name": "Olympian Push",
+    "image": "items/2k8.png",
+    "level": 0,
+    "player_bound": true,
+    "description": "As a last resort, use this to get a boost: +350 Atk +100 Arcane Damage +100 Kinetic Damage +100 Arcane Resist +100 Kinetic Resist (60 minute duration)"
+  },
+  {
+    "game_item_id": 4841,
+    "name": "Potion of Amdir",
+    "image": "items/arelepot.jpg",
+    "level": 60,
+    "player_bound": false,
+    "description": "+200 to all Original Elemental Damages Duration: 1 hour"
+  },
+  {
+    "game_item_id": 3625,
+    "name": "Potion of Deceit",
+    "image": "items/potion2.gif",
+    "level": 0,
+    "player_bound": false,
+    "description": "This Potion will grant you +650 ATK, +925 HP, +14 Critical Hit and +225 Vile Energy for 6 hours."
+  },
+  {
+    "game_item_id": 950,
+    "name": "Potion of Destruction",
+    "image": "pot2.jpg",
+    "level": 30,
+    "player_bound": false,
+    "description": "Gives your character +350 ATK, 8% critical, and 25% rampage. Lasts 10 mins."
+  },
+  {
+    "game_item_id": 6532,
+    "name": "Potion of Elemental Resistance",
+    "image": "items/eleresistpotion.png",
+    "level": 1,
+    "player_bound": false,
+    "description": "This potion will give +10% All Original Elemental Resistances for One hour."
+  },
+  {
+    "game_item_id": 4493,
+    "name": "Potion of Enraged Alsayic",
+    "image": "items/PotionofEA.jpg",
+    "level": 68,
+    "player_bound": true,
+    "description": "+1500 ATK+3000 HP+400 all Original Elemental Damages+3000 Rage Duration: 30 minutes"
+  },
+  {
+    "game_item_id": 905,
+    "name": "Potion of Fortitude",
+    "image": "pot21.jpg",
+    "level": 0,
+    "player_bound": true,
+    "description": "Gives your character +500 HP for 60 mins."
+  },
+  {
+    "game_item_id": 1544,
+    "name": "Pumpkin Juice",
+    "image": "halloween/PumpkinJuice.gif",
+    "level": 10,
+    "player_bound": true,
+    "description": "+900 ATK, +1700 HP, +2% Crit, +2% Block, and +4% Rampage Duration: 60 minutes"
+  },
+  {
+    "game_item_id": 4733,
+    "name": "PvP Immunity (1 Day)",
+    "image": "items/pvpimmune.jpg",
+    "level": 0,
+    "player_bound": true,
+    "description": "Cannot attack or be attacked by players for 24 hours."
+  },
+  {
+    "game_item_id": 4735,
+    "name": "PvP Immunity (7 Days)",
+    "image": "items/pvpimmune.jpg",
+    "level": 0,
+    "player_bound": true,
+    "description": "Cannot attack or be attacked by players for 7 days."
+  },
+  {
+    "game_item_id": 2964,
+    "name": "Quantum Quattro",
+    "image": "items/pot_quantumquattro.jpg",
+    "level": 0,
+    "player_bound": false,
+    "description": "+1000 Atk+1500 HP+500 Kinetic Damage+10% Critical Hit. Duration: 4 hours"
+  },
+  {
+    "game_item_id": 3001,
+    "name": "Quantum Solice",
+    "image": "items/pot_quantumsolice.jpg",
+    "level": 0,
+    "player_bound": false,
+    "description": "+300 Atk +500 HP +150 Holy Damage +100 Kin Resist +3% Critical Hit Duration: 2 hours"
+  },
+  {
+    "game_item_id": 5819,
+    "name": "Quest Experience Potion",
+    "image": "items/itemz80.gif",
+    "level": 0,
+    "player_bound": true,
+    "description": "Increases experience gained from completing quests by 100% for 2 weeks. This potion is unstable and will not be effective for characters over level 89."
+  },
+  {
+    "game_item_id": 904,
+    "name": "Rage Potion",
+    "image": "items/1000 Rage potion.jpg",
+    "level": 10,
+    "player_bound": true,
+    "description": "Warning: Awards 1,000 Rage upon consumption."
+  },
+  {
+    "game_item_id": 7586,
+    "name": "Rage Tonic",
+    "image": "items/1kragetonic.png",
+    "level": 20,
+    "player_bound": true,
+    "description": "Awards 1,000 Rage upon consumption."
+  },
+  {
+    "game_item_id": 2940,
+    "name": "Rampage Vile",
+    "image": "items/Pot_RampageVile.jpg",
+    "level": 0,
+    "player_bound": true,
+    "description": "+250 Attack, +100 Arcane Damage, +100 Kinetic Damage. Lasts 90 minutes."
+  },
+  {
+    "game_item_id": 1403,
+    "name": "Recharge the Fury",
+    "image": "rfury.jpg",
+    "level": 30,
+    "player_bound": true,
+    "description": "Restores your character's rage to the maximum."
+  },
+  {
+    "game_item_id": 1522,
+    "name": "Red Orange Potion",
+    "image": "halloween/Predorg.gif",
+    "level": 0,
+    "player_bound": false,
+    "description": "It's like a lava lamp."
+  },
+  {
+    "game_item_id": 1521,
+    "name": "Red Potion",
+    "image": "halloween/Pred.gif",
+    "level": 0,
+    "player_bound": false,
+    "description": "Might cure an upset stomach."
+  },
+  {
+    "game_item_id": 4542,
+    "name": "Reikavon's Elixir",
+    "image": "items/ReikavonsElixer.jpg",
+    "level": 0,
+    "player_bound": true,
+    "description": "1100 ATK1250 HP12% CritDuration: 120 mins"
+  },
+  {
+    "game_item_id": 2243,
+    "name": "Remnant Solice Lev 1",
+    "image": "items/goldpotion.gif",
+    "level": 20,
+    "player_bound": true,
+    "description": "Remnants of what was once a powerful source of energy condense to form a faded potion. +31 ATK +73 HP Duration: 3 hours"
+  },
+  {
+    "game_item_id": 6695,
+    "name": "Remnant Solice Lev 10",
+    "image": "items/90remnant.png",
+    "level": 90,
+    "player_bound": true,
+    "description": "Remnants of what was once a powerful source of energy condense to form a faded potion. +1000 ATK +2000 HP +25 Chaos damage +50 Original Elemental damages Duration: 4 hours"
+  },
+  {
+    "game_item_id": 7671,
+    "name": "Remnant Solice Lev 11",
+    "image": "items/95remnant.png",
+    "level": 95,
+    "player_bound": true,
+    "description": "Remnants of what was once a powerful source of energy condense to form a faded potion. +1250 ATK +2500 HP +30 Chaos damage +100 Original Elemental damages Duration: 4 hours"
+  },
+  {
+    "game_item_id": 2244,
+    "name": "Remnant Solice Lev 2",
+    "image": "items/goldpotion.gif",
+    "level": 30,
+    "player_bound": true,
+    "description": "Remnants of what was once a powerful source of energy condense to form a faded potion. +52 ATK +121 HP Duration: 3 hours"
+  },
+  {
+    "game_item_id": 2245,
+    "name": "Remnant Solice Lev 3",
+    "image": "items/goldpotion.gif",
+    "level": 40,
+    "player_bound": true,
+    "description": "Remnants of what was once a powerful source of energy condense to form a faded potion. +86 ATK +202 HP Duration: 3 hours"
+  },
+  {
+    "game_item_id": 2246,
+    "name": "Remnant Solice Lev 4",
+    "image": "items/goldpotion.gif",
+    "level": 50,
+    "player_bound": true,
+    "description": "Remnants of what was once a powerful source of energy condense to form a faded potion. +144 ATK +336 HP Duration: 3 hours"
+  },
+  {
+    "game_item_id": 2247,
+    "name": "Remnant Solice Lev 5",
+    "image": "items/goldpotion.gif",
+    "level": 60,
+    "player_bound": true,
+    "description": "Remnants of what was once a powerful source of energy condense to form a faded potion. +240 ATK +560 HP Duration: 3 hours"
+  },
+  {
+    "game_item_id": 2248,
+    "name": "Remnant Solice Lev 6",
+    "image": "items/goldpotion.gif",
+    "level": 65,
+    "player_bound": true,
+    "description": "Remnants of what was once a powerful source of energy condense to form a faded potion. +300 ATK +700 HP Duration: 3 hours"
+  },
+  {
+    "game_item_id": 4626,
+    "name": "Remnant Solice Lev 7",
+    "image": "items/goldpotionzor.gif",
+    "level": 75,
+    "player_bound": true,
+    "description": "Remnants of what was once a powerful source of energy condense to form a faded potion. +400 ATK +850 HP Duration: 3 hours"
+  },
+  {
+    "game_item_id": 4628,
+    "name": "Remnant Solice Lev 8",
+    "image": "items/goldpotionzorleetz.jpg",
+    "level": 80,
+    "player_bound": true,
+    "description": "Remnants of what was once a powerful source of energy condense to form a faded potion. +500 ATK +1000 HP Duration: 4 hours"
+  },
+  {
+    "game_item_id": 6252,
+    "name": "Remnant Solice Lev 9",
+    "image": "items/85remnant.jpg",
+    "level": 85,
+    "player_bound": true,
+    "description": "Remnants of what was once a powerful source of energy condense to form a faded potion. +750 ATK +1500 HP +25 Chaos damage Duration: 4 hours"
+  },
+  {
+    "game_item_id": 3064,
+    "name": "Revival Potion",
+    "image": "items/revival.jpg",
+    "level": 0,
+    "player_bound": true,
+    "description": "This potion will rejuvenate you and give you a big boost to your experience and rage pool."
+  },
+  {
+    "game_item_id": 1009,
+    "name": "Sammy Sosa's Special Sauce",
+    "image": "pot5.jpg",
+    "level": 30,
+    "player_bound": true,
+    "description": "Gives your character +1,200 ATK, +2,000 HP, +6% Critical, +2% Block, and +2% Rampage.Duration: 60 minutes."
+  },
+  {
+    "game_item_id": 1721,
+    "name": "Scientist Disguise On",
+    "image": "items/EoBCostOn.png",
+    "level": 0,
+    "player_bound": true,
+    "description": "Get a 8 year degree in seconds! Click to activate."
+  },
+  {
+    "game_item_id": 8081,
+    "name": "Seething Echoes",
+    "image": "items/coepotion1.png",
+    "level": 91,
+    "player_bound": false,
+    "description": "+3250 ATK+650 Vile+450 Original Elemental Damages+50 Chaos Damage Duration: 2 hours"
+  },
+  {
+    "game_item_id": 1492,
+    "name": "Shadow Liquid",
+    "image": "potion_purple.gif",
+    "level": 40,
+    "player_bound": true,
+    "description": "Increases your damage against certain guardians."
+  },
+  {
+    "game_item_id": 730,
+    "name": "Shadow Potion",
+    "image": "potion_purple.gif",
+    "level": 40,
+    "player_bound": false,
+    "description": "Used to kill Lady Ariella and other Potion Gods."
+  },
+  {
+    "game_item_id": 6251,
+    "name": "Spark the Fury",
+    "image": "items/sfury.jpg",
+    "level": 30,
+    "player_bound": true,
+    "description": "Restores 50% of your Maximum Rage."
+  },
+  {
+    "game_item_id": 3046,
+    "name": "Squidberry Juice",
+    "image": "items/Item_SquidberryJuice.jpg",
+    "level": 0,
+    "player_bound": false,
+    "description": "+800 Atk, +1500 HP, +1 Crit, +1 Block, +3 Ramp Duration: 1 hour"
+  },
+  {
+    "game_item_id": 2451,
+    "name": "Star Power",
+    "image": "items/starpowerelec.jpg",
+    "level": 20,
+    "player_bound": false,
+    "description": "Pull up on your guitar for +750 ATK, +1500 HP, +5% Crit, +5% Rampage, and 2,500 extra rage! Duration: 60 minutes"
+  },
+  {
+    "game_item_id": 1982,
+    "name": "Strength in Numbers Potion",
+    "image": "items/strengthinnumbers.png",
+    "level": 0,
+    "player_bound": true,
+    "description": "Increase your crews chance to stun the raid boss. If successful, the raid boss will not attack in the first round. You contribute 50% (of a possible 100% per player) to your crew's chance to stun."
+  },
+  {
+    "game_item_id": 1984,
+    "name": "Strength Potion",
+    "image": "items/pot6.jpg",
+    "level": 0,
+    "player_bound": true,
+    "description": "Maxes your characters strength."
+  },
+  {
+    "game_item_id": 3623,
+    "name": "Strong Man Elixir",
+    "image": "items/potion1.gif",
+    "level": 0,
+    "player_bound": false,
+    "description": "This Elixir will grant you +525 ATK, +750 HP, +10 Critical Hit and +95 Vile Energy for 4 hours."
+  },
+  {
+    "game_item_id": 3777,
+    "name": "Sugar Daddy",
+    "image": "items/sugardaddy.png",
+    "level": 0,
+    "player_bound": true,
+    "description": "The sweetness of the Sugar Daddy sends you into a sugar high rage. +625 ATK +250 Vile +5000 Rage Duration: 1 hour"
+  },
+  {
+    "game_item_id": 1337,
+    "name": "Super Rage Potion",
+    "image": "items/5000 Rage potion.jpg",
+    "level": 10,
+    "player_bound": true,
+    "description": "Warning: Awards 5,000 Rage upon consumption."
+  },
+  {
+    "game_item_id": 7585,
+    "name": "Super Rage Tonic",
+    "image": "items/5kragetonic.png",
+    "level": 20,
+    "player_bound": true,
+    "description": "Awards 5,000 Rage upon consumption."
+  },
+  {
+    "game_item_id": 3351,
+    "name": "Tracking Salve",
+    "image": "potion_yellow.gif",
+    "level": 0,
+    "player_bound": true,
+    "description": "+300 Atk, +300 HP, + 300 Rage/turn. 2 Hour Duration."
+  },
+  {
+    "game_item_id": 7814,
+    "name": "Triworld Tincture",
+    "image": "items/triworldtincture.png",
+    "level": 91,
+    "player_bound": false,
+    "description": "+1200 ATK+300 Vile+150 Original Elemental Damages+30 Chaos Damage Duration: 1 hour"
+  },
+  {
+    "game_item_id": 4842,
+    "name": "Unstoppable Concoction",
+    "image": "items/juggerelepot.jpg",
+    "level": 60,
+    "player_bound": false,
+    "description": "+400 to all Original Elemental Damages Duration: 2 hours"
+  },
+  {
+    "game_item_id": 7122,
+    "name": "Vial of Insanity",
+    "image": "items/vaultpot1.png",
+    "level": 85,
+    "player_bound": false,
+    "description": "+750 ATK+1500 HP+500 Original Elemental Damages Duration: 1 hour"
+  },
+  {
+    "game_item_id": 2286,
+    "name": "Vile Energy Lev 1",
+    "image": "items/vile_energy_potion.jpg",
+    "level": 20,
+    "player_bound": true,
+    "description": "Dark and murky, this evil within this potion grants a sporadic burst of energy to your attacks. 5% chance to proc an extra 250 damage on attack. Duration: 1 hour"
+  },
+  {
+    "game_item_id": 2287,
+    "name": "Vile Energy Lev 2",
+    "image": "items/vile_energy_potion.jpg",
+    "level": 30,
+    "player_bound": true,
+    "description": "Dark and murky, this evil within this potion grants a sporadic burst of energy to your attacks. 5% chance to proc an extra 500 damage on attack. Duration: 1 hour"
+  },
+  {
+    "game_item_id": 2288,
+    "name": "Vile Energy Lev 3",
+    "image": "items/vile_energy_potion.jpg",
+    "level": 40,
+    "player_bound": true,
+    "description": "Dark and murky, this evil within this potion grants a sporadic burst of energy to your attacks. 5% chance to proc an extra 1000 damage on attack. Duration: 1 hour"
+  },
+  {
+    "game_item_id": 2289,
+    "name": "Vile Energy Lev 4",
+    "image": "items/vile_energy_potion.jpg",
+    "level": 50,
+    "player_bound": true,
+    "description": "Dark and murky, this evil within this potion grants a sporadic burst of energy to your attacks. 5% chance to proc an extra 1500 damage on attack. Duration: 1 hour"
+  },
+  {
+    "game_item_id": 2290,
+    "name": "Vile Energy Lev 5",
+    "image": "items/vile_energy_potion.jpg",
+    "level": 60,
+    "player_bound": true,
+    "description": "Dark and murky, this evil within this potion grants a sporadic burst of energy to your attacks. 5% chance to proc an extra 2000 damage on attack. Duration: 1 hour"
+  },
+  {
+    "game_item_id": 2291,
+    "name": "Vile Energy Lev 6",
+    "image": "items/vile_energy_potion.jpg",
+    "level": 70,
+    "player_bound": true,
+    "description": "Dark and murky, this evil within this potion grants a sporadic burst of energy to your attacks. 5% chance to proc an extra 2500 damage on attack. Duration: 1 hour"
+  },
+  {
+    "game_item_id": 7741,
+    "name": "Wonderland Potion",
+    "image": "items/itemz95.png",
+    "level": 0,
+    "player_bound": true,
+    "description": "+1750 ATK +3500 HP +200 Arcane Damage +300 Fire Damage +200 Kinetic Damage +300 Shadow Damage +200 Arcane Resist +200 Fire Resist +200 Kinetic Resist +200 Shadow Resist Duration: 90 minutes"
+  },
+  {
+    "game_item_id": 1523,
+    "name": "Yellow Green Potion",
+    "image": "halloween/Pyelgre.gif",
+    "level": 0,
+    "player_bound": false,
+    "description": "Yellows and Greens how fun."
+  },
+  {
+    "game_item_id": 4810,
+    "name": "Zhulian Potion",
+    "image": "items/wozpotionzor.jpg",
+    "level": 0,
+    "player_bound": true,
+    "description": "1100 ATK1250 HP12% CritDuration: 120 mins"
+  },
+  {
+    "game_item_id": 3589,
+    "name": "Zombie Potion 1",
+    "image": "items/potion_1.gif",
+    "level": 0,
+    "player_bound": true,
+    "description": "650 atk, 1000 hp, 250 Vile Damage, 5% Critical HitDuration: 4 Hours"
+  },
+  {
+    "game_item_id": 3590,
+    "name": "Zombie Potion 2",
+    "image": "items/potion_2.gif",
+    "level": 0,
+    "player_bound": true,
+    "description": "800 atk, 1250 hp, 350 Vile Damage, 6% Critical HitDuration: 8 Hours"
+  },
+  {
+    "game_item_id": 3591,
+    "name": "Zombie Potion 3",
+    "image": "items/potion_3.gif",
+    "level": 0,
+    "player_bound": true,
+    "description": "1000 atk, 1500 hp, 500 Vile Damage, 7% Critical HitDuration: 10 Hours"
+  },
+  {
+    "game_item_id": 3592,
+    "name": "Zombie Potion 4",
+    "image": "items/potion_4.gif",
+    "level": 0,
+    "player_bound": true,
+    "description": "1250 atk, 1750 hp, 750 Vile Damage, 9% Critical Hit, 25 Kinetic Dmg, 25 Arcane Dmg, 25 Shadow Resist, 25 Fire Resist, 250 Rage per TurnDuration: 16 Hours"
+  },
+  {
+    "game_item_id": 3593,
+    "name": "Zombie Potion 5",
+    "image": "items/potion_5.gif",
+    "level": 0,
+    "player_bound": true,
+    "description": "1500 atk, 2000 hp, 750 Vile Damage, 11% Critical Hit, 50 Kinetic Dmg, 50 Arcane Dmg, 50 Shadow Resist, 50 Fire Resist, 500 Rage per TurnDuration: 24 Hours"
+  },
+  {
+    "game_item_id": 3594,
+    "name": "Zombie Potion 6",
+    "image": "items/potion_6.gif",
+    "level": 0,
+    "player_bound": true,
+    "description": "2100 atk, 3000 hp, 1000 Vile Damage, 12% Critical Hit, 100 Kinetic Dmg, 100 Arcane Dmg, 100 Shadow Resist, 100 Fire Resist, 1250 Rage per TurnDuration: 48 Hours"
+  }
+]

@@ -46,7 +46,9 @@ upstream.)
 **Already imported**: `php artisan db:seed` seeds the full core world —
 skills, junk items, quest items, rooms (41k, deduped, `source='seed'`), areas,
 zones, mobs + mob_room placements + behavioural flags, quest metadata
-(`game_quest_id`, dup ids first-wins), bosses. Seeders are idempotent and
+(`game_quest_id`, dup ids first-wins), bosses, and the 139-potion catalog
+(`database/data/potions.json`, harvested from the game's item database;
+`kind` buff/rage/other derived by `PotionEffectParser`). Seeders are idempotent and
 never clobber live-crawl data (spider-visited rooms, `last_mapped_at` quests,
 recorder-owned mob columns). The spider/quest crawl only verifies and extends.
 Seed sources live in `database/data/*.json` (zones.json is cleaned of the

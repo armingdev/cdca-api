@@ -4,14 +4,25 @@ use App\Http\Controllers\Api\V1\AttackListController;
 use App\Http\Controllers\Api\V1\AttackListTargetController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CharacterController;
+use App\Http\Controllers\Api\V1\CharacterPotionController;
 use App\Http\Controllers\Api\V1\CharacterQuestProgressController;
 use App\Http\Controllers\Api\V1\CharacterSkillController;
 use App\Http\Controllers\Api\V1\CharacterTeleportController;
 use App\Http\Controllers\Api\V1\CrewController;
+use App\Http\Controllers\Api\V1\CrewGroupController;
+use App\Http\Controllers\Api\V1\CrewGroupInviteCodeController;
+use App\Http\Controllers\Api\V1\CrewGroupMemberController;
+use App\Http\Controllers\Api\V1\CrewGroupSessionController;
+use App\Http\Controllers\Api\V1\CrewGroupSessionReadController;
+use App\Http\Controllers\Api\V1\CrewGroupSharedRgaController;
+use App\Http\Controllers\Api\V1\PasswordController;
+use App\Http\Controllers\Api\V1\PotionController;
 use App\Http\Controllers\Api\V1\QuestController;
 use App\Http\Controllers\Api\V1\QuestListController;
 use App\Http\Controllers\Api\V1\QuestListItemController;
+use App\Http\Controllers\Api\V1\RgaChallengeTokenController;
 use App\Http\Controllers\Api\V1\RgaController;
+use App\Http\Controllers\Api\V1\RgaSessionController;
 use App\Http\Controllers\Api\V1\RunController;
 use App\Http\Controllers\Api\V1\SkillController;
 use App\Http\Controllers\Api\V1\StatsController;
@@ -22,18 +33,35 @@ Route::prefix('v1')->group(function () {
     // Public auth endpoints (rate-limited).
     Route::post('register', [AuthController::class, 'register'])->middleware('throttle:auth');
     Route::post('login', [AuthController::class, 'login'])->middleware('throttle:auth');
+    Route::post('forgot-password', [PasswordController::class, 'forgot'])->middleware('throttle:auth');
+    Route::post('reset-password', [PasswordController::class, 'reset'])->middleware('throttle:auth');
 
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('logout', [AuthController::class, 'logout']);
         Route::get('user', [AuthController::class, 'user']);
+        Route::put('user/password', [PasswordController::class, 'update'])->middleware('throttle:auth');
 
-        // RGAs (game accounts) + their session actions.
+        // RGAs (game accounts) + their session actions. `rgas/sessions` must be
+        // registered before the resource, or `rgas/{rga}` swallows "sessions".
+        Route::get('rgas/sessions', [RgaSessionController::class, 'index'])->middleware('throttle:30,1');
         Route::apiResource('rgas', RgaController::class);
         Route::post('rgas/{rga}/login', [RgaController::class, 'login']);
         Route::post('rgas/{rga}/session', [RgaController::class, 'attachSession']);
         Route::get('rgas/{rga}/session', [RgaController::class, 'showSession']);
         Route::post('rgas/{rga}/sync-characters', [RgaController::class, 'syncCharacters']);
         Route::post('rgas/{rga}/refresh-stats', [RgaController::class, 'refreshStats']);
+        Route::get('rgas/{rga}/challenge-tokens', [RgaChallengeTokenController::class, 'show']);
+        Route::post('rgas/{rga}/challenge-tokens/claim', [RgaChallengeTokenController::class, 'claim']);
+
+        // Crew groups (crew leader mode): members opt in to sharing RGA sessions
+        // with the leader. `crew-groups/join` sits before the resource routes.
+        Route::post('crew-groups/join', [CrewGroupMemberController::class, 'store'])->middleware('throttle:auth');
+        Route::apiResource('crew-groups', CrewGroupController::class);
+        Route::post('crew-groups/{crewGroup}/invite-code', [CrewGroupInviteCodeController::class, 'store']);
+        Route::put('crew-groups/{crewGroup}/shared-rgas', [CrewGroupSharedRgaController::class, 'update']);
+        Route::delete('crew-groups/{crewGroup}/members/{user}', [CrewGroupMemberController::class, 'destroy']);
+        Route::get('crew-groups/{crewGroup}/sessions', [CrewGroupSessionController::class, 'index'])->middleware('throttle:30,1');
+        Route::get('crew-groups/{crewGroup}/session-reads', [CrewGroupSessionReadController::class, 'index']);
 
         // Characters + per-character skill selection / casting.
         Route::apiResource('characters', CharacterController::class)->only(['index', 'show']);
@@ -43,6 +71,11 @@ Route::prefix('v1')->group(function () {
         Route::post('characters/{character}/skills/{skill}/train', [CharacterSkillController::class, 'train']);
         Route::post('characters/{character}/cast', [CharacterSkillController::class, 'cast']);
         Route::post('characters/{character}/refresh-stats', [CharacterController::class, 'refreshStats']);
+
+        // Potions: what the character holds, what is active, drinking one.
+        Route::get('characters/{character}/potions', [CharacterPotionController::class, 'index']);
+        Route::post('characters/{character}/potions/sync', [CharacterPotionController::class, 'sync']);
+        Route::post('characters/{character}/potions/{potion}/activate', [CharacterPotionController::class, 'activate']);
 
         // Teleports: anchors the character can jump with, and travelling.
         Route::get('characters/{character}/teleports', [CharacterTeleportController::class, 'index']);
@@ -61,6 +94,9 @@ Route::prefix('v1')->group(function () {
 
         // Skill catalog (read-only).
         Route::get('skills', [SkillController::class, 'index']);
+
+        // Potion catalog (read-only).
+        Route::get('potions', [PotionController::class, 'index']);
 
         // Quest catalog (read-only, crawled from the game).
         Route::get('quests', [QuestController::class, 'index']);

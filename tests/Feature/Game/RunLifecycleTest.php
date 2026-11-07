@@ -1,6 +1,7 @@
 <?php
 
 use App\Game\Auth\LoginService;
+use App\Game\Enums\CharacterActivity;
 use App\Game\Enums\RunMode;
 use App\Game\Enums\RunSignal;
 use App\Game\Enums\RunStatus;
@@ -87,9 +88,11 @@ it('honours a stop request over a worker shutdown when the cache signal was lost
     $participant = RunParticipant::factory()->for($run)->for($character)->create();
 
     // The stop lands after pickup and only in the database — no cache signal.
-    RunParticipant::updated(function (RunParticipant $updated): void {
-        if ($updated->status === RunStatus::Running) {
-            RunParticipant::whereKey($updated->id)->update(['status' => RunStatus::Stopping]);
+    // Pickup claims the participant with an atomic query (no model event), so
+    // hook the next step of the pickup: the character turning Running.
+    Character::updated(function (Character $updated) use ($participant): void {
+        if ($updated->status === CharacterActivity::Running) {
+            RunParticipant::whereKey($participant->id)->update(['status' => RunStatus::Stopping]);
         }
     });
 
@@ -246,4 +249,37 @@ it('resumes a paused quest list from its persisted position', function () {
     expect($participant->status)->toBe(RunStatus::Completed)
         ->and($participant->progress['position'])->toBe($list->items->last()->position + 1)
         ->and($participant->wins)->toBe(5);
+});
+
+it('resumes a chained quest-list run in the list it stopped in', function () {
+    Mob::factory()->create(['name' => 'Stella'])->rooms()->attach(1, ['last_seen_at' => now()]);
+    Mob::factory()->create(['name' => 'Street Crawler'])->rooms()->attach(2, ['last_seen_at' => now()]);
+    fakeQuestWorld();
+
+    $catalog = seedQuestCatalog();
+    $first = QuestList::create(['name' => 'First']);
+    $first->addQuest($catalog[742]->id);
+    $second = QuestList::create(['name' => 'Second']);
+    $second->addQuest($catalog[742]->id);
+
+    $character = Character::factory()->for(Rga::factory()->withSession())->create();
+    $participant = RunParticipant::factory()
+        ->for(Run::factory()->state([
+            'mode' => RunMode::QuestList,
+            'config' => ['quest_list_ids' => [$first->id, $second->id], 'quest_list_id' => $first->id, 'stop_rage' => 2500],
+            'status' => RunStatus::Running,
+        ]))
+        ->for($character)
+        // Parked at the start of the second list.
+        ->create(['progress' => ['list_index' => 1, 'position' => 0]]);
+
+    makeRunJob($participant)->handle(app(LoginService::class));
+
+    $participant->refresh();
+
+    // The first list was not replayed: exactly one quest ran, in the second list.
+    expect($participant->status)->toBe(RunStatus::Completed)
+        ->and($participant->wins)->toBe(5)
+        ->and($participant->progress['list_index'])->toBe(1)
+        ->and($participant->progress['position'])->toBe($second->items->last()->position + 1);
 });

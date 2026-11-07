@@ -11,22 +11,28 @@ use App\Game\Engine\TransientFailure;
 use App\Game\Engine\WorkerDeathRecovery;
 use App\Game\Enums\BattleOutcome;
 use App\Game\Enums\CharacterActivity;
+use App\Game\Enums\PotionKind;
 use App\Game\Enums\RunEventType;
 use App\Game\Enums\RunSignal;
 use App\Game\Enums\RunStatus;
+use App\Game\Exceptions\GameException;
 use App\Game\Exceptions\SessionCollisionException;
 use App\Game\GameClock;
+use App\Game\Items\PotionEnsurer;
+use App\Game\Items\PotionService;
 use App\Game\Skills\BuffEnsurer;
 use App\Game\Skills\CircumspectGate;
 use App\Models\BattleEvent;
 use App\Models\Character;
 use App\Models\CharacterSkill;
+use App\Models\Potion;
 use App\Models\Run;
 use App\Models\RunEvent;
 use App\Models\RunParticipant;
 use App\Models\Skill;
 use Carbon\CarbonInterface;
 use Closure;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Contracts\Queue\Interruptible;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -64,6 +70,16 @@ abstract class RunJob implements Interruptible, ShouldQueue
 
     /** Session-collision re-logins tolerated per cycle before failing loudly. */
     private const int MAX_RELOGIN_ATTEMPTS = 3;
+
+    /**
+     * How long a delivery waits for the character lock before declaring the
+     * character double-driven. Only a superseded delivery stepping aside
+     * should ever be in the way, and it holds the lock for milliseconds.
+     */
+    private const int LOCK_GRACE_SECONDS = 2;
+
+    /** After a rage potion, resume as soon as the scheduler next looks (it runs every minute). */
+    private const int RAGE_POTION_RESUME_SECONDS = 5;
 
     /**
      * Consecutive respawn waits that produce nothing before we accept the
@@ -129,7 +145,8 @@ abstract class RunJob implements Interruptible, ShouldQueue
         public string $dispatchToken,
     ) {
         $this->onConnection('redis-runs');
-        $this->onQueue('runs');
+        // One queue per run priority; the runs supervisor drains them in order.
+        $this->onQueue($participant->run->priority->queue());
     }
 
     public function handle(LoginService $loginService): void
@@ -162,9 +179,14 @@ abstract class RunJob implements Interruptible, ShouldQueue
         // One character, one worker — the enrollment guard makes a second
         // driver near-impossible, so a held lock is a loud failure, not a
         // silent retry. TTL outlives the job so a hard-killed worker frees it.
+        // The short wait covers the one legitimate overlap: a delivery that
+        // was re-queued (priority change) holding the lock for the instant
+        // it takes to find its claim superseded.
         $lock = Cache::lock("character-run:{$character->id}", $this->timeout + 600);
 
-        if (! $lock->get()) {
+        try {
+            $lock->block(self::LOCK_GRACE_SECONDS);
+        } catch (LockTimeoutException) {
             $participant->transition(RunStatus::Failed, 'Character is already driven by another worker.');
             $participant->run->refreshStatus();
 
@@ -172,7 +194,19 @@ abstract class RunJob implements Interruptible, ShouldQueue
         }
 
         try {
-            $this->drive($participant, $character, $loginService);
+            // Claim atomically: only while still Pending under this job's
+            // token. A requeue (RunDispatcher::requeue) that swapped the token
+            // first wins, and this delivery steps aside without a trace.
+            $claimed = RunParticipant::whereKey($participant->id)
+                ->where('dispatch_token', $this->dispatchToken)
+                ->where('status', RunStatus::Pending)
+                ->update(['status' => RunStatus::Running, 'started_at' => now(), 'heartbeat_at' => now()]);
+
+            if ($claimed === 0) {
+                return;
+            }
+
+            $this->drive($participant->refresh(), $character, $loginService);
         } finally {
             $lock->release();
         }
@@ -241,7 +275,7 @@ abstract class RunJob implements Interruptible, ShouldQueue
 
     private function drive(RunParticipant $participant, Character $character, LoginService $loginService): void
     {
-        $participant->update(['status' => RunStatus::Running, 'started_at' => now(), 'heartbeat_at' => now()]);
+        // The participant itself was claimed as Running by handle().
         $character->update(['status' => CharacterActivity::Running]);
 
         $run = $participant->run;
@@ -285,7 +319,13 @@ abstract class RunJob implements Interruptible, ShouldQueue
                 $participant,
                 log: $log,
                 signal: $this->signalClosure($participant, $this->circumspectExpiryFor($character, $run), $character, $reserve),
-                ensureBuffs: $this->ensureBuffsClosure($run, $ensurer, $log, $recorder),
+                ensureBuffs: $this->ensureBuffsClosure(
+                    $run,
+                    $ensurer,
+                    PotionEnsurer::forCharacter($character, array_map(intval(...), $run->buff_potion_ids ?? [])),
+                    $log,
+                    $recorder,
+                ),
                 onBattle: function (BattleEvent $event) use ($participant): void {
                     // Every engine reports each fight here, which makes this
                     // the one place a battle learns which run it belongs to.
@@ -582,6 +622,12 @@ abstract class RunJob implements Interruptible, ShouldQueue
      */
     protected function waitForRage(string $reason, array $progress): ParticipantOutcome
     {
+        $drank = $this->drinkRagePotionInstead($reason, $progress);
+
+        if ($drank !== null) {
+            return $drank;
+        }
+
         if ((int) ($progress['rage_waits'] ?? 0) > self::MAX_RAGE_WAITS) {
             return new ParticipantOutcome(
                 RunStatus::Stopped,
@@ -598,6 +644,83 @@ abstract class RunJob implements Interruptible, ShouldQueue
             $resumeAt,
             $progress,
         );
+    }
+
+    /**
+     * Rather than park until the hourly rage tick, drink one of the run's
+     * rage potions — in the order the user picked them, at most
+     * `max_rage_potions` per run cycle — and come straight back. Null when
+     * the run has none selected, the budget is spent, or none is in stock;
+     * the caller then waits as before.
+     *
+     * @param  array<string, mixed>  $progress  the outcome progress the caller would park with
+     */
+    protected function drinkRagePotionInstead(string $reason, array $progress): ?ParticipantOutcome
+    {
+        $participant = $this->participant->fresh(['run', 'character']);
+
+        if ($participant === null) {
+            return null;
+        }
+
+        $run = $participant->run;
+        $potionIds = array_map(intval(...), $run->rage_potion_ids ?? []);
+        $used = (int) ($participant->progress['rage_potions_used'] ?? 0);
+
+        if ($potionIds === [] || $used >= $run->max_rage_potions) {
+            return null;
+        }
+
+        $recorder = new RunEventRecorder($participant);
+        $service = PotionService::forCharacter($participant->character);
+        $potions = Potion::whereIn('id', $potionIds)->where('kind', PotionKind::Rage)->get()
+            ->sortBy(fn (Potion $potion): int => (int) array_search($potion->id, $potionIds, true));
+
+        foreach ($potions as $potion) {
+            try {
+                $result = $service->activate($potion);
+            } catch (SessionCollisionException $exception) {
+                throw $exception;
+            } catch (GameException $exception) {
+                $recorder->record(RunEventType::PotionSkipped, "Could not drink {$potion->name}: {$exception->getMessage()}", [
+                    'potion_id' => $potion->id,
+                    'potion' => $potion->name,
+                    'reason' => 'read_failed',
+                ], RunEvent::LEVEL_WARNING);
+
+                return null;
+            }
+
+            if (! $result->drank()) {
+                continue;
+            }
+
+            $used++;
+            $message = "Drank {$potion->name} for rage ({$used}/{$run->max_rage_potions}) instead of waiting for the rage tick.";
+
+            $recorder->record(RunEventType::PotionUsed, $message, [
+                'potion_id' => $potion->id,
+                'potion' => $potion->name,
+                'kind' => $potion->kind->value,
+                'quantity_left' => $result->stack?->quantity,
+                'rage_potions_used' => $used,
+                'max_rage_potions' => $run->max_rage_potions,
+            ]);
+
+            return new ParticipantOutcome(
+                RunStatus::Waiting,
+                rtrim($reason, '.').". {$message}",
+                now()->addSeconds(self::RAGE_POTION_RESUME_SECONDS),
+                array_merge($progress, ['rage_potions_used' => $used]),
+            );
+        }
+
+        $recorder->record(RunEventType::PotionSkipped, 'No selected rage potion left — waiting for rage instead.', [
+            'reason' => 'out_of_stock',
+            'potion_ids' => $potionIds,
+        ], RunEvent::LEVEL_WARNING);
+
+        return null;
     }
 
     /**
@@ -789,14 +912,27 @@ abstract class RunJob implements Interruptible, ShouldQueue
      * @param  Closure(string): void  $log
      * @return Closure(): void
      */
-    private function ensureBuffsClosure(Run $run, BuffEnsurer $ensurer, Closure $log, RunEventRecorder $recorder): Closure
-    {
-        if (! $run->cast_on_start && ! $run->require_circumspect) {
+    private function ensureBuffsClosure(
+        Run $run,
+        BuffEnsurer $ensurer,
+        PotionEnsurer $potions,
+        Closure $log,
+        RunEventRecorder $recorder,
+    ): Closure {
+        $castsSkills = $run->cast_on_start || $run->require_circumspect;
+
+        if (! $castsSkills && ! $potions->hasWork()) {
             return function (): void {};
         }
 
-        return function () use ($run, $ensurer, $log, $recorder): void {
-            $ensurer->ensure(includeCircumspect: $run->require_circumspect, log: $log, events: $recorder);
+        return function () use ($run, $ensurer, $potions, $castsSkills, $log, $recorder): void {
+            if ($castsSkills) {
+                $ensurer->ensure(includeCircumspect: $run->require_circumspect, log: $log, events: $recorder);
+            }
+
+            // Selected buff potions are topped up at the same moment as the
+            // skills: right before combat, so their time is spent fighting.
+            $potions->ensure($log, $recorder);
         };
     }
 

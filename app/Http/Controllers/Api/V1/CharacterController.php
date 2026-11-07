@@ -26,6 +26,8 @@ class CharacterController extends Controller
             ->when($request->integer('server_id'), fn ($query, $server) => $query->where('server_id', $server))
             ->when($request->integer('rga_id'), fn ($query, $rga) => $query->where('rga_id', $rga))
             ->when($request->validated('ownership'), fn ($query, $ownership) => $query->where('is_trustee', $ownership === 'trustee'))
+            ->when($request->filled('min_level'), fn ($query) => $query->where('level', '>=', $request->integer('min_level')))
+            ->when($request->filled('max_level'), fn ($query) => $query->where('level', '<=', $request->integer('max_level')))
             ->orderByDesc('level')
             ->orderBy('name')
             ->orderBy('id')

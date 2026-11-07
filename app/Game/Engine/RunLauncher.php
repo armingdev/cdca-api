@@ -3,6 +3,7 @@
 namespace App\Game\Engine;
 
 use App\Game\Enums\RunMode;
+use App\Game\Enums\RunPriority;
 use App\Game\Enums\RunStatus;
 use App\Game\Exceptions\CharactersBusyException;
 use App\Game\Skills\SkillSelection;
@@ -37,6 +38,8 @@ class RunLauncher
      * @param  array<string, mixed>  $config  the mode's config array (MobRunConfig::toArray(), etc.)
      * @param  list<int>|null  $skillIds
      * @param  list<string>  $reserveRageFor  RageReserveEvent values the run parks ahead of
+     * @param  list<int>  $buffPotionIds  potions kept active before combat
+     * @param  list<int>  $ragePotionIds  potions drunk instead of waiting for rage, in this order
      *
      * @throws CharactersBusyException when a character is already enrolled in an unfinished run
      */
@@ -53,6 +56,10 @@ class RunLauncher
         ?string $name = null,
         array $reserveRageFor = [],
         int $reserveRageHours = 12,
+        RunPriority $priority = RunPriority::Normal,
+        array $buffPotionIds = [],
+        array $ragePotionIds = [],
+        int $maxRagePotions = 0,
     ): Run {
         if ($startAt !== null && $startAt->isPast()) {
             $startAt = $startAt->addDay();
@@ -75,9 +82,13 @@ class RunLauncher
             'cast_on_start' => $castOnStart,
             'require_circumspect' => $requireCircumspect,
             'skill_ids' => $skillIds,
+            'buff_potion_ids' => $buffPotionIds === [] ? null : $buffPotionIds,
+            'rage_potion_ids' => $ragePotionIds === [] ? null : $ragePotionIds,
+            'max_rage_potions' => $ragePotionIds === [] ? 0 : $maxRagePotions,
             'reserve_rage_for' => $reserveRageFor === [] ? null : $reserveRageFor,
             'reserve_rage_hours' => $reserveRageHours,
             'status' => $startAt?->isFuture() ?? false ? RunStatus::Pending : RunStatus::Running,
+            'priority' => $priority,
             'restart_every_minutes' => $restartEveryMinutes,
             'start_at' => $startAt,
             'last_started_at' => $startAt ?? now(),

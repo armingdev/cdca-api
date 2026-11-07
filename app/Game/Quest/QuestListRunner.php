@@ -23,7 +23,8 @@ use App\Models\RunEvent;
 use Closure;
 
 /**
- * Runs a named quest list in order: for each quest, run it via QuestRunner.
+ * Runs a run's quest lists back to back, each in order: for each quest, run
+ * it via QuestRunner.
  *
  * A quest the list cannot finish is skipped, not fatal — already completed,
  * giver unknown or unreachable, objective unfulfillable, or wanting an item
@@ -32,9 +33,9 @@ use Closure;
  * pause, a lapsed Circumspect buff, or rage the character cannot rebuild
  * without waiting — and the last three park rather than stop.
  *
- * A start position lets a paused or parked participant resume mid-list; the
- * settle callback reports each processed item so the caller can persist that
- * position.
+ * A start list index + position lets a paused or parked participant resume
+ * mid-list; the settle callback reports each processed item (and each list
+ * finished) so the caller can persist that cursor.
  */
 class QuestListRunner
 {
@@ -54,6 +55,12 @@ class QuestListRunner
 
     /** The list position the next cycle should start from. */
     private int $nextPosition = 0;
+
+    /** Which of the run's lists $nextPosition belongs to. */
+    private int $listIndex = 0;
+
+    /** The list being played — tags skip/complete events, whose positions are per list. */
+    private ?int $currentListId = null;
 
     /** Parked retries already spent on the quest at $nextPosition. */
     private int $questRetries = 0;
@@ -78,15 +85,21 @@ class QuestListRunner
     }
 
     /**
+     * Play the run's lists back to back, starting at ($startListIndex,
+     * $startPosition). Quests completed in an earlier list are recorded in
+     * the ledger as they finish, so a later list that repeats them skips
+     * them like any other settled quest.
+     *
      * @param  Closure(string): void|null  $log
      * @param  Closure(): RunSignal|null  $signal
      * @param  Closure(BattleEvent): void|null  $onBattle
      * @param  Closure(): void|null  $ensureBuffs  just-in-time buff top-up, forwarded to each quest
-     * @param  int  $startPosition  skip list items below this position (resume support)
-     * @param  Closure(int, int, int): void|null  $onQuestSettled  (nextPosition, completed, skipped) after each settled item
+     * @param  int  $startPosition  skip items below this position in the start list (resume support)
+     * @param  Closure(int, int, int, int): void|null  $onQuestSettled  (nextPosition, completed, skipped, listIndex) after each settled item and each finished list
      * @param  RunEventRecorder|null  $events  durable log for skip/complete decisions
      * @param  int  $questRetries  parked retries already spent on the quest at $startPosition
      * @param  int|null  $runId  provenance for anything written to the progress ledger
+     * @param  int  $startListIndex  which of the run's lists to resume in (0-based)
      */
     public function run(
         ?Closure $log = null,
@@ -98,43 +111,114 @@ class QuestListRunner
         ?RunEventRecorder $events = null,
         int $questRetries = 0,
         ?int $runId = null,
+        int $startListIndex = 0,
     ): QuestListRunSummary {
         $this->questRetries = $questRetries;
         $this->events = $events;
         $this->runId = $runId;
         $log ??= fn (string $message) => null;
 
-        $list = QuestList::with('items.quest')->find($this->config->questListId);
+        $listIds = $this->config->questListIds;
+        $lists = QuestList::with('items.quest')->whereIn('id', $listIds)->get()->keyBy('id');
 
-        if ($list === null) {
-            throw new GameException("Quest list #{$this->config->questListId} not found.");
+        if ($lists->isEmpty()) {
+            throw new GameException('Quest list #'.implode(', #', $listIds).' not found.');
         }
 
+        for ($index = $startListIndex; $index < count($listIds); $index++) {
+            $this->listIndex = $index;
+            $position = $index === $startListIndex ? $startPosition : 0;
+            $list = $lists->get($listIds[$index]);
+
+            if ($list === null) {
+                // Deleted after the run started: the remaining lists still run.
+                $log("Quest list #{$listIds[$index]} no longer exists — skipping it.");
+                $events?->record(RunEventType::Info, "Quest list #{$listIds[$index]} no longer exists — skipped.", [
+                    'quest_list_id' => $listIds[$index],
+                    'list_index' => $index,
+                ], RunEvent::LEVEL_WARNING);
+            } else {
+                $outcome = $this->runList($list, $index, count($listIds), $position, $log, $signal, $onBattle, $ensureBuffs, $onQuestSettled);
+
+                if ($outcome !== null) {
+                    return $outcome;
+                }
+            }
+
+            // Persist the move to the next list, so a resume never re-enters
+            // the tail of a list that is already done. After the last list
+            // the cursor stays past its end, as a single-list run always had.
+            if ($index + 1 < count($listIds)) {
+                $this->listIndex = $index + 1;
+                $this->nextPosition = 0;
+                $onQuestSettled?->__invoke($this->nextPosition, $this->completed, $this->skipped, $this->listIndex);
+            }
+        }
+
+        return $this->summary(
+            completed: true,
+            reason: count($listIds) > 1 ? 'All quest lists complete.' : 'Quest list complete.',
+            endReason: RunEndReason::Completed,
+        );
+    }
+
+    /**
+     * One list of the run, from $startPosition. Null when it ran to its end;
+     * a summary when the whole run has to stop or park on one of its quests.
+     *
+     * @param  Closure(string): void  $log
+     * @param  Closure(): RunSignal|null  $signal
+     * @param  Closure(BattleEvent): void|null  $onBattle
+     * @param  Closure(): void|null  $ensureBuffs
+     * @param  Closure(int, int, int, int): void|null  $onQuestSettled
+     */
+    private function runList(
+        QuestList $list,
+        int $index,
+        int $listCount,
+        int $startPosition,
+        Closure $log,
+        ?Closure $signal,
+        ?Closure $onBattle,
+        ?Closure $ensureBuffs,
+        ?Closure $onQuestSettled,
+    ): ?QuestListRunSummary {
+        $this->currentListId = $list->id;
         $items = $list->items->where('position', '>=', $startPosition)->values();
         $this->nextPosition = $startPosition;
 
-        // Read once, before walking anywhere: what this character has already
-        // settled with the game. Re-deriving it by visiting all 200 givers is
-        // exactly the cost this avoids.
+        // Read once per list, before walking anywhere: what this character has
+        // already settled with the game. Re-deriving it by visiting all 200
+        // givers is exactly the cost this avoids.
         $this->skippableQuestIds = $this->ledger->skippableQuestIds(
             $this->character,
             $items->pluck('quest_id'),
         );
 
-        $log(sprintf(
-            "Running quest list '%s' (%d quest(s)%s).",
+        $message = sprintf(
+            "Running quest list '%s'%s (%d quest(s)%s).",
             $list->name,
+            $listCount > 1 ? ' — list '.($index + 1)." of {$listCount}" : '',
             $items->count(),
             $startPosition > 0 ? ", resuming from position {$startPosition}" : '',
-        ));
+        );
+        $log($message);
+
+        if ($listCount > 1) {
+            $this->events?->record(RunEventType::Info, $message, [
+                'quest_list_id' => $list->id,
+                'list_index' => $index,
+                'list_count' => $listCount,
+            ]);
+        }
 
         if ($this->skippableQuestIds !== []) {
             $recorded = count($this->skippableQuestIds);
             $log("Skipping {$recorded} quest(s) already recorded for this character.");
-            $events?->record(
+            $this->events?->record(
                 RunEventType::QuestSkipped,
                 "Skipping {$recorded} quest(s) already recorded for this character.",
-                ['reason' => 'recorded', 'count' => $recorded, 'quest_ids' => $this->skippableQuestIds],
+                ['reason' => 'recorded', 'count' => $recorded, 'quest_ids' => $this->skippableQuestIds, 'quest_list_id' => $list->id],
             );
         }
 
@@ -166,10 +250,10 @@ class QuestListRunner
             }
 
             $this->nextPosition = $item->position + 1;
-            $onQuestSettled?->__invoke($this->nextPosition, $this->completed, $this->skipped);
+            $onQuestSettled?->__invoke($this->nextPosition, $this->completed, $this->skipped, $this->listIndex);
         }
 
-        return $this->summary(completed: true, reason: 'Quest list complete.', endReason: RunEndReason::Completed);
+        return null;
     }
 
     /**
@@ -310,6 +394,7 @@ class QuestListRunner
         $this->events?->record(RunEventType::QuestCompleted, "Completed {$item->displayName()}.", [
             'quest_id' => $quest->game_quest_id,
             'position' => $item->position,
+            'quest_list_id' => $this->currentListId,
         ]);
 
         return null;
@@ -341,6 +426,7 @@ class QuestListRunner
             [
                 'quest_id' => $item->quest->game_quest_id,
                 'position' => $item->position,
+                'quest_list_id' => $this->currentListId,
                 'attempt' => $this->questRetries,
             ],
             RunEvent::LEVEL_WARNING,
@@ -361,6 +447,7 @@ class QuestListRunner
             [
                 'quest_id' => $item->quest?->game_quest_id,
                 'position' => $item->position,
+                'quest_list_id' => $this->currentListId,
                 'reason' => $reason,
             ],
             RunEvent::LEVEL_WARNING,
@@ -378,6 +465,7 @@ class QuestListRunner
             endReason: $endReason,
             nextPosition: $this->nextPosition,
             questRetries: $this->questRetries,
+            nextListIndex: $this->listIndex,
         );
     }
 }

@@ -1324,3 +1324,19 @@ function fakePvpWorld(int $rage = 50000): void
         return Http::response('<html>world</html>');
     });
 }
+
+/**
+ * Fake the potion endpoints: the potion tab (the captured 43-stack fixture by
+ * default — Kix Potion iid 1794073122 ×96, Rage Potion iid 8240135 ×5) and
+ * the activate action. Call it BEFORE any catch-all world fake
+ * (fakeCombatWorld…): the first fake that answers a request wins.
+ */
+function fakePotionEndpoints(
+    string $activateResponse = '{"status":"Kix Potion activated!<br>","redirectTo":""}',
+    ?string $tab = null,
+): void {
+    Http::fake([
+        '*ajax/backpackcontents.php*' => Http::response($tab ?? gameFixture('potions/backpack_potion_tab.html')),
+        '*ajax/backpack_action.php*' => Http::response($activateResponse),
+    ]);
+}

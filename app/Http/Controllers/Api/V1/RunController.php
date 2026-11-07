@@ -10,6 +10,7 @@ use App\Game\Engine\QuestRunConfig;
 use App\Game\Engine\RunDispatcher;
 use App\Game\Engine\RunLauncher;
 use App\Game\Enums\RunMode;
+use App\Game\Enums\RunPriority;
 use App\Game\Enums\RunStatus;
 use App\Game\Exceptions\CharactersBusyException;
 use App\Http\Controllers\Controller;
@@ -84,6 +85,10 @@ class RunController extends Controller
                 name: $request->validated('name'),
                 reserveRageFor: array_values($request->validated('reserve_rage_for') ?? []),
                 reserveRageHours: $request->integer('reserve_rage_hours', 12),
+                priority: $request->enum('priority', RunPriority::class) ?? RunPriority::Normal,
+                buffPotionIds: array_values(array_map(intval(...), $request->validated('buff_potion_ids') ?? [])),
+                ragePotionIds: array_values(array_map(intval(...), $request->validated('rage_potion_ids') ?? [])),
+                maxRagePotions: $request->integer('max_rage_potions'),
             );
         } catch (CharactersBusyException $exception) {
             throw ValidationException::withMessages(['characters' => [$exception->getMessage()]]);
@@ -100,14 +105,32 @@ class RunController extends Controller
     }
 
     /**
-     * Rename a run. Allowed in any status — the label is for the person
-     * reading the list, not for the workers.
+     * Rename a run (any status — the label is for the person reading the
+     * list) and/or change its priority. A new priority moves the run's
+     * participants that are still waiting for a worker into the new queue
+     * now; parked ones pick it up at their next resume, running ones are
+     * never interrupted.
      */
-    public function update(UpdateRunRequest $request, Run $run): RunResource
+    public function update(UpdateRunRequest $request, Run $run, RunDispatcher $dispatcher): RunResource
     {
         Gate::authorize('update', $run);
 
-        $run->update(['name' => $request->validated('name')]);
+        if ($request->has('name')) {
+            $run->update(['name' => $request->validated('name')]);
+        }
+
+        $priority = $request->enum('priority', RunPriority::class);
+
+        if ($priority !== null && $priority !== $run->priority) {
+            $run->update(['priority' => $priority]);
+
+            $delayUntil = $run->start_at?->isFuture() ? $run->start_at : null;
+
+            foreach ($run->participants()->where('status', RunStatus::Pending)->get() as $participant) {
+                $participant->setRelation('run', $run);
+                $dispatcher->requeue($participant, $delayUntil);
+            }
+        }
 
         return RunResource::make($run->load('participants.character'));
     }
@@ -321,7 +344,7 @@ class RunController extends Controller
             ))->toArray(),
 
             RunMode::QuestList => (new QuestListRunConfig(
-                questListId: $this->ownedQuestListId($request, $userId),
+                questListIds: $this->ownedQuestListIds($request, $userId),
                 stopRage: $stopRage,
                 levelUp: $levelUp,
                 smart: $smart,
@@ -365,16 +388,26 @@ class RunController extends Controller
         return $attackList->id;
     }
 
-    private function ownedQuestListId(StoreRunRequest $request, int $userId): int
+    /**
+     * The requested lists, in the requested order, all of them the caller's
+     * own (community lists are copied first, then run).
+     *
+     * @return list<int>
+     */
+    private function ownedQuestListIds(StoreRunRequest $request, int $userId): array
     {
-        $questList = QuestList::where('id', $request->integer('quest_list_id'))
-            ->where('user_id', $userId)
-            ->first();
+        $ids = $request->questListIds();
+        $owned = QuestList::whereIn('id', $ids)->where('user_id', $userId)->pluck('id')->all();
+        $missing = array_values(array_diff($ids, $owned));
 
-        if ($questList === null) {
-            throw ValidationException::withMessages(['quest_list_id' => ['Quest list not found.']]);
+        if ($missing !== []) {
+            $field = $request->filled('quest_list_ids') ? 'quest_list_ids' : 'quest_list_id';
+
+            throw ValidationException::withMessages([$field => [
+                count($ids) === 1 ? 'Quest list not found.' : 'Quest list(s) not found: #'.implode(', #', $missing).'.',
+            ]]);
         }
 
-        return $questList->id;
+        return $ids;
     }
 }

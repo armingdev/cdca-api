@@ -26,6 +26,21 @@ class Rga extends Model
         'status',
         'last_login_at',
         'characters_synced_at',
+        'auto_claim_tokens',
+        'challenge_tokens',
+        'challenge_tokens_purchased',
+        'challenge_claim_at',
+        'challenge_claimed_at',
+        'challenge_synced_at',
+    ];
+
+    /**
+     * Mirrors the column default so a just-created RGA reports it too.
+     *
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'auto_claim_tokens' => true,
     ];
 
     protected $hidden = [
@@ -45,6 +60,12 @@ class Rga extends Model
             'security_answer' => 'encrypted',
             'last_login_at' => 'datetime',
             'characters_synced_at' => 'datetime',
+            'auto_claim_tokens' => 'boolean',
+            'challenge_tokens' => 'integer',
+            'challenge_tokens_purchased' => 'integer',
+            'challenge_claim_at' => 'datetime',
+            'challenge_claimed_at' => 'datetime',
+            'challenge_synced_at' => 'datetime',
         ];
     }
 

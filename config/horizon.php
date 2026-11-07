@@ -117,6 +117,8 @@ return [
         // Run jobs legitimately sit for hours behind 2h workers — don't page
         // about a "long wait" that is just a full runs queue.
         'redis-runs:runs' => 7200,
+        'redis-runs:runs-high' => 7200,
+        'redis-runs:runs-low' => 7200,
     ],
 
     /*
@@ -241,10 +243,17 @@ return [
         // loads. 25 of them on a 4GB server that also hosts Postgres, Redis
         // and PHP-FPM got workers OOM-killed mid-run. Participants beyond the
         // limit simply queue as Pending.
+        //
+        // Three queues, one per run priority (RunPriority::QUEUES). balance
+        // `false` makes every worker drain them strictly in this order, so a
+        // high-priority participant takes the next free worker; `simple` would
+        // split the workers evenly across the queues instead. min = max keeps
+        // the pool fixed: scaling down would SIGTERM a worker mid-run.
         'supervisor-runs' => [
             'connection' => 'redis-runs',
-            'queue' => ['runs'],
-            'balance' => 'simple',
+            'queue' => ['runs-high', 'runs', 'runs-low'],
+            'balance' => false,
+            'minProcesses' => (int) env('HORIZON_RUNS_MAX_PROCESSES', 10),
             'maxProcesses' => (int) env('HORIZON_RUNS_MAX_PROCESSES', 10),
             'maxTime' => 0,
             'maxJobs' => 0,
@@ -265,6 +274,7 @@ return [
                 'balanceCooldown' => 3,
             ],
             'supervisor-runs' => [
+                'minProcesses' => (int) env('HORIZON_RUNS_MAX_PROCESSES', 12),
                 'maxProcesses' => (int) env('HORIZON_RUNS_MAX_PROCESSES', 12),
             ],
         ],

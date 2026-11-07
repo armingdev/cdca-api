@@ -2,6 +2,61 @@
 
 Notes for API consumers (Angular/mobile clients). Newest first.
 
+## 2026-11-07 — Spawned mobs
+
+- Mob runs and quest objectives now draw out **spawnable** mobs by farming
+  their room-mates until the spawn appears, then kill it (up to 40 room-mate
+  attacks per room per pass; only the spawned mob counts as a kill). Before,
+  a quest needing one just waited in the room.
+- `GET /world/mobs` items gain `spawnable`.
+- No new endpoints or run fields; the run's `last_activity` shows the hunt
+  ("Possible Pyrite needs to be spawned — farming its room-mates.", "Beat A
+  Rock to draw out Possible Pyrite (3/40).", "Possible Pyrite steps out of
+  the shadows!").
+
+## 2026-11-07 — Potions
+
+Additive; client steps in `docs/frontend-brief-feedback-2026-11.md` §3.
+
+- `GET /potions` — the 139-potion catalog (`kind`: `buff` · `rage` · `other`).
+- `GET /characters/{id}/potions`, `POST …/potions/sync`,
+  `POST …/potions/{potion}/activate`.
+- `POST /runs` accepts `buff_potion_ids` (kept active before combat),
+  `rage_potion_ids` + `max_rage_potions` (drunk instead of parking for rage).
+- Run events `potion_used` and `potion_skipped`.
+- **Deploy:** `php artisan migrate` and `php artisan db:seed --class=PotionSeeder`.
+
+## 2026-11-07 — Chained quest lists, run priority
+
+Additive; client steps in `docs/frontend-brief-feedback-2026-11.md` §2.
+
+- `POST /runs` (quest-list mode) takes `quest_list_ids` (1–10, played back to
+  back); `quest_list_id` still works and is mirrored in `config`. Progress
+  gains `list_index`.
+- Runs have `priority` (`high` · `normal` · `low`), settable on create and via
+  `PATCH /runs/{id}`; waiting participants of higher-priority runs get the
+  next free worker first. **Deploy:** `php artisan migrate`, then
+  `php artisan horizon:terminate` so the runs supervisor picks up its three
+  queues (`runs-high`, `runs`, `runs-low`).
+
+## 2026-11-07 — Passwords, sessions, crew groups, challenge tokens
+
+All additive; details and client steps in `docs/frontend-brief-feedback-2026-11.md`.
+
+- `POST /forgot-password`, `POST /reset-password` (revokes all tokens),
+  `PUT /user/password` (revokes the other devices' tokens). Reset mails link
+  to `{FRONTEND_URL}/reset-password`.
+- `GET /rgas/sessions[?verify=1]` — every live session in one response.
+  `GET /rgas/{id}/session` also returns `rga_id` and `username`.
+- Crew groups (`/crew-groups/*`): invite-code membership, per-RGA opt-in
+  sharing, leader-only `GET /crew-groups/{id}/sessions`, audited.
+- Challenge tokens are claimed daily per RGA (`auto_claim_tokens`, default on);
+  `GET|POST /rgas/{id}/challenge-tokens[/claim]`. `RgaResource` gains
+  `auto_claim_tokens`, `challenge_tokens`, `challenge_tokens_purchased`,
+  `challenge_claim_at`.
+- `GET /characters` accepts `min_level` / `max_level`.
+- Fix: `GET /quests?max_level=` without `min_level` no longer returns `422`.
+
 ## 2026-08-28 — Quest runs park instead of stopping, and skip Quest Shard steps
 
 Four client-visible changes from live-run reports. One new request field;

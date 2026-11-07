@@ -15,6 +15,12 @@ enum RunEventType: string
     case SkillSkipped = 'skill_skipped';
     case SkillSyncFailed = 'skill_sync_failed';
 
+    /** A buff potion kept active, or a rage potion drunk instead of waiting for rage. */
+    case PotionUsed = 'potion_used';
+
+    /** A selected potion that could not be used (none left, refused). */
+    case PotionSkipped = 'potion_skipped';
+
     case QuestStarted = 'quest_started';
     case QuestCompleted = 'quest_completed';
     case QuestSkipped = 'quest_skipped';

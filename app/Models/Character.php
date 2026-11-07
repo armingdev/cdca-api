@@ -63,6 +63,14 @@ class Character extends Model
     }
 
     /**
+     * @return HasMany<CharacterPotion, $this>
+     */
+    public function potions(): HasMany
+    {
+        return $this->hasMany(CharacterPotion::class);
+    }
+
+    /**
      * @return BelongsTo<Room, $this>
      */
     public function currentRoom(): BelongsTo

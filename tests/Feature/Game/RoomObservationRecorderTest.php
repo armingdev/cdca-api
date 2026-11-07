@@ -103,3 +103,15 @@ it('records gated rooms without exits and journals a later gate change', functio
     expect($room->is_gated)->toBeFalse()
         ->and($room->gate_reason)->toBeNull();
 });
+
+it('learns that a mob is spawnable when it is seen as a spawn', function () {
+    Mob::factory()->create(['name' => 'Possible Pyrite', 'spawnable' => false]);
+
+    recorder()->record(blobFor(8055, mobs: [
+        ['name' => 'Possible Pyrite', 'level' => '66', 'rage' => '40', 'h' => 'x', 'encid' => 'E', 'mobId' => '1495', 'spawnId' => '39303', 'spawnedBy' => 'Someone', 'isDead' => false, 'type' => 3],
+        ['name' => 'A Rock', 'level' => '65', 'rage' => '39', 'h' => 'x', 'encid' => 'F', 'mobId' => '1492', 'spawnId' => '39307', 'type' => 2],
+    ]));
+
+    expect(Mob::where('name', 'Possible Pyrite')->value('spawnable'))->toBeTrue()
+        ->and(Mob::where('name', 'A Rock')->value('spawnable'))->not->toBeTrue();
+});

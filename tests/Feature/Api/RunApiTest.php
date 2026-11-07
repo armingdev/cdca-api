@@ -1,17 +1,22 @@
 <?php
 
+use App\Game\Engine\RunDispatcher;
 use App\Game\Enums\RunStatus;
 use App\Jobs\RunMobJob;
 use App\Jobs\RunPvpJob;
+use App\Jobs\RunQuestListJob;
 use App\Models\Character;
 use App\Models\CharacterSkill;
+use App\Models\Potion;
 use App\Models\Quest;
+use App\Models\QuestList;
 use App\Models\Rga;
 use App\Models\Run;
 use App\Models\RunParticipant;
 use App\Models\Skill;
 use App\Models\User;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
 
 beforeEach(function () {
@@ -572,5 +577,194 @@ describe('rage reserve options', function () {
         'gladiator is not supported yet' => [['reserve_rage_for' => ['gladiator']], 'reserve_rage_for.0'],
         'zero hours' => [['reserve_rage_for' => ['pvp-brawl'], 'reserve_rage_hours' => 0], 'reserve_rage_hours'],
         'more than three days' => [['reserve_rage_for' => ['pvp-brawl'], 'reserve_rage_hours' => 73], 'reserve_rage_hours'],
+    ]);
+});
+
+describe('quest-list runs', function () {
+    it('chains several of the user\'s lists in the given order', function () {
+        Queue::fake();
+        $character = Character::factory()->for($this->rga)->create();
+        $first = QuestList::create(['name' => 'First', 'user_id' => $this->user->id]);
+        $second = QuestList::create(['name' => 'Second', 'user_id' => $this->user->id]);
+
+        $this->postJson('/api/v1/runs', [
+            'mode' => 'quest-list',
+            'characters' => [$character->id],
+            'quest_list_ids' => [$second->id, $first->id],
+        ])
+            ->assertCreated()
+            ->assertJsonPath('data.config.quest_list_ids', [$second->id, $first->id])
+            // Mirror for clients that predate chaining.
+            ->assertJsonPath('data.config.quest_list_id', $second->id);
+
+        Queue::assertPushed(RunQuestListJob::class, 1);
+    });
+
+    it('still accepts a single quest_list_id', function () {
+        Queue::fake();
+        $character = Character::factory()->for($this->rga)->create();
+        $list = QuestList::create(['name' => 'Only', 'user_id' => $this->user->id]);
+
+        $this->postJson('/api/v1/runs', [
+            'mode' => 'quest-list',
+            'characters' => [$character->id],
+            'quest_list_id' => $list->id,
+        ])
+            ->assertCreated()
+            ->assertJsonPath('data.config.quest_list_ids', [$list->id]);
+    });
+
+    it('rejects a list that is not the user\'s own, naming it', function () {
+        Queue::fake();
+        $character = Character::factory()->for($this->rga)->create();
+        $mine = QuestList::create(['name' => 'Mine', 'user_id' => $this->user->id]);
+        $theirs = QuestList::create(['name' => 'Theirs', 'user_id' => User::factory()->create()->id]);
+
+        $this->postJson('/api/v1/runs', [
+            'mode' => 'quest-list',
+            'characters' => [$character->id],
+            'quest_list_ids' => [$mine->id, $theirs->id],
+        ])
+            ->assertUnprocessable()
+            ->assertJsonPath('errors.quest_list_ids.0', "Quest list(s) not found: #{$theirs->id}.");
+
+        expect(Run::count())->toBe(0);
+        Queue::assertNothingPushed();
+    });
+
+    it('validates the list of lists', function (Closure $payload, string $field) {
+        $character = Character::factory()->for($this->rga)->create();
+        $list = QuestList::create(['name' => 'Mine', 'user_id' => $this->user->id]);
+
+        $this->postJson('/api/v1/runs', ['mode' => 'quest-list', 'characters' => [$character->id], ...$payload($list)])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors($field);
+    })->with([
+        'no list at all' => [fn (QuestList $list) => [], 'quest_list_ids'],
+        'empty list of lists' => [fn (QuestList $list) => ['quest_list_ids' => []], 'quest_list_ids'],
+        'the same list twice' => [fn (QuestList $list) => ['quest_list_ids' => [$list->id, $list->id]], 'quest_list_ids.1'],
+        'more than ten' => [fn (QuestList $list) => ['quest_list_ids' => range(1, 11)], 'quest_list_ids'],
+    ]);
+});
+
+describe('run priority', function () {
+    it('queues a run on the queue of its priority', function (?string $priority, string $queue) {
+        Queue::fake();
+        $character = Character::factory()->for($this->rga)->create();
+
+        $this->postJson('/api/v1/runs', array_filter([
+            'mode' => 'mob',
+            'characters' => [$character->id],
+            'mobs' => ['Kix Harvester'],
+            'priority' => $priority,
+        ]))
+            ->assertCreated()
+            ->assertJsonPath('data.priority', $priority ?? 'normal');
+
+        Queue::assertPushedOn($queue, RunMobJob::class);
+    })->with([
+        'high' => ['high', 'runs-high'],
+        'low' => ['low', 'runs-low'],
+        'default' => [null, 'runs'],
+    ]);
+
+    it('rejects an unknown priority', function () {
+        $character = Character::factory()->for($this->rga)->create();
+
+        $this->postJson('/api/v1/runs', ['mode' => 'mob', 'characters' => [$character->id], 'mobs' => ['Kix'], 'priority' => 'urgent'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('priority');
+    });
+
+    it('moves participants still waiting for a worker to the new queue, and leaves the rest alone', function () {
+        Queue::fake();
+        [$oldToken, $runningToken, $parkedToken] = [(string) Str::uuid(), (string) Str::uuid(), (string) Str::uuid()];
+        $run = Run::factory()->for($this->user)->create(['mode' => 'mob', 'name' => 'kept', 'status' => RunStatus::Running]);
+        $queued = RunParticipant::factory()->for($run)->for(Character::factory()->for($this->rga))
+            ->create(['status' => RunStatus::Pending, 'dispatch_token' => $oldToken]);
+        $running = RunParticipant::factory()->for($run)->for(Character::factory()->for($this->rga))
+            ->create(['status' => RunStatus::Running, 'dispatch_token' => $runningToken]);
+        $parked = RunParticipant::factory()->for($run)->for(Character::factory()->for($this->rga))
+            ->create(['status' => RunStatus::Waiting, 'dispatch_token' => $parkedToken]);
+
+        $this->patchJson("/api/v1/runs/{$run->id}", ['priority' => 'high'])
+            ->assertOk()
+            ->assertJsonPath('data.priority', 'high')
+            ->assertJsonPath('data.name', 'kept');
+
+        expect($queued->fresh()->dispatch_token)->not->toBe($oldToken)
+            ->and($running->fresh()->dispatch_token)->toBe($runningToken)
+            ->and($parked->fresh()->dispatch_token)->toBe($parkedToken);
+
+        Queue::assertPushedOn('runs-high', RunMobJob::class, fn (RunMobJob $job) => $job->participant->is($queued)
+            && $job->dispatchToken === $queued->fresh()->dispatch_token);
+        Queue::assertPushed(RunMobJob::class, 1);
+    });
+
+    it('keeps a delayed start when moving a scheduled run', function () {
+        Queue::fake();
+        $startAt = now()->addHours(3)->startOfSecond();
+        $run = Run::factory()->for($this->user)->create(['mode' => 'mob', 'status' => RunStatus::Pending, 'start_at' => $startAt]);
+        RunParticipant::factory()->for($run)->for(Character::factory()->for($this->rga))
+            ->create(['status' => RunStatus::Pending, 'dispatch_token' => (string) Str::uuid()]);
+
+        $this->patchJson("/api/v1/runs/{$run->id}", ['priority' => 'low'])->assertOk();
+
+        Queue::assertPushedOn('runs-low', RunMobJob::class, fn (RunMobJob $job) => $job->delay?->equalTo($startAt));
+    });
+
+    it('does not requeue a participant a worker has already claimed', function () {
+        Queue::fake();
+        $run = Run::factory()->for($this->user)->create(['mode' => 'mob', 'status' => RunStatus::Running]);
+        $oldToken = (string) Str::uuid();
+        $participant = RunParticipant::factory()->for($run)->for(Character::factory()->for($this->rga))
+            ->create(['status' => RunStatus::Pending, 'dispatch_token' => $oldToken]);
+
+        // A worker claims it between the controller's read and the requeue.
+        RunParticipant::whereKey($participant->id)->update(['status' => RunStatus::Running]);
+
+        expect(app(RunDispatcher::class)->requeue($participant))->toBeFalse()
+            ->and($participant->fresh()->dispatch_token)->toBe($oldToken);
+        Queue::assertNothingPushed();
+    });
+});
+
+describe('run potions', function () {
+    beforeEach(function () {
+        $this->buff = Potion::factory()->create(['name' => 'Kix Potion']);
+        $this->rage = Potion::factory()->rage()->create(['name' => 'Rage Potion']);
+        $this->character = Character::factory()->for($this->rga)->create();
+    });
+
+    it('stores the buff potions to keep active and the rage potions to drink', function () {
+        Queue::fake();
+
+        $this->postJson('/api/v1/runs', [
+            'mode' => 'mob',
+            'characters' => [$this->character->id],
+            'mobs' => ['Kix Harvester'],
+            'buff_potion_ids' => [$this->buff->id],
+            'rage_potion_ids' => [$this->rage->id],
+            'max_rage_potions' => 3,
+        ])
+            ->assertCreated()
+            ->assertJsonPath('data.buff_potion_ids', [$this->buff->id])
+            ->assertJsonPath('data.rage_potion_ids', [$this->rage->id])
+            ->assertJsonPath('data.max_rage_potions', 3);
+    });
+
+    it('refuses a potion of the wrong kind, and rage potions without a cap', function (Closure $payload, string $field, string $message) {
+        $this->postJson('/api/v1/runs', [
+            'mode' => 'mob',
+            'characters' => [$this->character->id],
+            'mobs' => ['Kix Harvester'],
+            ...$payload($this->buff, $this->rage),
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors([$field => $message]);
+    })->with([
+        'rage potion as a buff' => [fn ($buff, $rage) => ['buff_potion_ids' => [$rage->id]], 'buff_potion_ids.0', 'Only potions with a lasting effect can be kept active.'],
+        'buff potion for rage' => [fn ($buff, $rage) => ['rage_potion_ids' => [$buff->id], 'max_rage_potions' => 1], 'rage_potion_ids.0', 'Only rage potions can be drunk to refill rage.'],
+        'no cap' => [fn ($buff, $rage) => ['rage_potion_ids' => [$rage->id]], 'max_rage_potions', 'The max rage potions field is required.'],
     ]);
 });

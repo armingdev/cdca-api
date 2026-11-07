@@ -56,6 +56,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Client Application URL
+    |--------------------------------------------------------------------------
+    |
+    | The Angular client lives on its own origin. Links mailed to users (the
+    | password reset link) must open the client, not this API.
+    |
+    */
+
+    'frontend_url' => rtrim((string) env('FRONTEND_URL', 'http://localhost:4200'), '/'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------
     |

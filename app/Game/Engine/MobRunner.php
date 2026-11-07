@@ -38,6 +38,13 @@ class MobRunner
     /** Refused attacks in a row on one mob before we stop offering it rage. */
     private const int MAX_CONSECUTIVE_ATTACK_FAILURES = 5;
 
+    /**
+     * Room-mate attacks per spawn room per pass before giving up on the spawn
+     * there. Live spawns took 6 and 10 kills (2026-11-07); the cap only has to
+     * stop a room that will never deliver from eating the whole rage bar.
+     */
+    private const int MAX_TRIGGER_ATTACKS_PER_ROOM = 40;
+
     private int $wins = 0;
 
     private int $losses = 0;
@@ -72,6 +79,15 @@ class MobRunner
 
     /** @var array<string, array{cost: int, held: int}> mob name => the price it refused us at */
     private array $unaffordable = [];
+
+    /** @var array<int, list<string>> room id => spawnable targets that spawn there */
+    private array $spawnTargetsByRoom = [];
+
+    /** @var array<int, int> room id => room-mate attacks made there to draw out a spawn */
+    private array $triggerAttacks = [];
+
+    /** Room-mates killed to draw out spawnable targets — never counted as target wins. */
+    private int $triggerKills = 0;
 
     public function __construct(
         private readonly MobRunConfig $config,
@@ -150,12 +166,16 @@ class MobRunner
      */
     private function loop(Closure $log, ?Closure $signal, ?Closure $onBattle, ?Closure $ensureBuffs = null): MobRunSummary
     {
-        $targetRooms = Mob::whereIn('name', $this->config->mobNames)
-            ->with('rooms:id')
-            ->get()
-            ->flatMap(fn (Mob $mob) => $mob->rooms->pluck('id'))
-            ->unique()
-            ->values();
+        $targets = Mob::whereIn('name', $this->config->mobNames)->with('rooms:id')->get();
+        $targetRooms = $targets->flatMap(fn (Mob $mob) => $mob->rooms->pluck('id'))->unique()->values();
+
+        // A spawnable target is absent until its room-mates are farmed. Mob runs
+        // and quest objectives both land here, so both farm for the spawn.
+        foreach ($targets->where('spawnable', true) as $mob) {
+            foreach ($mob->rooms as $room) {
+                $this->spawnTargetsByRoom[$room->id][] = $mob->name;
+            }
+        }
 
         if ($targetRooms->isEmpty()) {
             throw new GameException('No known rooms for the target mobs — map the area first or check the names.');
@@ -266,6 +286,17 @@ class MobRunner
                 continue;
             }
 
+            // No live target here. A spawnable one has to be drawn out first.
+            if (isset($this->spawnTargetsByRoom[$blob->curRoom])) {
+                $hunted = $this->huntSpawn($blob, $current, $log, $onBattle, $ensureBuffs);
+
+                if ($hunted !== null) {
+                    [$blob, $current] = $hunted;
+
+                    continue;
+                }
+            }
+
             if ($targetRooms->contains($blob->curRoom)) {
                 $this->spawnRoomsVisited++;
             }
@@ -314,6 +345,109 @@ class MobRunner
                 $blob = $this->navigator->loadCurrentRoom();
             }
         }
+    }
+
+    /**
+     * The target is spawnable and not here: attack one room-mate to draw it
+     * out, then reload the room. Returns the new room and stats to keep going
+     * with, or null when this room has nothing more to give this pass (cap
+     * reached, or no room-mate the character can attack right now) — the
+     * caller then treats it like any cleared spawn room.
+     *
+     * @param  Closure(string): void  $log
+     * @param  Closure(BattleEvent): void|null  $onBattle
+     * @param  Closure(): void|null  $ensureBuffs
+     * @return array{0: RoomBlob, 1: UserStats}|null
+     */
+    private function huntSpawn(RoomBlob $blob, UserStats $current, Closure $log, ?Closure $onBattle, ?Closure $ensureBuffs): ?array
+    {
+        $room = $blob->curRoom;
+        $wanted = implode(' / ', $this->spawnTargetsByRoom[$room]);
+        $attacks = $this->triggerAttacks[$room] ?? 0;
+
+        // Already out (just priced out of reach, or refusing): drawing out
+        // another is not possible and would only burn rage.
+        foreach ($blob->mobs as $sighting) {
+            if (! $sighting->isDead && in_array($sighting->name, $this->spawnTargetsByRoom[$room], true)) {
+                return null;
+            }
+        }
+
+        if ($attacks >= self::MAX_TRIGGER_ATTACKS_PER_ROOM) {
+            $log("No {$wanted} after {$attacks} room-mate attacks here — moving on.");
+
+            return null;
+        }
+
+        $trigger = $this->spawnTrigger($blob, $current);
+
+        if ($trigger === null) {
+            $log("{$wanted} needs to be spawned, but nothing in this room can be farmed for it right now.");
+
+            return null;
+        }
+
+        if ($attacks === 0) {
+            $log("{$wanted} needs to be spawned — farming its room-mates.");
+        }
+
+        $ensureBuffs?->__invoke();
+
+        $event = $this->attacker->attack($trigger);
+        $this->triggerAttacks[$room] = $attacks + 1;
+        $onBattle?->__invoke($event);
+
+        match ($event->outcome) {
+            BattleOutcome::Win => $this->triggerKills++,
+            BattleOutcome::Loss => $this->losses++,
+            default => $this->errors++,
+        };
+
+        $log(match ($event->outcome) {
+            BattleOutcome::Win => sprintf('Beat %s to draw out %s (%d/%d).', $trigger->name, $wanted, $attacks + 1, self::MAX_TRIGGER_ATTACKS_PER_ROOM),
+            BattleOutcome::Loss => "Lost to {$trigger->name} while farming for {$wanted}.",
+            default => "Attack on {$trigger->name} failed: {$event->fail_reason}",
+        });
+
+        // A refusing room-mate drops out of the trigger pool like any target.
+        $this->trackAttackFailures($event, $trigger, $log);
+        $current = $this->stats->refresh();
+
+        if ($event->outcome === BattleOutcome::Loss && $this->config->smart) {
+            $current = $this->handleLoss($trigger, $current, $log);
+        }
+
+        $blob = $this->navigator->loadCurrentRoom();
+
+        foreach ($blob->mobs as $sighting) {
+            if ($sighting->isSpawn() && ! $sighting->isDead && in_array($sighting->name, $this->spawnTargetsByRoom[$room], true)) {
+                $log("{$sighting->name} steps out of the shadows!");
+
+                break;
+            }
+        }
+
+        return [$blob, $current];
+    }
+
+    /**
+     * The room-mate to farm for a spawn: an ordinary, attackable, affordable
+     * mob that is not itself a target — cheapest rage first, then lowest level.
+     */
+    private function spawnTrigger(RoomBlob $blob, UserStats $current): ?MobSighting
+    {
+        return collect($blob->mobs)
+            ->reject(fn (MobSighting $sighting): bool => $sighting->isDead
+                || $sighting->noAttack
+                || $sighting->encid === ''
+                || $sighting->isRaid()
+                || $sighting->isSpawn()
+                || in_array($sighting->name, $this->config->mobNames, true)
+                || isset($this->unattackable[$sighting->name])
+                || isset($this->outmatched[$sighting->name])
+                || ! $this->canAfford($sighting, $current))
+            ->sortBy([['rageCost', 'asc'], ['level', 'asc']])
+            ->first();
     }
 
     /**
@@ -632,6 +766,7 @@ class MobRunner
             $endReason,
             $this->targetsRespawnPending(),
             $this->rageShortfall(),
+            $this->triggerKills,
         );
     }
 }

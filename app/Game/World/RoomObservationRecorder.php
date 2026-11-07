@@ -110,6 +110,9 @@ class RoomObservationRecorder
                     'can_form' => $sighting->canForm,
                     'image' => $sighting->image,
                     'last_seen_at' => now(),
+                    // A live spawn teaches what the seed may not know; nothing
+                    // ever un-learns it (a spawnable is only seen as a spawn).
+                    ...($sighting->isSpawn() ? ['spawnable' => true] : []),
                 ],
             );
 

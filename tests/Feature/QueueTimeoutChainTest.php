@@ -1,5 +1,6 @@
 <?php
 
+use App\Game\Enums\RunPriority;
 use App\Jobs\RefreshCharacterStatsJob;
 use App\Jobs\RunMobJob;
 use App\Jobs\SyncRgaCharactersJob;
@@ -29,4 +30,18 @@ it('keeps every job timeout below its supervisor timeout and its connection retr
 it('runs each supervisor on the connection its timeout chain was sized for', function () {
     expect(config('horizon.defaults.supervisor-1.connection'))->toBe('redis')
         ->and(config('horizon.defaults.supervisor-runs.connection'))->toBe('redis-runs');
+});
+
+/*
+ * Each run priority is its own queue. A queue the runs supervisor does not
+ * list would strand every run of that priority as Pending forever, and any
+ * balance other than `false` ignores the order that makes it a priority.
+ */
+it('drains every run-priority queue, highest first, with a fixed worker pool', function () {
+    expect(config('horizon.defaults.supervisor-runs.queue'))->toBe(RunPriority::QUEUES)
+        ->and(array_map(fn (RunPriority $priority) => $priority->queue(), RunPriority::cases()))->toBe(RunPriority::QUEUES)
+        ->and(config('horizon.defaults.supervisor-runs.balance'))->toBeFalse()
+        ->and(config('horizon.defaults.supervisor-runs.minProcesses'))->toBe(config('horizon.defaults.supervisor-runs.maxProcesses'))
+        ->and(config('horizon.environments.production.supervisor-runs.minProcesses'))
+        ->toBe(config('horizon.environments.production.supervisor-runs.maxProcesses'));
 });

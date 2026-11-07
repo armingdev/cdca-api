@@ -20,6 +20,8 @@ class RgaSessionResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
+            'rga_id' => $this->id,
+            'username' => $this->username,
             'rg_sess_id' => $this->cookies['rg_sess_id'] ?? null,
             'token' => $this->cookies['token'] ?? null,
             'cuserid2' => $this->cookies['cuserid2'] ?? null,

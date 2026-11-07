@@ -168,3 +168,20 @@ it('still uses the PvE rules when a page carries no success flag', function () {
     expect(new BattleResultParser()->parse($win)->outcome)->toBe(BattleOutcome::Win)
         ->and(new BattleResultParser()->parse($loss)->outcome)->toBe(BattleOutcome::Loss);
 });
+
+it('parses a full captured PvE battle page', function () {
+    $result = new BattleResultParser()->parse(gameFixture('spawn/attack_pve_win.html'));
+
+    expect($result->outcome)->toBe(BattleOutcome::Win)
+        ->and($result->defenderName)->toBe('A Rock')
+        ->and($result->expGained)->toBe(672)
+        ->and($result->goldGained)->toBe(65);
+});
+
+it('reads a win that drew out a spawn like any other win', function () {
+    $result = new BattleResultParser()->parse(gameFixture('spawn/attack_pve_spawn_line.html'));
+
+    expect($result->outcome)->toBe(BattleOutcome::Win)
+        ->and($result->defenderName)->toBe('A Rock')
+        ->and($result->rawBattleResult)->toEndWith('Possible Pyrite steps out of the shadows!');
+});
