@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreRgaRequest extends FormRequest
 {
@@ -17,9 +18,9 @@ class StoreRgaRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'username' => ['required', 'string', 'max:255', 'unique:rgas,username'],
-            'password' => ['required', 'string'],
-            'security_answer' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'username' => [Rule::required(), Rule::string()->max(255), Rule::unique('rgas', 'username')],
+            'password' => [Rule::required(), Rule::string()],
+            'security_answer' => [Rule::sometimes(), Rule::nullable(), Rule::string()->max(255)],
         ];
     }
 }

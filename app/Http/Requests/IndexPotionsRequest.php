@@ -19,8 +19,8 @@ class IndexPotionsRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'kind' => ['sometimes', Rule::enum(PotionKind::class)],
-            'search' => ['sometimes', 'string', 'max:100'],
+            'kind' => [Rule::sometimes(), Rule::enum(PotionKind::class)],
+            'search' => [Rule::sometimes(), Rule::string()->max(100)],
         ];
     }
 }

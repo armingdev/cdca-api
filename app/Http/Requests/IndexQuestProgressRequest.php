@@ -19,9 +19,9 @@ class IndexQuestProgressRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
-            'page' => ['sometimes', 'integer', 'min:1'],
-            'status' => ['sometimes', Rule::enum(QuestProgressStatus::class)],
+            'per_page' => [Rule::sometimes(), Rule::numeric()->integer()->min(1)->max(100)],
+            'page' => [Rule::sometimes(), Rule::numeric()->integer()->min(1)],
+            'status' => [Rule::sometimes(), Rule::enum(QuestProgressStatus::class)],
         ];
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class LoginRequest extends FormRequest
 {
@@ -17,9 +18,9 @@ class LoginRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'email' => ['required', 'email'],
-            'password' => ['required', 'string'],
-            'device_name' => ['sometimes', 'string', 'max:255'],
+            'email' => [Rule::required(), Rule::email()],
+            'password' => [Rule::required(), Rule::string()],
+            'device_name' => [Rule::sometimes(), Rule::string()->max(255)],
         ];
     }
 }

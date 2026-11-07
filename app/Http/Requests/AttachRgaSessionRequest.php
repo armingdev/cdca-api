@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class AttachRgaSessionRequest extends FormRequest
 {
@@ -17,9 +18,9 @@ class AttachRgaSessionRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'rg_sess_id' => ['required', 'string', 'regex:/^[0-9a-fA-F]{32}$/'],
-            'token' => ['sometimes', 'nullable', 'string', 'max:255'],
-            'cuserid2' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'rg_sess_id' => [Rule::required(), Rule::string(), Rule::regex('/^[0-9a-fA-F]{32}$/')],
+            'token' => [Rule::sometimes(), Rule::nullable(), Rule::string()->max(255)],
+            'cuserid2' => [Rule::sometimes(), Rule::nullable(), Rule::string()->max(255)],
         ];
     }
 }

@@ -25,7 +25,7 @@ Put these three calls in the base `Pest.php` of the project:
 
 ## How to run the suite in parallel
 
-Run `vendor/bin/pest --parallel` to spread tests across the machine's CPU cores. If the default count does not suit the machine or CI, add `--processes=N`.
+Run `vendor/bin/sail bin pest --parallel` to spread tests across the machine's CPU cores. If the default count does not suit the machine or CI, add `--processes=N`.
 
 A parallel run gives each process a separate database. Each test must meet the conditions below. A test that fails only in parallel breaks one of them.
 
@@ -35,19 +35,19 @@ A parallel run gives each process a separate database. Each test must meet the c
 
 ## How to run fewer tests
 
-Run `vendor/bin/pest --parallel --tia` to run only the tests that the recent changes affect. Pest replays the cached result of each other test.
+Run `vendor/bin/sail bin pest --parallel --tia` to run only the tests that the recent changes affect. Pest replays the cached result of each other test.
 
 Pest replays cached results rather than skipping unaffected tests. The cache includes each produced value and the covered lines and branches. Pest finds affected Laravel, Symfony, Livewire, and Inertia tests without configuration.
 
 ## How to split tests across CI
 
-Run `vendor/bin/pest --update-shards` to measure the time of each test. Run `vendor/bin/pest --shard=1/4` in each CI job, and change the first number for each job.
+Run `vendor/bin/sail bin pest --update-shards` to measure the time of each test. Run `vendor/bin/sail bin pest --shard=1/4` in each CI job, and change the first number for each job.
 
 Commit `tests/.pest/shards.json` so each CI job gets the same shard and the shards remain balanced by runtime rather than test count.
 
 ## How to find a slow test
 
-Run `vendor/bin/pest --profile` to list the slowest tests. Start with the ten slowest tests, because the same cause often applies to the complete suite.
+Run `vendor/bin/sail bin pest --profile` to list the slowest tests. Start with the ten slowest tests, because the same cause often applies to the complete suite.
 
 If the cause of a slow test is unclear, add an event listener or temporary log entry to identify the work the test does.
 

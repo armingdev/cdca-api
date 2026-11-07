@@ -19,10 +19,10 @@ class StoreQuestListRequest extends FormRequest
     {
         return [
             'name' => [
-                'required', 'string', 'max:255',
+                Rule::required(), Rule::string()->max(255),
                 Rule::unique('quest_lists', 'name')->where('user_id', $this->user()->id),
             ],
-            'is_public' => ['sometimes', 'boolean'],
+            'is_public' => [Rule::sometimes(), Rule::boolean()],
         ];
     }
 }

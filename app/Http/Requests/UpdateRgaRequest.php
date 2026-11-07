@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 /**
  * Update an RGA's credentials and settings. The username is deliberately immutable —
@@ -22,10 +23,10 @@ class UpdateRgaRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'password' => ['sometimes', 'string'],
-            'security_answer' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'password' => [Rule::sometimes(), Rule::string()],
+            'security_answer' => [Rule::sometimes(), Rule::nullable(), Rule::string()->max(255)],
             // Let the scheduler claim the daily challenge tokens (on by default).
-            'auto_claim_tokens' => ['sometimes', 'boolean'],
+            'auto_claim_tokens' => [Rule::sometimes(), Rule::boolean()],
         ];
     }
 }

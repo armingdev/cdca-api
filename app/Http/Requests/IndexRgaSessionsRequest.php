@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class IndexRgaSessionsRequest extends FormRequest
 {
@@ -19,7 +20,7 @@ class IndexRgaSessionsRequest extends FormRequest
         return [
             // Ask the game about each session before handing it out (one
             // request per RGA); dead ones are marked invalid and flagged.
-            'verify' => ['sometimes', 'boolean'],
+            'verify' => [Rule::sometimes(), Rule::boolean()],
         ];
     }
 }

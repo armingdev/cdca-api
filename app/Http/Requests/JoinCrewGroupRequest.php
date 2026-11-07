@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class JoinCrewGroupRequest extends FormRequest
 {
@@ -17,7 +18,7 @@ class JoinCrewGroupRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'invite_code' => ['required', 'string', 'max:16'],
+            'invite_code' => [Rule::required(), Rule::string()->max(16)],
         ];
     }
 }

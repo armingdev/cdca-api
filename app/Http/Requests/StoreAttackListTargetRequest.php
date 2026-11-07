@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreAttackListTargetRequest extends FormRequest
 {
@@ -19,8 +20,8 @@ class StoreAttackListTargetRequest extends FormRequest
         return [
             // Targets are added by name — what the user knows. The player id
             // is resolved on the first search and cached back onto the row.
-            'name' => ['required', 'string', 'max:255'],
-            'player_id' => ['sometimes', 'nullable', 'integer', 'min:1'],
+            'name' => [Rule::required(), Rule::string()->max(255)],
+            'player_id' => [Rule::sometimes(), Rule::nullable(), Rule::numeric()->integer()->min(1)],
         ];
     }
 }

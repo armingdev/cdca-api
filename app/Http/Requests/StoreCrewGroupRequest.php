@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreCrewGroupRequest extends FormRequest
 {
@@ -17,7 +18,7 @@ class StoreCrewGroupRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => ['required', 'string', 'max:60'],
+            'name' => [Rule::required(), Rule::string()->max(60)],
         ];
     }
 }

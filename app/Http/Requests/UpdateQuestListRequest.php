@@ -19,12 +19,12 @@ class UpdateQuestListRequest extends FormRequest
     {
         return [
             'name' => [
-                'sometimes', 'string', 'max:255',
+                Rule::sometimes(), Rule::string()->max(255),
                 Rule::unique('quest_lists', 'name')
                     ->where('user_id', $this->user()->id)
                     ->ignore($this->route('questList')),
             ],
-            'is_public' => ['sometimes', 'boolean'],
+            'is_public' => [Rule::sometimes(), Rule::boolean()],
         ];
     }
 }

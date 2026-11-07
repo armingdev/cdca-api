@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class IndexQuestListsRequest extends FormRequest
 {
@@ -19,7 +20,7 @@ class IndexQuestListsRequest extends FormRequest
         return [
             // mine (default) = the user's own lists; community = lists other
             // users published plus the built-in ones, to read and copy.
-            'scope' => ['sometimes', 'in:mine,community'],
+            'scope' => [Rule::sometimes(), Rule::in(['mine', 'community'])],
         ];
     }
 }

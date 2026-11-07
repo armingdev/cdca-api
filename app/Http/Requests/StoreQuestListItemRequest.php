@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreQuestListItemRequest extends FormRequest
 {
@@ -17,8 +18,8 @@ class StoreQuestListItemRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'quest_id' => ['required', 'integer', 'exists:quests,id'],
-            'label' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'quest_id' => [Rule::required(), Rule::numeric()->integer(), Rule::exists('quests', 'id')],
+            'label' => [Rule::sometimes(), Rule::nullable(), Rule::string()->max(255)],
         ];
     }
 }
