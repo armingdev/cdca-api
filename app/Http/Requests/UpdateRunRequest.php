@@ -23,8 +23,8 @@ class UpdateRunRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => [Rule::when(! $this->has('priority'), ['present']), 'nullable', 'string', 'max:80'],
-            'priority' => ['sometimes', Rule::enum(RunPriority::class)],
+            'name' => [Rule::when(! $this->has('priority'), [Rule::present()]), Rule::nullable(), Rule::string()->max(80)],
+            'priority' => [Rule::sometimes(), Rule::enum(RunPriority::class)],
         ];
     }
 }

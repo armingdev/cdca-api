@@ -22,10 +22,10 @@ class UpdateCrewGroupSharedRgasRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'rga_ids' => ['present', 'array', 'max:75'],
+            'rga_ids' => [Rule::present(), Rule::array()->max(75)],
             'rga_ids.*' => [
-                'integer',
-                'distinct',
+                Rule::numeric()->integer(),
+                Rule::distinct(),
                 Rule::exists('rgas', 'id')->where('user_id', $this->user()->id),
             ],
         ];

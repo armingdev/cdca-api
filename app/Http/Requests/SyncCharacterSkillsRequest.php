@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class SyncCharacterSkillsRequest extends FormRequest
 {
@@ -22,8 +23,8 @@ class SyncCharacterSkillsRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'max_age_seconds' => ['sometimes', 'integer', 'min:0', 'max:86400'],
-            'with_recharge' => ['sometimes', 'boolean'],
+            'max_age_seconds' => [Rule::sometimes(), Rule::numeric()->integer()->min(0)->max(86400)],
+            'with_recharge' => [Rule::sometimes(), Rule::boolean()],
         ];
     }
 }

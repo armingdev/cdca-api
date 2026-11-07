@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class CastSkillRequest extends FormRequest
 {
@@ -18,8 +19,8 @@ class CastSkillRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'skill_id' => ['sometimes', 'integer', 'exists:skills,id'],
-            'on_start' => ['sometimes', 'boolean'],
+            'skill_id' => [Rule::sometimes(), Rule::numeric()->integer(), Rule::exists('skills', 'id')],
+            'on_start' => [Rule::sometimes(), Rule::boolean()],
         ];
     }
 

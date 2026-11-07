@@ -20,12 +20,11 @@ class StoreAttackListRequest extends FormRequest
         return [
             // Scoped to the owner, so two users may both have a "Rivals" list.
             'name' => [
-                'required',
-                'string',
-                'max:255',
+                Rule::required(),
+                Rule::string()->max(255),
                 Rule::unique('attack_lists', 'name')->where('user_id', $this->user()->id),
             ],
-            'server_id' => ['sometimes', 'nullable', 'integer', 'in:1,2'],
+            'server_id' => [Rule::sometimes(), Rule::nullable(), Rule::numeric()->integer(), Rule::in([1, 2])],
         ];
     }
 }

@@ -217,6 +217,11 @@ abstract class RunJob implements Interruptible, ShouldQueue
      * receives SIGTERM/SIGQUIT/SIGINT while this job is running. Only a flag is
      * flipped here — a signal handler can fire in the middle of any statement,
      * so all the real work happens at the engine's next signal check.
+     *
+     * The worker also calls this with SIGALRM when the job times out, right
+     * before it kills itself, so the flag never gets read on that path; the
+     * timeout reaches failed() instead (see PASS_END_MARGIN_SECONDS for why a
+     * healthy run never gets that far).
      */
     public function interrupted(int $signal): void
     {

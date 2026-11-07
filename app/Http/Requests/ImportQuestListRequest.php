@@ -3,6 +3,8 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\File;
 
 class ImportQuestListRequest extends FormRequest
 {
@@ -22,10 +24,10 @@ class ImportQuestListRequest extends FormRequest
         return [
             // Read once as text and never stored, so the limits that matter
             // are size and "is it text at all".
-            'file' => ['required_without:text', 'file', 'max:256', 'mimetypes:application/json,text/plain'],
-            'text' => ['required_without:file', 'string', 'max:262144'],
+            'file' => [Rule::requiredWithout('text'), File::types(['application/json', 'text/plain'])->max(256)],
+            'text' => [Rule::requiredWithout('file'), Rule::string()->max(262144)],
             // Optional for a dDCT list, which carries its own name.
-            'name' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'name' => [Rule::sometimes(), Rule::nullable(), Rule::string()->max(255)],
         ];
     }
 

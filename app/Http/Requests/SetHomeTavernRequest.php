@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class SetHomeTavernRequest extends FormRequest
 {
@@ -17,7 +18,7 @@ class SetHomeTavernRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'room_id' => ['required', 'integer', 'min:1'],
+            'room_id' => [Rule::required(), Rule::numeric()->integer()->min(1)],
         ];
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class ForgotPasswordRequest extends FormRequest
 {
@@ -17,7 +18,7 @@ class ForgotPasswordRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'email' => ['required', 'email', 'max:255'],
+            'email' => [Rule::required(), Rule::email(), Rule::string()->max(255)],
         ];
     }
 }

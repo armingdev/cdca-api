@@ -20,14 +20,14 @@ class IndexRunEventsRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
-            'page' => ['sometimes', 'integer', 'min:1'],
-            'participant_id' => ['sometimes', 'integer', 'min:1'],
-            'character_id' => ['sometimes', 'integer', 'min:1'],
-            'type' => ['sometimes', Rule::enum(RunEventType::class)],
-            'level' => ['sometimes', Rule::in([RunEvent::LEVEL_INFO, RunEvent::LEVEL_WARNING, RunEvent::LEVEL_ERROR])],
+            'per_page' => [Rule::sometimes(), Rule::numeric()->integer()->min(1)->max(100)],
+            'page' => [Rule::sometimes(), Rule::numeric()->integer()->min(1)],
+            'participant_id' => [Rule::sometimes(), Rule::numeric()->integer()->min(1)],
+            'character_id' => [Rule::sometimes(), Rule::numeric()->integer()->min(1)],
+            'type' => [Rule::sometimes(), Rule::enum(RunEventType::class)],
+            'level' => [Rule::sometimes(), Rule::in([RunEvent::LEVEL_INFO, RunEvent::LEVEL_WARNING, RunEvent::LEVEL_ERROR])],
             // Live tailing: only rows newer than the last one the client holds.
-            'after_id' => ['sometimes', 'integer', 'min:0'],
+            'after_id' => [Rule::sometimes(), Rule::numeric()->integer()->min(0)],
         ];
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UpdateCharacterSkillsRequest extends FormRequest
 {
@@ -17,8 +18,8 @@ class UpdateCharacterSkillsRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'skill_ids' => ['present', 'array'],
-            'skill_ids.*' => ['integer', 'exists:skills,id'],
+            'skill_ids' => [Rule::present(), Rule::array()],
+            'skill_ids.*' => [Rule::numeric()->integer(), Rule::exists('skills', 'id')],
         ];
     }
 }

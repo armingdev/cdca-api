@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class TeleportRequest extends FormRequest
 {
@@ -18,9 +19,9 @@ class TeleportRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'anchor_id' => ['sometimes', 'integer', 'exists:teleport_anchors,id'],
-            'room_id' => ['sometimes', 'integer', 'min:1'],
-            'home_tavern' => ['sometimes', 'boolean'],
+            'anchor_id' => [Rule::sometimes(), Rule::numeric()->integer(), Rule::exists('teleport_anchors', 'id')],
+            'room_id' => [Rule::sometimes(), Rule::numeric()->integer()->min(1)],
+            'home_tavern' => [Rule::sometimes(), Rule::boolean()],
         ];
     }
 
