@@ -3,6 +3,7 @@
 use App\Game\Combat\AttackService;
 use App\Game\Data\MobSighting;
 use App\Game\Enums\BattleOutcome;
+use App\Game\Exceptions\GameServerException;
 use App\Models\Character;
 use App\Models\Mob;
 use App\Models\Rga;
@@ -65,6 +66,33 @@ it('records a failed attack when the game returns 200 with a reason', function (
     expect($event->outcome)->toBe(BattleOutcome::Failed)
         ->and($event->battle_id)->toBeNull()
         ->and($event->fail_reason)->toContain('already dead');
+});
+
+it('records a failed attack when the game answers 500 because the mob is already gone', function () {
+    $character = Character::factory()->for(Rga::factory()->withSession())->create();
+
+    Http::fake([
+        '*somethingelse.php*' => Http::response(gameFixture('attack_invalid_mob_500.html'), 500),
+    ]);
+
+    $event = AttackService::forCharacter($character)->attack(sighting());
+
+    expect($event->outcome)->toBe(BattleOutcome::Failed)
+        ->and($event->battle_id)->toBeNull()
+        ->and($event->fail_reason)->toBe('Invalid mob!');
+});
+
+it('lets a server outage during the attack through without recording a battle', function () {
+    $character = Character::factory()->for(Rga::factory()->withSession())->create();
+
+    Http::fake([
+        '*somethingelse.php*' => Http::response('error code: 521', 521),
+    ]);
+
+    expect(fn () => AttackService::forCharacter($character)->attack(sighting()))
+        ->toThrow(GameServerException::class, 'HTTP 521');
+
+    $this->assertDatabaseCount('battle_events', 0);
 });
 
 it('records a loss from the captured loss text', function () {

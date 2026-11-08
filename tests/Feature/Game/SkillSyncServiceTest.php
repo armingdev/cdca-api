@@ -206,3 +206,29 @@ it('refuses to train misc, gated, exhausted, cross-school, and maxed skills', fu
 
     Http::assertNothingSent();
 });
+
+/**
+ * The Misc tab lists only acquired skills. A Misc skill selected for a run
+ * but missing there stayed unsynced, so the caster tried it daily and the
+ * game refused it — 51 times for one character in prod.
+ */
+it('records a misc skill the misc tab does not list as not owned, ending its refusals', function () {
+    $character = Character::factory()->for(Rga::factory()->withSession())->create();
+    $dailyGrind = CharacterSkill::create([
+        'character_id' => $character->id,
+        'skill_id' => 2996,
+        'cast_on_start' => true,
+        'cast_refusals' => 51,
+        'cast_refused_until' => now()->addDay(),
+    ]);
+    fakeSkillTabs(['C7' => skillsTabHtml(skillRowHtml(46, 'Shield Wall', '1', trainable: false))]);
+
+    SkillSyncService::forCharacter($character)->sync();
+
+    $dailyGrind->refresh();
+    expect($dailyGrind->synced_at)->not->toBeNull()
+        ->and($dailyGrind->isCastable())->toBeFalse()
+        ->and($dailyGrind->cast_refusals)->toBe(0)
+        ->and($dailyGrind->cast_refused_until)->toBeNull()
+        ->and(CharacterSkill::where('character_id', $character->id)->where('skill_id', 46)->first()->isCastable())->toBeTrue();
+});

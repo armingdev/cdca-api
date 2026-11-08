@@ -1,6 +1,7 @@
 <?php
 
 use App\Game\Engine\ParticipantOutcome;
+use App\Game\Engine\QuestListProgress;
 use App\Game\Engine\QuestListRunConfig;
 use App\Game\Engine\QuestListRunSummary;
 use App\Game\Engine\QuestRunConfig;
@@ -84,7 +85,7 @@ function questListEndOutcome(
         kills: $kills,
         stopReason: "Waiting on Quest 742: All 'Street Crawler' targets are dead — waiting for respawn.",
         endReason: $endReason,
-        nextPosition: $nextPosition,
+        progress: new QuestListProgress(position: $nextPosition),
     );
 
     return new RunQuestListJob($participant, (string) Str::uuid())
@@ -172,7 +173,8 @@ it('parks a quest and a quest list for a minute when the worker is told to quit'
         ->and($quest->progress)->toBeNull()
         ->and($list->status)->toBe(RunStatus::Waiting)
         ->and($list->resumeAt->toDateTimeString())->toBe('2026-08-27 12:41:00')
-        ->and($list->progress)->toBe(['list_index' => 0, 'position' => 5]);
+        ->and($list->progress)->toMatchArray(['list_index' => 0, 'position' => 5])
+        ->and($list->progress)->not->toHaveKey('respawn_waits');
 });
 
 it('parks a quest until the next game-clock rage tick when it cannot afford its target', function () {

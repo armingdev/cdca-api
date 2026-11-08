@@ -6,6 +6,7 @@ use App\Game\Combat\StatsService;
 use App\Game\Data\BuffEnsureResult;
 use App\Game\Engine\RunEventRecorder;
 use App\Game\Enums\RunEventType;
+use App\Game\Enums\SkillSchool;
 use App\Game\Exceptions\GameException;
 use App\Game\World\TeleportService;
 use App\Models\Character;
@@ -227,8 +228,11 @@ class BuffEnsurer
             $entry = ['skill_id' => $state->skill_id, 'name' => $state->skill->name];
 
             if ($state->synced_at !== null && ! $state->isCastable()) {
-                $skipped[] = $entry + ['reason' => BuffEnsureResult::REASON_UNTRAINED];
-                $log("{$state->skill->name} not trained — skipping.");
+                $acquiredOnly = $state->skill->school === SkillSchool::Misc;
+                $skipped[] = $entry + ['reason' => $acquiredOnly ? BuffEnsureResult::REASON_NOT_ACQUIRED : BuffEnsureResult::REASON_UNTRAINED];
+                $log($acquiredOnly
+                    ? "{$state->skill->name} not acquired by this character — skipping."
+                    : "{$state->skill->name} not trained — skipping.");
 
                 continue;
             }

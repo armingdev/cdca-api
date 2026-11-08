@@ -52,6 +52,7 @@ reports every skill.
 ```
 
 `reason` is one of `active` (buff already up), `cooldown`, `untrained`,
+`not_acquired` (a Misc skill this character does not own — added Nov 2026),
 `rage` (the skill costs more than the character holds), or — under `failed` —
 `refused` (the game did not confirm the cast).
 

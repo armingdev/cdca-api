@@ -18,6 +18,9 @@ final readonly class BuffEnsureResult
 
     public const string REASON_UNTRAINED = 'untrained';
 
+    /** A Misc skill the character does not own — those are acquired, never trained. */
+    public const string REASON_NOT_ACQUIRED = 'not_acquired';
+
     public const string REASON_RAGE = 'rage';
 
     public const string REASON_REFUSED = 'refused';

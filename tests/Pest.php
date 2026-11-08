@@ -253,9 +253,13 @@ function fakeCastConfirmationHtml(?int $skillId): string
  * rage. Pair with rooms/mob seeded via seedCombatWorld().
  *
  * Returns a respawn closure that stands the Harvester back up — re-faking
- * cannot do it, since Http::fake callbacks stack first-wins.
+ * cannot do it, since Http::fake callbacks stack first-wins (and every one of
+ * them still runs, so a second fake for the attack would kill him anyway).
+ *
+ * $attack answers each attack instead (refusals, "Invalid mob!", a scripted
+ * win); the Harvester then stays standing whatever it returns.
  */
-function fakeCombatWorld(int $rage = 5000): Closure
+function fakeCombatWorld(int $rage = 5000, ?Closure $attack = null): Closure
 {
     $position = 1;
     $killed = false;
@@ -289,7 +293,7 @@ function fakeCombatWorld(int $rage = 5000): Closure
         ]);
     };
 
-    Http::fake(function ($request) use (&$position, &$killed, $roomBlob, $rage) {
+    Http::fake(function ($request) use (&$position, &$killed, $roomBlob, $rage, $attack) {
         $url = $request->url();
 
         if (str_contains($url, 'userstats.php')) {
@@ -306,6 +310,10 @@ function fakeCombatWorld(int $rage = 5000): Closure
             return Http::response($request->method() === 'POST'
                 ? fakeCastConfirmationHtml((int) $request['castskillid'])
                 : fakeSkillsPageHtml());
+        }
+
+        if (str_contains($url, 'somethingelse.php') && $attack !== null) {
+            return $attack();
         }
 
         if (str_contains($url, 'somethingelse.php')) {

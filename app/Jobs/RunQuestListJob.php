@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Game\Engine\ParticipantOutcome;
+use App\Game\Engine\QuestListProgress;
 use App\Game\Engine\QuestListRunConfig;
 use App\Game\Engine\QuestListRunSummary;
 use App\Game\Engine\RunEndReason;
@@ -35,31 +36,18 @@ class RunQuestListJob extends RunJob
         Closure $onBattle,
     ): ParticipantOutcome {
         $config = QuestListRunConfig::fromArray($participant->run->config);
-        $startPosition = (int) ($participant->progress['position'] ?? 0);
-        // Runs from before list chaining stored only a position: list 0.
-        $startListIndex = (int) ($participant->progress['list_index'] ?? 0);
 
         $summary = QuestListRunner::forCharacter($character, $config)->run(
             log: $log,
             signal: $signal,
             onBattle: $onBattle,
             ensureBuffs: $ensureBuffs,
-            startPosition: $startPosition,
-            onQuestSettled: function (int $nextPosition, int $completed, int $skipped, int $listIndex) use ($participant): void {
-                $participant->update(['progress' => array_merge($participant->progress ?? [], [
-                    'list_index' => $listIndex,
-                    'position' => $nextPosition,
-                    'quests_completed' => $completed,
-                    'quests_skipped' => $skipped,
-                    // Settling an item clears the retry budget: it belongs to
-                    // the quest that was stuck, not to the list.
-                    'quest_retries' => 0,
-                ])]);
+            from: QuestListProgress::fromArray($participant->progress ?? []),
+            onProgress: function (QuestListProgress $progress) use ($participant): void {
+                $participant->update(['progress' => array_merge($participant->progress ?? [], $progress->toArray())]);
             },
             events: new RunEventRecorder($participant),
-            questRetries: (int) ($participant->progress['quest_retries'] ?? 0),
             runId: $participant->run_id,
-            startListIndex: $startListIndex,
         );
 
         return $this->outcomeForListEnd($summary, $config, $participant->run, $participant->progress ?? [], $character);
@@ -79,6 +67,10 @@ class RunQuestListJob extends RunJob
         array $progressIn,
         Character $character,
     ): ParticipantOutcome {
+        // The whole list state rides along on every outcome: cursor, pass,
+        // deferred quests and tallies, so a resume picks up exactly here.
+        $progress = $summary->progress->toArray();
+
         if ($summary->endReason === RunEndReason::CircumspectExpired
             || ($run->require_circumspect && in_array($summary->endReason, [
                 RunEndReason::RageExhausted,
@@ -86,8 +78,7 @@ class RunQuestListJob extends RunJob
             ], true))
         ) {
             return $this->waitForCircumspect($character, $summary->stopReason, [
-                'list_index' => $summary->nextListIndex,
-                'position' => $summary->nextPosition,
+                ...$progress,
                 'respawn_waits' => 0,
             ]);
         }
@@ -95,7 +86,7 @@ class RunQuestListJob extends RunJob
         // The worker is going away mid-list: hold the position on the
         // unsettled quest so the next worker re-enters it.
         if ($summary->endReason === RunEndReason::WorkerShutdown) {
-            return $this->waitForWorkerRestart(['list_index' => $summary->nextListIndex, 'position' => $summary->nextPosition]);
+            return $this->waitForWorkerRestart($progress);
         }
 
         // A blip rather than a verdict on the quest: park briefly on the same
@@ -108,12 +99,7 @@ class RunQuestListJob extends RunJob
                 RunStatus::Waiting,
                 rtrim($summary->stopReason, '.').". Retrying at {$resumeAt->format('Y-m-d H:i')}.",
                 $resumeAt,
-                [
-                    'list_index' => $summary->nextListIndex,
-                    'position' => $summary->nextPosition,
-                    'quest_retries' => $summary->questRetries,
-                    'respawn_waits' => 0,
-                ],
+                [...$progress, 'respawn_waits' => 0],
             );
         }
 
@@ -124,8 +110,7 @@ class RunQuestListJob extends RunJob
             $waits = $madeProgress ? 1 : (int) ($progressIn['respawn_waits'] ?? 0) + 1;
 
             return $this->waitForRespawn($summary->stopReason, $config->respawnWaitSeconds, [
-                'list_index' => $summary->nextListIndex,
-                'position' => $summary->nextPosition,
+                ...$progress,
                 'respawn_waits' => $waits,
             ]);
         }
@@ -138,8 +123,7 @@ class RunQuestListJob extends RunJob
             $madeProgress = $summary->kills > 0 || $summary->questsCompleted > 0;
 
             return $this->waitForRage($summary->stopReason, [
-                'list_index' => $summary->nextListIndex,
-                'position' => $summary->nextPosition,
+                ...$progress,
                 'rage_waits' => $this->rageWaits($progressIn, $madeProgress),
                 'respawn_waits' => 0,
             ]);
@@ -155,10 +139,6 @@ class RunQuestListJob extends RunJob
             default => RunStatus::Stopped,
         };
 
-        return new ParticipantOutcome($status, $summary->stopReason, progress: [
-            'list_index' => $summary->nextListIndex,
-            'position' => $summary->nextPosition,
-            'respawn_waits' => 0,
-        ]);
+        return new ParticipantOutcome($status, $summary->stopReason, progress: [...$progress, 'respawn_waits' => 0]);
     }
 }

@@ -28,6 +28,7 @@ class Navigator
         private readonly GameClient $client,
         private readonly RoomBlobParser $parser,
         private readonly RoomObservationRecorder $recorder,
+        private readonly GatedRooms $gates,
     ) {}
 
     public static function forCharacter(Character $character): self
@@ -37,6 +38,7 @@ class Navigator
             GameClient::forCharacter($character),
             app(RoomBlobParser::class),
             app(RoomObservationRecorder::class),
+            app(GatedRooms::class),
         );
     }
 
@@ -142,7 +144,17 @@ class Navigator
                 throw DesyncException::moveRejected($room, $blob->error);
             }
 
-            throw new GatedRoomException($room, $blob->error);
+            $gate = new GatedRoomException($room, $blob->error);
+
+            // Remembered for this character, so its next path goes around the
+            // gate instead of back to it, and for the world, as the mapper
+            // does. Room 0 is a reload, not a door.
+            if ($room > 0) {
+                $this->gates->remember($this->character, $gate);
+                $this->recorder->recordGated($room, $gate->reason, $this->character);
+            }
+
+            throw $gate;
         }
 
         $this->recorder->record($blob, $this->character);

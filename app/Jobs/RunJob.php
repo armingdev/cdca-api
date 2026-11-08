@@ -102,11 +102,14 @@ abstract class RunJob implements Interruptible, ShouldQueue
      */
     private const int WORKER_RESTART_RESUME_SECONDS = 60;
 
-    /** Network/Redis/database blips in a row tolerated before failing loudly. */
-    private const int MAX_TRANSIENT_FAILURES = 5;
-
-    /** How long a run parks after such a blip before trying again. */
-    private const int TRANSIENT_RETRY_SECONDS = 120;
+    /**
+     * Minutes a run parks after each network/game-server/Redis/database blip
+     * in a row, one entry per tolerated attempt: doubling from two minutes and
+     * capped at an hour, about three hours in all before it fails loudly. An
+     * Outwar outage (Cloudflare 521 for the whole site) outlasts the flat
+     * 5 × 2 minutes this replaced, which failed runs that would have resumed.
+     */
+    private const array TRANSIENT_BACKOFF_MINUTES = [2, 4, 8, 16, 32, 60, 60];
 
     /**
      * The pass ends itself this long before the job timeout and parks, so a
@@ -440,21 +443,22 @@ abstract class RunJob implements Interruptible, ShouldQueue
     }
 
     /**
-     * A blip that says nothing about the run (see TransientFailure): park
-     * briefly and let the resume scheduler try again. Bounded, like every
-     * park, so an outage that never ends still fails loudly.
+     * A blip that says nothing about the run (see TransientFailure): park and
+     * let the resume scheduler try again, waiting longer after each blip in a
+     * row. Bounded, like every park, so an outage that never ends still fails
+     * loudly.
      */
     private function recoverFromTransient(RunParticipant $participant, RunEventRecorder $recorder, Throwable $exception): void
     {
         $failures = (int) ($participant->progress['transient_failures'] ?? 0) + 1;
 
-        if ($failures > self::MAX_TRANSIENT_FAILURES) {
+        if ($failures > count(self::TRANSIENT_BACKOFF_MINUTES)) {
             $this->failParticipant($participant, $recorder, $exception);
 
             return;
         }
 
-        $resumeAt = now()->addSeconds(self::TRANSIENT_RETRY_SECONDS);
+        $resumeAt = now()->addMinutes(self::TRANSIENT_BACKOFF_MINUTES[$failures - 1]);
         $reason = Str::limit("Connection trouble — retrying at {$resumeAt->format('H:i')}: {$exception->getMessage()}", 250);
 
         $participant->transition(RunStatus::Waiting, $reason, $resumeAt, ['transient_failures' => $failures]);

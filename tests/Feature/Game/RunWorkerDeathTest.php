@@ -153,8 +153,40 @@ describe('a network failure during the run', function () {
             ->and($participant->run->fresh()->status)->not->toBe(RunStatus::Failed);
     });
 
-    it('fails the participant once the network has failed six times in a row', function () {
-        $participant = mobParticipant(RunStatus::Pending, ['progress' => ['transient_failures' => 5]]);
+    /**
+     * Cloudflare answers 502/521 for the whole site while Outwar is down — 25
+     * runs failed for good on it before it counted as transient.
+     */
+    it('parks the participant when the game server answers with a 5xx', function () {
+        $participant = mobParticipant();
+        Http::fake(fn () => Http::response('error code: 521', 521));
+
+        makeRunJob($participant)->handle(app(LoginService::class));
+
+        $participant->refresh();
+
+        expect($participant->status)->toBe(RunStatus::Waiting)
+            ->and($participant->last_activity)->toContain('HTTP 521')
+            ->and($participant->progress['transient_failures'])->toBe(1);
+    });
+
+    it('waits longer after each failure in a row', function (int $failuresSoFar, string $resumesAt) {
+        $this->travelTo('2026-11-07 12:00:00');
+        $participant = mobParticipant(RunStatus::Pending, ['progress' => ['transient_failures' => $failuresSoFar]]);
+        Http::fake(fn () => throw new ConnectionException('cURL error 28: Resolving timed out'));
+
+        makeRunJob($participant)->handle(app(LoginService::class));
+
+        expect($participant->fresh()->status)->toBe(RunStatus::Waiting)
+            ->and($participant->fresh()->resume_at->toDateTimeString())->toBe($resumesAt);
+    })->with([
+        'first blip' => [0, '2026-11-07 12:02:00'],
+        'fourth in a row' => [3, '2026-11-07 12:16:00'],
+        'seventh in a row, capped at an hour' => [6, '2026-11-07 13:00:00'],
+    ]);
+
+    it('fails the participant once the network has failed eight times in a row', function () {
+        $participant = mobParticipant(RunStatus::Pending, ['progress' => ['transient_failures' => 7]]);
         Http::fake(fn () => throw new ConnectionException('cURL error 28: Resolving timed out'));
 
         makeRunJob($participant)->handle(app(LoginService::class));

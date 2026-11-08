@@ -4,6 +4,7 @@ use App\Game\Enums\RunSignal;
 use App\Game\Exceptions\DesyncException;
 use App\Game\Exceptions\GatedRoomException;
 use App\Game\Exceptions\RunInterruptedException;
+use App\Game\World\GatedRooms;
 use App\Game\World\Navigator;
 use App\Models\Character;
 use App\Models\Rga;
@@ -67,6 +68,35 @@ it('throws a gated-room exception when entry is refused', function () {
 
     Navigator::forCharacter($character)->stepTo(999, 998);
 })->throws(GatedRoomException::class, 'torch');
+
+/**
+ * The refusal as prod recorded it 2026-11-07, navigation links and all — 34
+ * quests in a row walked back to room 42622 to read it again.
+ */
+it('remembers a gate for the character and the world, keeping only the readable reason', function () {
+    $character = Character::factory()->for(Rga::factory()->withSession())->create();
+
+    Http::fake([
+        '*ajax_changeroomb.php*' => Http::response(json_encode([
+            'error' => 'To enter this room you must be carrying Triworld Teleporter. <p>Head <a href="/world.php?room=42621">back to last room</a><p>Or click here to <a href="world.php?teleport=1">teleport to your home bar</a>.',
+        ])),
+    ]);
+
+    try {
+        Navigator::forCharacter($character)->stepTo(42622, 42621);
+        $this->fail('Expected GatedRoomException was not thrown.');
+    } catch (GatedRoomException $exception) {
+        expect($exception->getMessage())->toBe('Entry to room 42622 refused: To enter this room you must be carrying Triworld Teleporter.')
+            ->and($exception->requiredItem())->toBe('Triworld Teleporter');
+    }
+
+    expect(app(GatedRooms::class)->for($character))->toBe([42622 => 'Triworld Teleporter']);
+    $this->assertDatabaseHas('rooms', [
+        'id' => 42622,
+        'is_gated' => true,
+        'gate_reason' => 'To enter this room you must be carrying Triworld Teleporter.',
+    ]);
+});
 
 it('resets to the start room via world?room=1', function () {
     $character = Character::factory()->for(Rga::factory()->withSession())->create();

@@ -2,6 +2,7 @@
 
 namespace App\Game\Http;
 
+use App\Game\Exceptions\GameServerException;
 use App\Game\Exceptions\SessionCollisionException;
 use App\Models\Character;
 use App\Models\Rga;
@@ -9,10 +10,12 @@ use GuzzleHttp\Cookie\CookieJar;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Sleep;
+use Illuminate\Support\Str;
 use Throwable;
 
 /**
@@ -101,17 +104,29 @@ class GameClient
     }
 
     /**
+     * A 5xx becomes a GameServerException — transient, and not a GameException,
+     * so no engine site mistakes an outage for a dead end. A 4xx still throws
+     * the framework's RequestException, as it always has.
+     *
      * @param  array<string, mixed>  $options
+     *
+     * @throws GameServerException
+     * @throws RequestException
      */
     private function send(string $method, string $path, array $options): Response
     {
         $this->throttle();
 
-        $response = $this->pendingRequest()->send($method, ltrim($path, '/'), $options);
+        $path = ltrim($path, '/');
+        $response = $this->pendingRequest()->send($method, $path, $options);
 
         $this->guard($response);
 
-        return $response;
+        if ($response->serverError()) {
+            throw new GameServerException($response, Str::before($path, '?'));
+        }
+
+        return $response->throwIfClientError();
     }
 
     private function pendingRequest(): PendingRequest
@@ -121,10 +136,15 @@ class GameClient
             ->withUserAgent(config('outwar.http.user_agent'))
             ->timeout((int) config('outwar.http.timeout'))
             ->connectTimeout((int) config('outwar.http.connect_timeout'))
+            // Retries cover connection failures only — an attack or a turn-in
+            // that reached the game must never be sent twice. throw: false
+            // hands send() the error response to classify, instead of a bare
+            // RequestException that every engine site would treat as fatal.
             ->retry(
                 (int) config('outwar.http.retry_times'),
                 (int) config('outwar.http.retry_sleep_ms'),
                 fn (?Throwable $exception): bool => $exception instanceof ConnectionException,
+                throw: false,
             )
             ->withOptions([
                 'allow_redirects' => false,
@@ -216,7 +236,8 @@ class GameClient
      * A 3xx whose Location points at the login page. Note a dead session also
      * makes some ajax endpoints answer 500 with an empty body — deliberately
      * NOT treated as booted, because a genuine server blip is indistinguishable
-     * and invalidating on it would trigger pointless re-login storms.
+     * and invalidating on it would trigger pointless re-login storms. It
+     * surfaces as a GameServerException instead, which parks and retries.
      */
     private function isLoginRedirect(Response $response): bool
     {

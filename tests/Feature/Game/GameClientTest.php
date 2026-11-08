@@ -1,5 +1,6 @@
 <?php
 
+use App\Game\Exceptions\GameServerException;
 use App\Game\Exceptions\SessionCollisionException;
 use App\Game\Http\GameClient;
 use App\Models\Character;
@@ -88,7 +89,7 @@ it('detects a full page bouncing to the login screen', function () {
 
 /**
  * A dead session also makes ajax endpoints answer 500 with an empty body, but
- * a server blip looks identical — so a 5xx surfaces as a plain request failure
+ * a server blip looks identical — so a 5xx surfaces as a game server error
  * and must NOT invalidate the RGA, or a blip would trigger a re-login storm.
  */
 it('leaves the rga alone on a 5xx, which a server blip and a dead session share', function () {
@@ -97,8 +98,58 @@ it('leaves the rga alone on a 5xx, which a server blip and a dead session share'
     Http::fake(['outwar.com/*' => Http::response('', 500)]);
 
     expect(fn () => GameClient::forRga($rga)->get('ajax/trusteeList.php', ['dropdown' => 1]))
-        ->toThrow(RequestException::class)
+        ->toThrow(GameServerException::class)
         ->and($rga->fresh()->status)->not->toBe(Rga::STATUS_INVALID);
+});
+
+it('raises a readable game server error for a 5xx, keeping the game alert apart from an outage', function (string $body, int $status, string $message, ?string $alert) {
+    $character = Character::factory()->for(Rga::factory()->withSession())->create();
+
+    Http::fake(['sigil.outwar.com/*' => Http::response($body, $status)]);
+
+    try {
+        GameClient::forCharacter($character)->get('somethingelse.php', ['attackid' => 'ENC']);
+    } catch (GameServerException $exception) {
+        expect($exception->getMessage())->toBe($message)
+            ->and($exception->gameAlert())->toBe($alert);
+
+        return;
+    }
+
+    $this->fail('Expected GameServerException was not thrown.');
+})->with([
+    'the game refusing a vanished mob' => [
+        gameFixture('attack_invalid_mob_500.html'), 500,
+        'Game server answered HTTP 500 for somethingelse.php: Invalid mob!', 'Invalid mob!',
+    ],
+    'cloudflare with the origin down' => [
+        'error code: 521', 521,
+        'Game server answered HTTP 521 for somethingelse.php: error code: 521', null,
+    ],
+    'an html bad gateway page' => [
+        '<html><head><style>body{color:red}</style><title>502 Bad Gateway</title></head><body><h1>502 Bad Gateway</h1></body></html>', 502,
+        'Game server answered HTTP 502 for somethingelse.php: 502 Bad Gateway 502 Bad Gateway', null,
+    ],
+]);
+
+it('sends a request that hit a 5xx only once, so an attack is never repeated', function () {
+    $character = Character::factory()->for(Rga::factory()->withSession())->create();
+
+    Http::fake(['sigil.outwar.com/*' => Http::response('error code: 502', 502)]);
+
+    expect(fn () => GameClient::forCharacter($character)->get('somethingelse.php', ['attackid' => 'ENC']))
+        ->toThrow(GameServerException::class);
+
+    Http::assertSentCount(1);
+});
+
+it('still raises a request exception for a 4xx', function () {
+    $character = Character::factory()->for(Rga::factory()->withSession())->create();
+
+    Http::fake(['sigil.outwar.com/*' => Http::response('Not Found', 404)]);
+
+    expect(fn () => GameClient::forCharacter($character)->get('no_such_page.php'))
+        ->toThrow(RequestException::class);
 });
 
 it('does not mistake a normal attack redirect for a login bounce', function () {

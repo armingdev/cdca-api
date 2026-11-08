@@ -88,10 +88,15 @@ class RoomGraph
      * predicate is also offered rooms whose exits we don't know yet, so it
      * can target the frontier itself.
      *
+     * Rooms in $avoid are never entered — neither crossed nor accepted as the
+     * destination. That is how a character's known gates (GatedRooms) stay off
+     * its paths without touching the graph, which other runners share.
+     *
      * @param  Closure(int): bool  $predicate
+     * @param  array<int, mixed>  $avoid  keyed by room id
      * @return list<int>|null
      */
-    public function pathToNearest(int $from, Closure $predicate): ?array
+    public function pathToNearest(int $from, Closure $predicate, array $avoid = []): ?array
     {
         if ($predicate($from)) {
             return [$from];
@@ -105,7 +110,7 @@ class RoomGraph
             $current = $queue->dequeue();
 
             foreach ($this->adjacency[$current] ?? [] as $neighbor) {
-                if (isset($parents[$neighbor])) {
+                if (isset($parents[$neighbor]) || isset($avoid[$neighbor])) {
                     continue;
                 }
 
