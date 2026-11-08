@@ -171,6 +171,17 @@ it('skips a synced untrained skill without a request', function () {
         ->count())->toBe(0);
 });
 
+it('skips a misc skill the character has not acquired, saying so rather than untrained', function () {
+    fakeSkillWorld();
+    $dailyGrind = Skill::create(['id' => 2996, 'name' => 'Daily Grind', 'school' => 'misc', 'rage_cost' => 15]);
+    selectSkill($this->character, $dailyGrind, ['trained_level' => 0, 'synced_at' => now()]);
+
+    $result = BuffEnsurer::forCharacter($this->character)->ensure();
+
+    expect($result->skipped)->toHaveCount(1)
+        ->and($result->skipped[0]['reason'])->toBe(BuffEnsureResult::REASON_NOT_ACQUIRED);
+});
+
 it('costs nothing to call again while every buff is healthy', function () {
     fakeSkillWorld();
 

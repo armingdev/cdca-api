@@ -7,7 +7,9 @@ use App\Game\Exceptions\GatedRoomException;
 use App\Game\World\GatedRooms;
 use App\Models\Character;
 use App\Models\Rga;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Sleep;
 
 beforeEach(function () {
     config(['outwar.http.throttle_min_ms' => 0, 'outwar.http.throttle_max_ms' => 0]);
@@ -61,4 +63,55 @@ it('keeps off a room the game has turned the character away from', function () {
 
     expect($summary->wins)->toBe(0);
     Http::assertNotSent(fn ($request) => str_contains($request->url(), 'ajax_changeroomb.php') && $request['room'] === '2');
+});
+
+/**
+ * 100+ of our characters on one list used to pick the same spawn; one killed
+ * it and the rest got "Invalid mob!". A spawn is claimed for the length of one
+ * attack, keyed by its spawnId (Kix Harvester's is 1234, in room 2).
+ */
+describe('mobs our other characters are fighting', function () {
+    it('holds a claim on the mob while attacking it and lets go after', function () {
+        $character = Character::factory()->for(Rga::factory()->withSession())->create();
+        $claimKey = "mob-claim:{$character->server_id}:2:1234";
+        $claimedDuringAttack = null;
+        fakeCombatWorld(attack: function () use ($claimKey, &$claimedDuringAttack) {
+            $probe = Cache::lock($claimKey, 15);
+            $claimedDuringAttack = ! $probe->get();
+            $probe->release();
+
+            return Http::response('', 302, ['Location' => 'https://sigil.outwar.com/attack/555/']);
+        });
+
+        $summary = MobRunner::forCharacter($character, new MobRunConfig(mobNames: ['Kix Harvester'], maxKills: 1))->run();
+
+        expect($summary->wins)->toBe(1)
+            ->and($claimedDuringAttack)->toBeTrue()
+            ->and(Cache::lock($claimKey, 15)->get())->toBeTrue();
+    });
+
+    it('waits for another of our characters to finish a mob, then takes its turn', function () {
+        Sleep::fake(syncWithCarbon: true);
+        fakeCombatWorld();
+        $character = Character::factory()->for(Rga::factory()->withSession())->create();
+        Cache::lock("mob-claim:{$character->server_id}:2:1234", 5)->get();
+
+        $summary = MobRunner::forCharacter($character, new MobRunConfig(mobNames: ['Kix Harvester'], maxKills: 1))->run();
+
+        expect($summary->wins)->toBe(1);
+        Sleep::assertSleptTimes(2);
+    });
+
+    it('leaves a room whose mobs our other characters keep claimed', function () {
+        Sleep::fake(syncWithCarbon: true);
+        fakeCombatWorld();
+        $character = Character::factory()->for(Rga::factory()->withSession())->create();
+        Cache::lock("mob-claim:{$character->server_id}:2:1234", 600)->get();
+
+        $summary = MobRunner::forCharacter($character, new MobRunConfig(mobNames: ['Kix Harvester'], maxKills: 1))->run();
+
+        expect($summary->wins)->toBe(0);
+        Sleep::assertSleptTimes(5);
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), 'somethingelse.php'));
+    });
 });

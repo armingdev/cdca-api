@@ -316,6 +316,19 @@ level-90 giver, skip each one, and call the list complete. Now:
   from is skipped without walking there: "Quest-giver 'Trelon' is past gated
   room 42622 (Triworld Teleporter)."
 
+## 3d. Fleet contention and Misc skills (stability work — API done)
+
+- Characters of the same fleet no longer attack the same mob at once. When
+  they would, one waits: `last_activity` reads "The targets here are being
+  fought by our other characters — waiting 3s for a turn (1/5)." Nothing to
+  build; it shows in the activity line.
+- A Misc skill (Daily Grind, Triworld Influence, Shield Wall, God Slayer…)
+  selected for a run but not owned by a character is now skipped instead of
+  being tried and refused every day. In `skill_cast` events its skip reason
+  is the new `not_acquired` (Misc skills are acquired, never trained).
+  Suggested label: "not acquired". In the skill picker, consider a hint on
+  Misc skills: "Only cast by characters that own it."
+
 ---
 
 ## 4. Type changes checklist (`core/models`)
@@ -345,5 +358,6 @@ level-90 giver, skip each one, and call the list complete. Now:
     `skipped_by_reason?: Record<string, number>`, `pass?: number`,
     `retrying?: number[] | null`.
 - New `potion.ts` — `Potion { id; game_item_id; name; image: string | null; level; player_bound; description; kind: 'buff' | 'rage' | 'other'; duration_minutes: number | null; rage_amount: number | null }`, `CharacterPotion { potion_id; potion?: Potion; quantity; active; active_until; active_synced_at; last_activated_at; refused_until; synced_at }`, `PotionActivationResult { outcome: 'activated' | 'already_active' | 'out_of_stock' | 'refused'; message; data: CharacterPotion | null }`.
-- `run-event.ts` — `RunEventType` += `'potion_used' | 'potion_skipped' | 'quest_deferred'`.
+- `run-event.ts` — `RunEventType` += `'potion_used' | 'potion_skipped' | 'quest_deferred'`;
+  skill skip reason union += `'not_acquired'`.
 - `world.ts` — mob search item += `spawnable: boolean`.

@@ -3,6 +3,7 @@
 namespace App\Game\Engine;
 
 use App\Game\Combat\AttackService;
+use App\Game\Combat\MobClaims;
 use App\Game\Combat\StatsService;
 use App\Game\Data\MobSighting;
 use App\Game\Data\RoomBlob;
@@ -23,6 +24,7 @@ use App\Models\BattleEvent;
 use App\Models\Character;
 use App\Models\Mob;
 use Closure;
+use Illuminate\Support\Sleep;
 
 /**
  * The mob-mode loop for one character: pathfind to the target mobs' rooms,
@@ -47,6 +49,16 @@ class MobRunner
      * refusal dropped the only target of a quest and skipped the quest.
      */
     private const int MAX_CONSECUTIVE_VANISHED_TARGETS = 10;
+
+    /**
+     * When every live target in a room is claimed by another of our characters
+     * (MobClaims), wait this long, up to MAX_CONTESTED_WAITS times, for it to
+     * finish before treating the room as cleared. Leaving at once would read a
+     * room full of mobs as "nothing alive" and park or skip a quest over it.
+     */
+    private const int CONTESTED_WAIT_SECONDS = 3;
+
+    private const int MAX_CONTESTED_WAITS = 5;
 
     /**
      * Room-mate attacks per spawn room per pass before giving up on the spawn
@@ -87,6 +99,12 @@ class MobRunner
     /** @var array<string, int> mob name => consecutive attacks this pass that found it already gone */
     private array $vanishedTargets = [];
 
+    /** Whether the last liveTarget() passed over live targets only because others had claimed them. */
+    private bool $targetsClaimedByOthers = false;
+
+    /** @var array<int, int> room id => waits spent on its claimed targets since we last got one there */
+    private array $contestedWaits = [];
+
     /** @var array<string, true> mob names whose attacks keep failing — skipped for this pass */
     private array $unattackable = [];
 
@@ -104,6 +122,7 @@ class MobRunner
 
     /**
      * @param  array<int, string>  $gatedRooms  rooms the game turned this character away from (GatedRooms), kept off every path
+     * @param  MobClaims|null  $claims  keeps our own characters off each other's mobs; null attacks unclaimed
      */
     public function __construct(
         private readonly MobRunConfig $config,
@@ -114,6 +133,7 @@ class MobRunner
         private readonly ?GearManager $gearManager = null,
         private readonly ?TeleportService $teleports = null,
         private readonly array $gatedRooms = [],
+        private readonly ?MobClaims $claims = null,
     ) {}
 
     public static function forCharacter(Character $character, MobRunConfig $config): self
@@ -127,6 +147,7 @@ class MobRunner
             GearManager::forCharacter($character),
             TeleportService::forCharacter($character),
             app(GatedRooms::class)->for($character),
+            MobClaims::forCharacter($character),
         );
     }
 
@@ -160,6 +181,7 @@ class MobRunner
             return $this->signalSummary($interrupt->signal)
                 ?? $this->summary('Worker restarting.', RunEndReason::WorkerShutdown);
         } finally {
+            $this->claims?->release();
             $this->dropJunk($log);
         }
     }
@@ -245,6 +267,30 @@ class MobRunner
 
             $sighting = $this->liveTarget($blob);
 
+            if ($sighting === null && $this->targetsClaimedByOthers) {
+                $waits = $this->contestedWaits[$blob->curRoom] ?? 0;
+
+                if ($waits < self::MAX_CONTESTED_WAITS) {
+                    $this->contestedWaits[$blob->curRoom] = $waits + 1;
+                    $log(sprintf(
+                        'The targets here are being fought by our other characters — waiting %ds for a turn (%d/%d).',
+                        self::CONTESTED_WAIT_SECONDS,
+                        $waits + 1,
+                        self::MAX_CONTESTED_WAITS,
+                    ));
+                    Sleep::for(self::CONTESTED_WAIT_SECONDS)->seconds();
+                    $blob = $this->navigator->loadCurrentRoom();
+
+                    continue;
+                }
+
+                // Waited enough: leave this room to them, as if cleared.
+            }
+
+            if ($sighting !== null) {
+                unset($this->contestedWaits[$blob->curRoom]);
+            }
+
             if ($sighting !== null && ! $this->canAfford($sighting, $current)) {
                 $current = $this->recoverRageFor($sighting, $current, $log);
 
@@ -271,6 +317,7 @@ class MobRunner
                 $ensureBuffs?->__invoke();
 
                 $event = $this->attacker->attack($sighting);
+                $this->claims?->release();
                 $this->tally($event, $sighting, $log);
                 $onBattle?->__invoke($event);
 
@@ -413,6 +460,7 @@ class MobRunner
         $ensureBuffs?->__invoke();
 
         $event = $this->attacker->attack($trigger);
+        $this->claims?->release();
         $this->triggerAttacks[$room] = $attacks + 1;
         $onBattle?->__invoke($event);
 
@@ -466,7 +514,8 @@ class MobRunner
                 || isset($this->outmatched[$sighting->name])
                 || ! $this->canAfford($sighting, $current))
             ->sortBy([['rageCost', 'asc'], ['level', 'asc']])
-            ->first();
+            // The cheapest room-mate nobody else of ours is already beating.
+            ->first(fn (MobSighting $sighting): bool => $this->claim($sighting, $blob->curRoom));
     }
 
     /**
@@ -486,23 +535,39 @@ class MobRunner
         return false;
     }
 
+    /**
+     * The first live, attackable target in the room that this character can
+     * claim. Targets passed over only because our other characters hold them
+     * set $targetsClaimedByOthers, so the caller waits instead of reading the
+     * room as cleared.
+     */
     private function liveTarget(RoomBlob $blob): ?MobSighting
     {
+        $this->targetsClaimedByOthers = false;
+
         foreach ($blob->mobs as $sighting) {
             if ($sighting->isDead
                 || isset($this->outmatched[$sighting->name])
                 || isset($this->unattackable[$sighting->name])
                 || isset($this->unaffordable[$sighting->name])
+                || ! in_array($sighting->name, $this->config->mobNames, true)
             ) {
                 continue;
             }
 
-            if (in_array($sighting->name, $this->config->mobNames, true)) {
+            if ($this->claim($sighting, $blob->curRoom)) {
                 return $sighting;
             }
+
+            $this->targetsClaimedByOthers = true;
         }
 
         return null;
+    }
+
+    private function claim(MobSighting $sighting, int $roomId): bool
+    {
+        return $this->claims === null || $this->claims->claim($sighting, $roomId);
     }
 
     /**

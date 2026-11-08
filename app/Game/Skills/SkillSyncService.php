@@ -3,6 +3,7 @@
 namespace App\Game\Skills;
 
 use App\Game\Data\SkillInfo;
+use App\Game\Data\SkillRow;
 use App\Game\Data\SkillsPage;
 use App\Game\Data\SkillSyncResult;
 use App\Game\Data\TrainResult;
@@ -292,7 +293,34 @@ class SkillSyncService
             $synced++;
         }
 
+        if ($school === SkillSchool::Misc) {
+            $this->recordUnacquiredMisc($page);
+        }
+
         return [$synced, $discovered, $unreadable];
+    }
+
+    /**
+     * The Misc tab lists only the skills this character has acquired, so a
+     * Misc skill missing from it is one the character does not own. Recording
+     * that read — synced, level 0 — is what lets the caster skip it. Left
+     * unsynced, a Misc skill selected for a run was cast, refused and retried
+     * every day: 278 refusals across 16 such rows in prod by Nov 2026, Daily
+     * Grind and Triworld Influence above all. The refusal backoff is cleared
+     * too, so a skill acquired later is cast straight away.
+     */
+    private function recordUnacquiredMisc(SkillsPage $page): void
+    {
+        $this->character->skills()
+            ->whereIn('skill_id', Skill::where('school', SkillSchool::Misc)->select('id'))
+            ->whereNotIn('skill_id', array_map(fn (SkillRow $row): int => $row->id, $page->rows))
+            ->update([
+                'trained_level' => 0,
+                'bonus_level' => 0,
+                'synced_at' => now(),
+                'cast_refusals' => 0,
+                'cast_refused_until' => null,
+            ]);
     }
 
     /**
